@@ -1,0 +1,32 @@
+# Plannit
+
+A native iOS social calendar that syncs with your phone's calendar, lets you share the right events with the right people, and — the part no competitor has nailed — **automatically finds a date that works for everyone** from a plain-language constraint like "a weekend afternoon."
+
+## The three pillars
+
+1. **Two-way sync** — the device (Apple) calendar is a first-class citizen. Events flow both directions and reconcile whenever either side changes.
+2. **Per-group visibility** — one personal calendar; reveal specific events to specific groups (share with Soccer, hide from Family). Enforced in the database, not on client trust.
+3. **Automated group date-finding (the wedge)** — create a group, give a constraint ("weekend afternoon"), and Plannit proposes a slot when everyone is free.
+
+## The strategic bet
+
+The shared-calendar market is crowded and **Howbout owns it** (4.8★, 75k+ reviews, free). A shared calendar alone walks straight into that wall. **No one auto-solves natural constraints** — that gap is Plannit's wedge, and it shapes the architecture from day one even though it ships last.
+
+## Recommended stack
+
+| Layer | Choice |
+|---|---|
+| Client | Swift + SwiftUI (iOS 17+), EventKit, GRDB, Sign in with Apple, APNs |
+| Backend | Supabase — Postgres + Auth + Realtime + Edge Functions + Row-Level Security |
+| Scheduler | Sweep-line / interval-overlap in a TypeScript Edge Function |
+
+## Documentation
+
+- [`docs/market-research.md`](docs/market-research.md) — competitive landscape, what to borrow, what to avoid
+- [`docs/technical-proposal.md`](docs/technical-proposal.md) — architecture, sync engine, data model, scheduler, phasing
+- [`docs/cost-analysis.md`](docs/cost-analysis.md) — infra cost model, prototype & beta totals
+- [`docs/decisions.md`](docs/decisions.md) — the decision log (D-01 … D-15) with recommendations and status
+
+## Status
+
+Pre-development. Repo initialized 2026-08-13 with research and planning docs.
