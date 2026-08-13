@@ -1,0 +1,41 @@
+# Supabase local development config.
+# Docs: https://supabase.com/docs/guides/cli/config
+project_id = "plannit"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# Deep link back into the iOS app after auth.
+site_url = "plannit://auth-callback"
+additional_redirect_urls = ["plannit://auth-callback"]
+jwt_expiry = 3600
+enable_signup = true
+
+# Sign in with Apple — the primary auth method for Plannit (see docs/decisions.md D-03).
+# Secrets are provided via env, never committed.
+[auth.external.apple]
+enabled = true
+client_id = "env(APPLE_CLIENT_ID)"
+secret = "env(APPLE_SECRET)"
+
+[functions.find-slots]
+verify_jwt = true

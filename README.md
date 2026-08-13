@@ -20,13 +20,28 @@ The shared-calendar market is crowded and **Howbout owns it** (4.8★, 75k+ revi
 | Backend | Supabase — Postgres + Auth + Realtime + Edge Functions + Row-Level Security |
 | Scheduler | Sweep-line / interval-overlap in a TypeScript Edge Function |
 
+## Repository layout
+
+```
+Plannit/
+├─ docs/            # research, proposal, cost analysis, decisions, API contract
+└─ supabase/        # the backend — schema, RLS, and the scheduler Edge Function
+```
+
+Frontend/iOS is being built on a separate track against the published
+[API contract](docs/backend/api-contract.md).
+
 ## Documentation
 
 - [`docs/market-research.md`](docs/market-research.md) — competitive landscape, what to borrow, what to avoid
 - [`docs/technical-proposal.md`](docs/technical-proposal.md) — architecture, sync engine, data model, scheduler, phasing
 - [`docs/cost-analysis.md`](docs/cost-analysis.md) — infra cost model, prototype & beta totals
-- [`docs/decisions.md`](docs/decisions.md) — the decision log (D-01 … D-15) with recommendations and status
+- [`docs/decisions.md`](docs/decisions.md) — the decision log (D-01 … D-15), all Accepted
+- [`docs/backend/api-contract.md`](docs/backend/api-contract.md) — **stable interface for the frontend track**
+- [`supabase/README.md`](supabase/README.md) — backend setup, local dev, security model
 
 ## Status
 
-Pre-development. Repo initialized 2026-08-13 with research and planning docs.
+Backend scaffolded (2026-08-13): full Postgres schema + RLS, and the scheduler
+(the wedge) implemented and validated. Next: wire APNs push and stand up a
+Supabase project. Frontend/iOS proceeds in parallel against the API contract.
