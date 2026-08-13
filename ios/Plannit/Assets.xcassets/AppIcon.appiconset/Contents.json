@@ -1,0 +1,14 @@
+{
+  "images": [
+    {
+      "filename": "PlannitAppIcon-1024.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    }
+  ],
+  "info": {
+    "author": "plannit-design-system",
+    "version": 1
+  }
+}

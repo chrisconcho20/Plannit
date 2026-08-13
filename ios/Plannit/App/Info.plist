@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Plannit</string>
+    <key>CFBundleDisplayName</key>
+    <string>Plannit</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <!-- iOS 17 EventKit permission strings (see docs/backend/sync-contract.md) -->
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Plannit reads your events to find times your groups are free. Event details stay on your device — only free/busy is shared.</string>
+    <key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+    <string>Plannit adds the plans you make into your calendar.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Plannit syncs with your calendar to find times your groups are free.</string>
+
+    <!-- Deep link for Sign in with Apple / auth callback -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.plannit.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>plannit</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
