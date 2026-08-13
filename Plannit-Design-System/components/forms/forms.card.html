@@ -1,0 +1,42 @@
+<!-- @dsCard group="Components" viewport="700x480" name="Forms" subtitle="Input · Select · DayOfWeekPicker · Checkbox · Radio · Switch · SegmentedControl" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script>window.PLANNIT_ICON_BASE='../../assets/icons'</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--bg-app)}.wrap{display:flex;flex-direction:column;gap:14px}.rowx{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lbl{font:var(--type-caption);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}@keyframes plannit-fade{from{opacity:0}to{opacity:1}}@keyframes plannit-sheet{from{transform:translateY(100%)}to{transform:none}}@keyframes plannit-toast{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const {Input,Select,Checkbox,Radio,Switch,SegmentedControl,DayOfWeekPicker,Card}=window.PlannitDesignSystem_ede968;
+function Demo(){
+  const [view,setView]=React.useState('Month');
+  const [on,setOn]=React.useState(true);
+  const [pick,setPick]=React.useState('vote');
+  const [days,setDays]=React.useState(true);
+  const [eve,setEve]=React.useState(false);
+  const [days2,setDays2]=React.useState([0,6]);
+  return (<div className="wrap">
+    <SegmentedControl options={['Month','Week','List']} value={view} onChange={setView}/>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+      <Input label="Event title" icon="calendar-plus" placeholder="Five-a-side at the pitch"/>
+      <Select label="How long?" options={['1 hour','2 hours','Half a day']}/>
+      <Input label="When should it be?" placeholder="a weekend afternoon" icon="wand-sparkles" hint="Plain language is fine."/>
+      <Input label="Group name" value="Soccer" error="A group called Soccer already exists" onChange={()=>{}}/>
+    </div>
+    <div><div className="lbl">Which days work? — all on by default, tap to rule a day out</div><DayOfWeekPicker value={days2} onChange={setDays2}/></div>
+    <Input label="Notes" multiline rows={2} placeholder="Bring bibs. Pitch 3 if it rains."/>
+    <Card pad={14}>
+      <Checkbox checked={days} onChange={()=>setDays(!days)} label="Weekends only" sublabel="Sat & Sun, any time after noon"/>
+      <Checkbox checked={eve} onChange={()=>setEve(!eve)} label="Weekday evenings"/>
+      <div style={{height:1,background:'var(--line-hairline)',margin:'8px 0'}}/>
+      <Radio checked={pick==='vote'} onChange={()=>setPick('vote')} label="Propose then vote" sublabel="The group picks from the top three slots"/>
+      <Radio checked={pick==='auto'} onChange={()=>setPick('auto')} label="Auto-lock the best slot"/>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginTop:6}}>
+        <span style={{flex:1,font:'var(--type-body)',color:'var(--text-strong)'}}>Two-way calendar sync</span>
+        <Switch checked={on} onChange={setOn}/><Switch checked={false}/><Switch checked disabled/>
+      </div>
+    </Card>
+  </div>);}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script></body></html>

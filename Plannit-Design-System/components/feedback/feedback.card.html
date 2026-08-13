@@ -1,0 +1,82 @@
+<!-- @dsCard group="Components" viewport="700x470" name="Feedback" subtitle="Sheet (find-a-date flow) · Toast · Tooltip · EmptyState · ProgressDots" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script>window.PLANNIT_ICON_BASE='../../assets/icons'</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--bg-app)}.wrap{display:flex;flex-direction:column;gap:14px}.rowx{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lbl{font:var(--type-caption);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}@keyframes plannit-fade{from{opacity:0}to{opacity:1}}@keyframes plannit-sheet{from{transform:translateY(100%)}to{transform:none}}@keyframes plannit-toast{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const {Sheet,Toast,Tooltip,EmptyState,ProgressDots,Button,Card,Icon,Input,Tag,DayOfWeekPicker,ListRow,Checkbox,Select}=window.PlannitDesignSystem_ede968;
+const SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function FindADate(){
+  const [group,setGroup]=React.useState('soccer');
+  const [days,setDays]=React.useState([0,1,2,3,4,5,6]);
+  const [times,setTimes]=React.useState(['Afternoon']);
+  const [more,setMore]=React.useState(false);
+  const groups=[{id:'soccer',name:'Soccer',hue:'var(--hue-teal)',soft:'var(--hue-teal-soft)'},
+    {id:'family',name:'Family',hue:'var(--hue-amber)',soft:'var(--hue-amber-soft)'},
+    {id:'work',name:'Work',hue:'var(--hue-sky)',soft:'var(--hue-sky-soft)'}];
+  const toggleTime=t=>setTimes(s=>s.includes(t)?s.filter(x=>x!==t):[...s,t]);
+  const dayText=days.length===7?'Any day':days.length===0?'Pick at least one day':days.map(d=>SHORT[d]).join(', ');
+  const timeText=times.length?times.join(' or ').toLowerCase():'any time';
+  return (
+    <Sheet open title="Find a date" onClose={()=>{}}
+      footer={<Button variant="primary" size="lg" fullWidth icon="wand-sparkles" disabled={!days.length}>Find a date</Button>}>
+      <div className="lbl">Who’s it with?</div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:18}}>
+        {groups.map(g=><Tag key={g.id} hue={g.hue} soft={g.soft} selected={group===g.id} onClick={()=>setGroup(g.id)}>{g.name}</Tag>)}
+        <Tag hue="var(--text-muted)" icon="plus" onClick={()=>{}}>New group</Tag>
+      </div>
+      <div className="lbl">Which days work?</div>
+      <DayOfWeekPicker value={days} onChange={setDays}/>
+      <div style={{font:'var(--type-footnote)',color:'var(--text-muted)',margin:'8px 0 16px'}}>
+        {dayText} · {timeText} · next 3 weeks
+      </div>
+      <Card pad={0}>
+        <ListRow icon={more?'chevron-down':'chevron-right'} title="More details"
+          subtitle={more?null:'Time of day, how long, who has to make it'} onClick={()=>setMore(!more)} last/>
+        {more?<div style={{padding:'0 16px 16px'}}>
+          <div className="lbl">Time of day</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+            {['Morning','Afternoon','Evening'].map(t=>
+              <Tag key={t} hue="var(--action-primary)" selected={times.includes(t)} onClick={()=>toggleTime(t)}>{t}</Tag>)}
+          </div>
+          <Select label="How long?" options={['1 hour','2 hours','Half a day','All day']} style={{marginBottom:12}}/>
+          <Select label="Look how far ahead?" options={['Next 3 weeks','Next month','Next 3 months']} style={{marginBottom:6}}/>
+          <Checkbox checked onChange={()=>{}} label="It’s fine if one person can’t make it" sublabel="We’ll accept 5 of 6 free"/>
+        </div>:null}
+      </Card>
+    </Sheet>
+  );
+}
+
+function Demo(){return (<div className="wrap">
+  <div style={{display:'grid',gridTemplateColumns:'320px 1fr',gap:14,alignItems:'start'}}>
+    <div style={{position:'relative',height:436,borderRadius:'var(--r-lg)',overflow:'hidden',boxShadow:'var(--shadow-1)',background:'var(--bg-sunk)'}}>
+      <FindADate/>
+    </div>
+    <div className="wrap">
+      <div><div className="lbl">Toast</div>
+        <div className="wrap" style={{gap:8}}>
+          <Toast tone="free" icon="circle-check" action="Undo">Saturday 2pm is on everyone’s calendar</Toast>
+          <Toast icon="repeat">Synced with your iPhone calendar</Toast>
+          <Toast tone="danger" icon="info">Couldn’t reach the group. Try again?</Toast>
+        </div>
+      </div>
+      <div><div className="lbl">Tooltip · ProgressDots</div>
+        <div className="rowx">
+          <Tooltip label="Only Soccer can see this"><span style={{display:'inline-flex',padding:8,borderRadius:'var(--r-pill)',background:'var(--bg-sunk)'}}><Icon name="lock" size={18}/></span></Tooltip>
+          <ProgressDots count={3} index={1}/>
+        </div>
+      </div>
+      <Card pad={0} style={{overflow:'hidden'}}>
+        <EmptyState icon="users" title="No groups yet" body="Groups are how you share the right plans with the right people." action={<Button variant="primary" icon="plus">Make a group</Button>}/>
+      </Card>
+    </div>
+  </div>
+</div>);}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script></body></html>

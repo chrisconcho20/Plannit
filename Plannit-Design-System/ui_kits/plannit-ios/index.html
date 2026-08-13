@@ -1,0 +1,25 @@
+<!-- @dsCard group="Plannit iOS" viewport="430x900" name="Plannit app" subtitle="Click-through iOS kit: onboarding, calendar, groups, the date-finder" -->
+<!doctype html><html><head><meta charset="utf-8"><title>Plannit — iOS UI kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<script>window.PLANNIT_ICON_BASE='../../assets/icons'</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="data.js"></script>
+<style>
+html,body{margin:0;background:var(--bg-app)}
+body{display:flex;align-items:flex-start;justify-content:center;padding:28px 0 40px;min-height:100vh}
+@keyframes plannit-fade{from{opacity:0}to{opacity:1}}
+@keyframes plannit-sheet{from{transform:translateY(100%)}to{transform:none}}
+@keyframes plannit-toast{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+</style></head>
+<body><div id="root"></div>
+<script type="text/babel" src="Chrome.jsx"></script>
+<script type="text/babel" src="Onboarding.jsx"></script>
+<script type="text/babel" src="CalendarScreen.jsx"></script>
+<script type="text/babel" src="GroupsScreen.jsx"></script>
+<script type="text/babel" src="PlansScreen.jsx"></script>
+<script type="text/babel" src="App.jsx"></script>
+<script type="text/babel">ReactDOM.createRoot(document.getElementById('root')).render(<App/>);</script>
+</body></html>

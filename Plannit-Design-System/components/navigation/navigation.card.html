@@ -1,0 +1,62 @@
+<!-- @dsCard group="Components" viewport="700x430" name="Navigation" subtitle="NavBar (large + pushed) · TabBar · ListRow" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script>window.PLANNIT_ICON_BASE='../../assets/icons'</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--bg-app)}.wrap{display:flex;flex-direction:column;gap:14px}.lbl{font:var(--type-caption);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+.panel{border-radius:var(--r-lg);overflow:hidden;background:var(--bg-sunk);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.mock{padding:12px;display:flex;flex-direction:column;gap:10px}
+.mrow{display:flex;align-items:center;gap:10px;background:var(--bg-surface);border-radius:var(--r-card);box-shadow:var(--shadow-1);padding:11px 12px}
+.mtile{width:34px;height:34px;border-radius:var(--r-sm);flex:none}
+.mt{font:var(--type-subhead);font-weight:600;color:var(--text-strong)}
+.ms{font:var(--type-caption);color:var(--text-muted);margin-top:2px}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const {NavBar,TabBar,ListRow,Card,Switch,Badge,Avatar}=window.PlannitDesignSystem_ede968;
+
+function Mock({rows}){
+  return (<div className="mock">{rows.map((r,i)=>(
+    <div className="mrow" key={i}>
+      <span className="mtile" style={{background:r.hue}}/>
+      <span style={{flex:1}}><span className="mt">{r.t}</span><div className="ms">{r.s}</div></span>
+    </div>))}</div>);
+}
+
+function Demo(){
+  const [tab,setTab]=React.useState('cal');
+  return (<div className="wrap">
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+      <div><div className="lbl">NavBar — large (tab root)</div>
+        <div className="panel">
+          <NavBar large title="August" subtitle="4 plans this week" actions={[{name:'search',label:'Search'},{name:'bell',label:'Notifications'}]}/>
+          <Mock rows={[{t:'Five-a-side',s:'Sat 16 Aug · 2:00 PM',hue:'var(--hue-teal)'},{t:'Dinner with Ada',s:'Sat 16 Aug · 7:30 PM',hue:'var(--hue-coral)'}]}/>
+        </div>
+      </div>
+      <div><div className="lbl">NavBar — pushed screen</div>
+        <div className="panel">
+          <NavBar back title="Five-a-side" subtitle="Soccer · 6 people" actions={[{name:'pencil',label:'Edit'},{name:'ellipsis',label:'More'}]}/>
+          <Mock rows={[{t:'Hackney Marshes',s:'Pitch 3 · 20 min away',hue:'var(--hue-sky)'},{t:'Visible to Soccer',s:'6 going · 1 maybe',hue:'var(--hue-indigo)'}]}/>
+        </div>
+      </div>
+    </div>
+    <div><div className="lbl">TabBar — four roots</div>
+      <div className="panel" style={{background:'var(--bg-surface)'}}>
+        <TabBar tabs={[{value:'cal',label:'Calendar',icon:'calendar-days'},{value:'groups',label:'Groups',icon:'users'},{value:'plans',label:'Plans',icon:'sparkles',badge:2},{value:'you',label:'You',icon:'user'}]}
+          value={tab} onChange={setTab} safeArea={false}/>
+      </div>
+    </div>
+    <div><div className="lbl">ListRow — grouped list</div>
+      <Card pad={0}>
+        <ListRow leading={<Avatar name="Maya Ellis" size={32}/>} title="Maya Ellis" subtitle="Free Saturday afternoon" chevron/>
+        <ListRow icon="users" iconTint="var(--hue-sky)" title="Work" value="4 people" chevron/>
+        <ListRow icon="repeat" title="Two-way sync" right={<Switch checked onChange={()=>{}}/>}/>
+        <ListRow icon="lock" title="Who can see this" right={<Badge tone="neutral">Soccer only</Badge>} chevron/>
+        <ListRow icon="trash-2" title="Leave group" danger last/>
+      </Card>
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script></body></html>

@@ -1,0 +1,10 @@
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg-app);color:var(--text-body);font:var(--type-body);letter-spacing:var(--track-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4,p{margin:0}
+h1{font:var(--type-title1);letter-spacing:var(--track-title);color:var(--text-strong)}
+h2{font:var(--type-title2);letter-spacing:var(--track-title);color:var(--text-strong)}
+h3{font:var(--type-title3);color:var(--text-strong)}
+a{color:var(--text-link);text-decoration:none;font-weight:var(--fw-semibold)}
+a:hover{color:var(--coral-700);text-decoration:underline;text-underline-offset:2px}
+button{font-family:inherit}
+::selection{background:var(--coral-100)}

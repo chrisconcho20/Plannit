@@ -1,0 +1,9 @@
+:root{
+--dur-instant:90ms;/* @kind other */--dur-fast:140ms;/* @kind other */--dur-base:220ms;/* @kind other */--dur-slow:340ms;/* @kind other */--dur-sheet:420ms;/* @kind other */
+--ease-ios:cubic-bezier(.32,.72,0,1);/* @kind other */      /* the default: sheets, pushes, reveals */
+--ease-out:cubic-bezier(.2,.8,.2,1);/* @kind other */
+--ease-in-out:cubic-bezier(.4,0,.2,1);/* @kind other */
+--ease-pop:cubic-bezier(.34,1.4,.64,1);/* @kind other */    /* confirmations only, one small overshoot */
+--press-scale:.97;/* @kind other */
+--transition-control:transform var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out);/* @kind other */
+}

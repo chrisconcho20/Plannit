@@ -1,0 +1,30 @@
+:root{
+--font-core:"Figtree",-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+--font-display:"Figtree",-apple-system,"SF Pro Rounded",sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+/* iOS-derived scale (pt == px at 1x) */
+--text-caption2:11px;--text-caption:12px;--text-footnote:13px;--text-subhead:15px;
+--text-body-size:17px;--text-title3:20px;--text-title2:22px;--text-title1:28px;
+--text-display:34px;--text-display-lg:44px;--text-hero:56px;
+
+--lh-tight:1.08;/* @kind other */--lh-snug:1.2;/* @kind other */--lh-normal:1.35;/* @kind other */--lh-relaxed:1.5;/* @kind other */
+
+--fw-regular:400;/* @kind font */--fw-medium:500;/* @kind font */--fw-semibold:600;/* @kind font */--fw-bold:700;/* @kind font */--fw-heavy:800;/* @kind font */
+
+--track-hero:-.032em;/* @kind font */--track-display:-.024em;/* @kind font */--track-title:-.016em;/* @kind font */
+--track-body:-.006em;/* @kind font */--track-caps:.06em;/* @kind font */
+
+/* composed roles */
+--type-hero:var(--fw-heavy) var(--text-hero)/var(--lh-tight) var(--font-display);
+--type-display:var(--fw-heavy) var(--text-display)/var(--lh-snug) var(--font-display);
+--type-title1:var(--fw-bold) var(--text-title1)/var(--lh-snug) var(--font-display);
+--type-title2:var(--fw-bold) var(--text-title2)/var(--lh-snug) var(--font-display);
+--type-title3:var(--fw-semibold) var(--text-title3)/var(--lh-snug) var(--font-core);
+--type-headline:var(--fw-semibold) var(--text-body-size)/var(--lh-normal) var(--font-core);
+--type-body:var(--fw-regular) var(--text-body-size)/var(--lh-relaxed) var(--font-core);
+--type-subhead:var(--fw-medium) var(--text-subhead)/var(--lh-normal) var(--font-core);
+--type-footnote:var(--fw-regular) var(--text-footnote)/var(--lh-normal) var(--font-core);
+--type-caption:var(--fw-medium) var(--text-caption)/var(--lh-normal) var(--font-core);
+--type-label:var(--fw-bold) var(--text-caption)/1 var(--font-core);
+}

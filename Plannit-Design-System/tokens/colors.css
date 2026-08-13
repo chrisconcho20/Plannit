@@ -1,0 +1,55 @@
+:root{
+/* --- base ramp: coral "Ember" — Plannit's primary --- */
+--coral-50:#FFF3EE;--coral-100:#FFE2D7;--coral-200:#FFC5B1;--coral-300:#FFA486;
+--coral-400:#FF8360;--coral-500:#F76941;--coral-600:#E4501F;--coral-700:#BC3D13;--coral-800:#8E2E0E;
+/* --- base ramp: teal "Free" — availability, confirmation, the date-finder --- */
+--teal-50:#E7F7F4;--teal-100:#C6EDE6;--teal-200:#8FDCCF;--teal-300:#4FC5B2;
+--teal-400:#22B29B;--teal-500:#14A98F;--teal-600:#0E8A75;--teal-700:#0A6B5B;
+/* --- base ramp: warm neutrals "Ink / Paper" --- */
+--ink-900:#1A1714;--ink-800:#2C2721;--ink-700:#3E3831;--ink-600:#5A524A;
+--ink-500:#7A7268;--ink-400:#9E958A;--ink-300:#C2B9AD;--ink-200:#E0D8CC;
+--ink-100:#EFE9DF;--ink-50:#F7F2EA;
+--paper:#FFFBF6;--white:#FFFFFF;
+/* --- group hues: per-group event colours (six, assigned round-robin) --- */
+--hue-coral:#F76941;--hue-amber:#F2A63B;--hue-teal:#14A98F;
+--hue-sky:#3E8FEB;--hue-indigo:#6A6FE0;--hue-rose:#E45A96;
+--hue-coral-soft:#FFE2D7;--hue-amber-soft:#FDEDD3;--hue-teal-soft:#C6EDE6;
+--hue-sky-soft:#DCEAFD;--hue-indigo-soft:#E2E3FB;--hue-rose-soft:#FBDFEB;
+/* --- semantic status --- */
+--green-500:#2FA96B;--amber-500:#D98A0B;--red-500:#DC3B45;--red-50:#FDECEC;--blue-500:#3E8FEB;
+
+/* ============ semantic aliases — use these in components ============ */
+--bg-app:var(--paper);
+--bg-surface:var(--white);
+--bg-sunk:var(--ink-50);
+--bg-raised:var(--white);
+--bg-scrim:rgba(26,23,20,.44);
+--bg-tint-primary:var(--coral-50);
+--bg-tint-free:var(--teal-50);
+--bg-chrome:rgba(255,251,246,.82);
+
+--text-strong:var(--ink-900);
+--text-body:var(--ink-800);
+--text-muted:var(--ink-500);
+--text-faint:var(--ink-400);
+--text-on-primary:var(--white);
+--text-link:var(--coral-600);
+
+--line-hairline:var(--ink-100);
+--line-strong:var(--ink-200);
+--line-focus:var(--coral-400);
+
+--action-primary:var(--coral-500);
+--action-primary-press:var(--coral-600);
+--action-primary-soft:var(--coral-100);
+--action-secondary:var(--ink-50);
+--action-secondary-press:var(--ink-100);
+--action-disabled:var(--ink-200);
+
+--status-free:var(--teal-500);
+--status-busy:var(--ink-300);
+--status-success:var(--green-500);
+--status-warning:var(--amber-500);
+--status-danger:var(--red-500);
+--status-info:var(--blue-500);
+}

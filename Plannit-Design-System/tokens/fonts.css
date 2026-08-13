@@ -1,0 +1,7 @@
+/* Plannit webfonts.
+   SUBSTITUTION NOTE: the source repo ships no font files (pre-development, docs only).
+   Plannit is a native iOS app, so its real type is Apple SF Pro / SF Pro Rounded.
+   SF cannot be redistributed on the web, so this system uses the closest Google Fonts
+   matches: Figtree (humanist geometric, tall x-height, rounded terminals) for all UI text
+   and JetBrains Mono for tabular/code. Swap in real SF files if this becomes production iOS. */
+@import url("https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=JetBrains+Mono:wght@400;500;700&display=swap");

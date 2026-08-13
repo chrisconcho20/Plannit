@@ -1,0 +1,8 @@
+:root{
+--r-xs:6px;--r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:24px;--r-2xl:32px;--r-pill:999px;
+/* roles */
+--r-control:var(--r-md);   /* buttons, inputs */
+--r-card:var(--r-lg);      /* event cards, list groups */
+--r-sheet:var(--r-2xl);    /* bottom sheets, modals */
+--r-chip:var(--r-pill);    /* tags, avatars, filters */
+}

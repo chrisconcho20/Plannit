@@ -1,0 +1,35 @@
+<!-- @dsCard group="Components" viewport="700x420" name="Calendar" subtitle="EventCard · MonthGrid · SlotCard · AvailabilityBar" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<script>window.PLANNIT_ICON_BASE='../../assets/icons'</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>body{margin:0;padding:16px;background:var(--bg-app)}.wrap{display:flex;flex-direction:column;gap:14px}.rowx{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lbl{font:var(--type-caption);letter-spacing:var(--track-caps);text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}@keyframes plannit-fade{from{opacity:0}to{opacity:1}}@keyframes plannit-sheet{from{transform:translateY(100%)}to{transform:none}}@keyframes plannit-toast{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const {EventCard,MonthGrid,SlotCard,AvailabilityBar,Card}=window.PlannitDesignSystem_ede968;
+const people=[{name:'Maya Ellis'},{name:'Theo Sand'},{name:'Ada Kim'},{name:'Sam Roe'},{name:'Rae Loft'},{name:'Jo Vane'}];
+function Demo(){
+  const [day,setDay]=React.useState(16);
+  return (<div style={{display:'grid',gridTemplateColumns:'260px 1fr',gap:14}}>
+    <div className="wrap">
+      <Card pad={12}><MonthGrid year={2026} month={7} selected={day} onSelect={setDay}
+        marks={{5:['var(--hue-amber)'],9:['var(--hue-rose)'],14:['var(--hue-sky)','var(--hue-amber)'],16:['var(--hue-teal)','var(--hue-coral)','var(--hue-indigo)'],22:['var(--hue-indigo)'],27:['var(--hue-teal)']}}/></Card>
+      <Card pad={14}>
+        <div className="lbl">Availability · Sat 16</div>
+        {[['Maya',[{start:9,end:11}]],['Theo',[{start:8,end:9},{start:18,end:21}]],['Ada',[{start:13,end:14}]],['Sam',[]]].map(([n,b])=>
+          <AvailabilityBar key={n} name={n} blocks={b} style={{marginBottom:8}}/>)}
+      </Card>
+    </div>
+    <div className="wrap">
+      <EventCard title="Five-a-side" time="Sat 16 Aug · 2:00–4:00 PM" location="Hackney Marshes" hue="var(--hue-teal)" group="Soccer" icon="party-popper" people={people.slice(0,5)} badge="Found" badgeTone="free"/>
+      <EventCard title="Dinner with Ada" time="Sat 16 Aug · 7:30 PM" location="Bermondsey" hue="var(--hue-coral)" icon="utensils" badge="Private" badgeTone="neutral"/>
+      <EventCard title="Mum's birthday lunch" time="Sun 17 Aug · 1:00 PM" hue="var(--hue-amber)" group="Family" icon="cake" people={people.slice(0,3)}/>
+      <div className="lbl" style={{marginTop:4}}>Proposed slots</div>
+      <SlotCard day="SAT" date={16} time="2:00 – 4:00 PM" freeCount={6} total={6} best selected people={people}/>
+      <SlotCard day="SUN" date={17} time="11:00 – 1:00 PM" freeCount={5} total={6} people={people.slice(0,5)}/>
+    </div>
+  </div>);}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+</script></body></html>
