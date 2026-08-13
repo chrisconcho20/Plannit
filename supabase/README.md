@@ -14,7 +14,8 @@ supabase/
 ├─ migrations/
 │  ├─ 0001_init.sql                 # schema: profiles, groups, events, shares, busy_blocks, proposals…
 │  ├─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies
-│  └─ 0003_device_tokens.sql        # APNs device tokens (+ RLS)
+│  ├─ 0003_device_tokens.sql        # APNs device tokens (+ RLS)
+│  └─ 0004_notifications.sql        # pg_net push triggers (share/friend/finalized)
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder

@@ -56,14 +56,17 @@ Tokens APNs reports as `410 / BadDeviceToken / Unregistered` are auto-pruned.
 (contents of the `.p8`), `APNS_BUNDLE_ID`, `APNS_ENV` (`sandbox`|`production`),
 and `INTERNAL_FUNCTION_SECRET` (any long random string shared with callers).
 
-## Notification catalog (planned)
+## Notification catalog
 
-| Event | Recipients | Deep link |
-|---|---|---|
-| A date was found (proposal created) | group members except creator | proposal |
-| Event shared to your group | group members | event |
-| Friend request / accepted | the other party | friends |
-| New vote / proposal finalized | group members | proposal |
+| Event | Recipients | Deep link | Where |
+|---|---|---|---|
+| A date was found (proposal created) | group members except creator | proposal | `find-slots` function |
+| Event shared to a group / user | group (minus owner) or target user | event | trigger (`0004`) |
+| Friend request sent | addressee | friends | trigger (`0004`) |
+| Friend request accepted | requester | friends | trigger (`0004`) |
+| Proposal finalized | all group members | proposal | trigger (`0004`) |
+| New vote cast | proposal creator | proposal | _not yet — would be noisy; add if wanted_ |
 
-Only the "date found" trigger is wired today; the rest are straightforward
-webhook additions.
+Triggers fire via `pg_net` (async) and read `internal_function_secret` +
+`functions_base_url` from Vault — see the runbook. If Vault isn't configured the
+triggers no-op, so they never block a write.

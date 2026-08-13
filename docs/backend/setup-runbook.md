@@ -71,6 +71,20 @@ npx supabase secrets set APNS_PRIVATE_KEY="$(cat AuthKey_XXXXXXXX.p8)"
 
 Set these **yourself** — don't paste the `.p8` or `service_role` key into chat.
 
+## 5b. Enable notification triggers (Vault)
+
+Migration `0004` adds DB triggers that push on event-share / friend-request /
+proposal-finalized. They read two values from Supabase Vault; until both are set
+the triggers silently no-op (writes still succeed). In the SQL editor:
+
+```sql
+select vault.create_secret('<same value as INTERNAL_FUNCTION_SECRET>', 'internal_function_secret');
+select vault.create_secret('https://<PROJECT_REF>.supabase.co/functions/v1', 'functions_base_url');
+```
+
+> If you ran `db push` before `0004` existed, pull latest and run
+> `npx supabase db push` again to apply it.
+
 ## 6. Apple Developer setup (auth + push)
 
 Needs the $99/yr program.
