@@ -4,6 +4,8 @@ _Last updated 2026-08-13._
 
 Status key: **Accepted** = decided · **Proposed** = recommended default, awaiting confirmation.
 
+**All decisions below were confirmed by the founder on 2026-08-13** — the full ledger is now Accepted. Any can still be revisited as build realities emerge.
+
 ## Settled direction
 
 | # | Decision | Choice | Status |
@@ -15,42 +17,42 @@ Status key: **Accepted** = decided · **Proposed** = recommended default, awaiti
 
 ## Decision ledger (D-01 … D-15)
 
-Each has a recommendation marked ★. Statuses reflect the discussion to date; ★ items not yet explicitly confirmed are **Proposed**.
+Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 
 ### Foundation
 
 | ID | Decision | Options | Recommendation ★ | Status |
 |---|---|---|---|---|
 | D-01 | Backend approach | Supabase / Firebase / Custom Node·Go | **Supabase** (Postgres + RLS fits per-group visibility; predictable cost; open-source escape hatch) | **Accepted** |
-| D-02 | Local persistence | GRDB / Core Data / SwiftData | **GRDB** (battle-tested SQLite) | Proposed |
-| D-03 | Auth methods | Apple first / Apple+email / Apple+phone | **Apple first**, add email later | Proposed |
-| D-04 | Cross-platform timing | iOS-first / iOS+Android now | **iOS-first**, keep backend platform-agnostic | Proposed |
+| D-02 | Local persistence | GRDB / Core Data / SwiftData | **GRDB** (battle-tested SQLite) | Accepted |
+| D-03 | Auth methods | Apple first / Apple+email / Apple+phone | **Apple first**, add email later | Accepted |
+| D-04 | Cross-platform timing | iOS-first / iOS+Android now | **iOS-first**, keep backend platform-agnostic | Accepted |
 
 ### Sync & privacy
 
 | ID | Decision | Options | Recommendation ★ | Status |
 |---|---|---|---|---|
-| D-05 | Calendar permission scope | Write-only default / Full access upfront | **Write-only default**, full access only for availability | Proposed |
-| D-06 | Where app events live | Dedicated Plannit calendar / User's existing calendars | **Dedicated Plannit calendar** | Proposed |
-| D-07 | Sync conflict strategy | Last-write-wins / Per-field merge / CRDT | **Last-write-wins (v1)** | Proposed |
-| D-08 | Availability privacy model | On-device busy blocks / Server-side from shared events | **On-device busy blocks** (opaque, no titles leave phone) | Proposed |
-| D-09 | Group event visibility default | Private by default / Open feed | **Private by default** (opt-in to share) | Proposed |
+| D-05 | Calendar permission scope | Write-only default / Full access upfront | **Write-only default**, full access only for availability | Accepted |
+| D-06 | Where app events live | Dedicated Plannit calendar / User's existing calendars | **Dedicated Plannit calendar** | Accepted |
+| D-07 | Sync conflict strategy | Last-write-wins / Per-field merge / CRDT | **Last-write-wins (v1)** | Accepted |
+| D-08 | Availability privacy model | On-device busy blocks / Server-side from shared events | **On-device busy blocks** (opaque, no titles leave phone) | Accepted |
+| D-09 | Group event visibility default | Private by default / Open feed | **Private by default** (opt-in to share) | Accepted |
 
 ### The scheduler
 
 | ID | Decision | Options | Recommendation ★ | Status |
 |---|---|---|---|---|
-| D-10 | Where the scheduler runs | Server Edge Function / On-device | **Server Edge Function** (single source of truth) | Proposed |
-| D-11 | Constraint richness for v1 | Basic (day+time+duration+quorum) / Advanced | **Basic set** for v1 | Proposed |
-| D-12 | Outcome of a proposal | Propose then vote / Auto-lock best | **Propose then vote** (social) | Proposed |
+| D-10 | Where the scheduler runs | Server Edge Function / On-device | **Server Edge Function** (single source of truth) | Accepted |
+| D-11 | Constraint richness for v1 | Basic (day+time+duration+quorum) / Advanced | **Basic set** for v1 | Accepted |
+| D-12 | Outcome of a proposal | Propose then vote / Auto-lock best | **Propose then vote** (social) | Accepted |
 
 ### Realtime & product
 
 | ID | Decision | Options | Recommendation ★ | Status |
 |---|---|---|---|---|
-| D-13 | Realtime transport | Realtime + APNs / APNs only / Polling | **Realtime + APNs** | Proposed |
-| D-14 | Non-user participation | Web link in Phase 2 / App-only | **Web link in Phase 2** (beats Howbout's invite wall) | Proposed |
-| D-15 | First TestFlight scope | Through the scheduler / Phases 1–2 only | **Through the scheduler** (ship the wedge) | Proposed |
+| D-13 | Realtime transport | Realtime + APNs / APNs only / Polling | **Realtime + APNs** | Accepted |
+| D-14 | Non-user participation | Web link in Phase 2 / App-only | **Web link in Phase 2** (beats Howbout's invite wall) | Accepted |
+| D-15 | First TestFlight scope | Through the scheduler / Phases 1–2 only | **Through the scheduler** (ship the wedge) | Accepted |
 
 ## Open questions (product / go-to-market)
 
@@ -62,6 +64,6 @@ Each has a recommendation marked ★. Statuses reflect the discussion to date; �
 
 ## Next steps
 
-1. Confirm the **Proposed** decisions above (or override any).
+1. ~~Confirm the recommended decisions above.~~ **Done 2026-08-13 — full ledger Accepted.**
 2. Scaffold the repo — Xcode SwiftUI project, Supabase schema with RLS policies, sync-engine skeleton.
 3. Prove the wedge early — a small on-device sweep-line prototype that finds a slot from fake busy-blocks.
