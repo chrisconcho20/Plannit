@@ -39,3 +39,7 @@ secret = "env(APPLE_SECRET)"
 
 [functions.find-slots]
 verify_jwt = true
+
+# Internal-only: protected by INTERNAL_FUNCTION_SECRET, not a user JWT.
+[functions.send-push]
+verify_jwt = false

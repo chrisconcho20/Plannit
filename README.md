@@ -38,10 +38,13 @@ Frontend/iOS is being built on a separate track against the published
 - [`docs/cost-analysis.md`](docs/cost-analysis.md) — infra cost model, prototype & beta totals
 - [`docs/decisions.md`](docs/decisions.md) — the decision log (D-01 … D-15), all Accepted
 - [`docs/backend/api-contract.md`](docs/backend/api-contract.md) — **stable interface for the frontend track**
+- [`docs/backend/sync-contract.md`](docs/backend/sync-contract.md) — two-way calendar sync rules for iOS
+- [`docs/backend/push-notifications.md`](docs/backend/push-notifications.md) — APNs push
 - [`supabase/README.md`](supabase/README.md) — backend setup, local dev, security model
 
 ## Status
 
-Backend scaffolded (2026-08-13): full Postgres schema + RLS, and the scheduler
-(the wedge) implemented and validated. Next: wire APNs push and stand up a
-Supabase project. Frontend/iOS proceeds in parallel against the API contract.
+Backend scaffolded (2026-08-13): full Postgres schema + RLS, the scheduler (the
+wedge, validated), APNs push (validated), and the two-way sync contract for iOS.
+Next: stand up a Supabase project and run the migrations. Frontend/iOS proceeds
+in parallel against the API + sync contracts.

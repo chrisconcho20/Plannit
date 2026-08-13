@@ -13,14 +13,21 @@ supabase/
 ├─ seed.sql                         # local demo data (3 users, 1 group, busy blocks)
 ├─ migrations/
 │  ├─ 0001_init.sql                 # schema: profiles, groups, events, shares, busy_blocks, proposals…
-│  └─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies
+│  ├─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies
+│  └─ 0003_device_tokens.sql        # APNs device tokens (+ RLS)
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder
-   │  └─ scheduler.test.ts          # Deno unit tests
-   └─ find-slots/
-      └─ index.ts                   # Edge Function wrapping the scheduler
+   │  ├─ scheduler.test.ts          # Deno unit tests
+   │  └─ apns.ts                    # token-based APNs signer + sender
+   ├─ find-slots/
+   │  └─ index.ts                   # scheduler Edge Function (+ best-effort "date found" push)
+   └─ send-push/
+      └─ index.ts                   # internal-only APNs sender
 ```
+
+Push notifications: [`../docs/backend/push-notifications.md`](../docs/backend/push-notifications.md).
+Two-way calendar sync contract: [`../docs/backend/sync-contract.md`](../docs/backend/sync-contract.md).
 
 ## Prerequisites
 

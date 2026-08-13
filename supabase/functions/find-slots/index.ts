@@ -116,5 +116,33 @@ Deno.serve(async (req) => {
     if (slotErr) return json({ error: "slots_failed", detail: slotErr.message }, 500);
   }
 
+  // Best-effort: notify the rest of the group that a date was found. Push is
+  // never allowed to fail the proposal, so this is fire-and-forget + guarded.
+  try {
+    const secret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+    if (secret && slots.length) {
+      const recipients = memberIds.filter((id) => id !== uid);
+      if (recipients.length) {
+        await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-internal-secret": secret },
+          body: JSON.stringify({
+            userIds: recipients,
+            notification: {
+              title: "Plannit found a date",
+              body: body.title
+                ? `"${body.title}" — ${slots.length} option${slots.length > 1 ? "s" : ""} to vote on`
+                : `${slots.length} option${slots.length > 1 ? "s" : ""} to vote on`,
+              data: { proposalId: proposal.id, groupId: body.groupId },
+              collapseId: `proposal-${proposal.id}`,
+            },
+          }),
+        });
+      }
+    }
+  } catch (_) {
+    // Swallow push errors — the proposal already succeeded.
+  }
+
   return json({ proposal, slots });
 });

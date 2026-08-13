@@ -137,6 +137,16 @@ struct ProposalSlot: Codable {
 
 ---
 
+## Push notifications
+Register the device's APNs token into `device_tokens` after sign-in (RLS lets a
+user write only their own). Sending is server-side only. Full details:
+[`push-notifications.md`](push-notifications.md).
+
+## Two-way calendar sync
+The device ↔ backend reconciliation rules (identity mapping, import/export,
+deltas, `busy_blocks` derivation, background refresh) are specified in
+[`sync-contract.md`](sync-contract.md) — implement the client against that.
+
 ## What's stubbed / coming next
-- **Push (APNs):** notifications for new shared events, invites, and "a date was found" — planned as a second Edge Function + APNs key. Contract TBD.
+- **Additional push triggers** (event shared, friend request, proposal finalized) — webhook additions; only "date found" is wired today.
 - **Non-user web participation link** (Phase 2, decision D-14) — not yet specified.
