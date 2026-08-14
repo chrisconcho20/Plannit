@@ -1,0 +1,46 @@
+# Codemagic CI/CD — build Plannit in the cloud and ship to TestFlight (no Mac needed).
+# One-time setup lives in ios/CODEMAGIC.md. Rename the integration below to match
+# the App Store Connect API key you add in the Codemagic UI.
+
+workflows:
+  ios-testflight:
+    name: Plannit iOS — TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: CodemagicAppStoreKey   # <- name of the API key you add in Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.plannit.app
+      xcode: latest
+      vars:
+        XCODE_PROJECT: "Plannit.xcodeproj"
+        XCODE_SCHEME: "Plannit"
+        BUNDLE_ID: "com.plannit.app"
+    scripts:
+      - name: Install XcodeGen and generate the project
+        script: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Apply signing profiles
+        script: |
+          cd ios
+          xcode-project use-profiles
+      - name: Set the TestFlight build number
+        script: |
+          cd ios
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1)) || true
+      - name: Build the IPA
+        script: |
+          cd ios
+          xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - ios/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Internal testers get the build automatically once it finishes processing.

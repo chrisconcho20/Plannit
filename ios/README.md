@@ -69,6 +69,12 @@ and calling `find-slots` from the New Plan flow (the client method
 runner** on every push that touches `ios/**`. Check the repo's **Actions** tab
 for pass/fail — this is how the Swift is validated when no local Mac is available.
 
+## Run it on your iPhone without a Mac (Codemagic → TestFlight)
+
+`../codemagic.yaml` builds a signed app in the cloud and delivers it to your phone
+via TestFlight. Full one-time setup: **[CODEMAGIC.md](CODEMAGIC.md)**. The app
+installs in demo mode, so you can use it on a real device with no backend setup.
+
 ## Structure
 
 ```
