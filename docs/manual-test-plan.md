@@ -86,7 +86,22 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 | 5.3 | Tap a day with nothing | "No events on this day" with a New event action |
 | 5.4 | Cross a month boundary with an event | The event is on its real date, not the same day-number of the wrong month |
 
-## 6. Try to break it
+## 6. The polish pass (new)
+
+| # | Do this | Expect |
+|---|---|---|
+| 6.1 | Sign in, force-quit, reopen | Still signed in — no sign-in screen |
+| 6.2 | You → Sign out → confirm | Back to sign-in, and your data is gone from the tabs |
+| 6.3 | Turn the network off, pull to refresh | An amber banner with **Retry**, not an empty screen |
+| 6.4 | Event → ⋯ → Edit, change the time, save | The card and the calendar dot move to the new time |
+| 6.5 | Event → ⋯ → Delete | Gone from the calendar and from any group it was shared with |
+| 6.6 | Group → Rename or recolour | The name changes everywhere; the colour sticks (this device only) |
+| 6.7 | Calendar → **Week** | A real week strip with dots, ‹ › moves weeks, tapping a day filters below |
+| 6.8 | Groups → search icon → type a member's name | Groups containing that person |
+| 6.9 | Plan → vote → **Remove my vote** | The count drops and the Plans badge comes back |
+| 6.10 | Plan → **Cancel plan** (as organiser) | It disappears for everyone |
+
+## 7. Try to break it
 
 | # | Do this | Expect |
 |---|---|---|
@@ -103,10 +118,7 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 ## Known gaps (don't file these)
 
 - **No realtime** — another person's vote appears on reload, not live.
-- **Session isn't persisted** — relaunch signs you out.
-- **Week view** is the same list as **List**; it was never built.
-- **No event edit/delete**, no "unvote", no reopening a locked plan.
+- **No reopening a locked plan** — cancel it and run the finder again.
 - **Friends don't exist** — you can only add people you already share a group
   with, so a brand-new account sees nobody until it's seeded.
-- **Group hue** isn't stored; it's derived from the name, so the colour picker in
-  "New group" is cosmetic.
+- **Group colour is device-local** — your teammates see the name-derived one.
