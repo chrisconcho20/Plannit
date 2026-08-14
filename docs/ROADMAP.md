@@ -118,12 +118,15 @@ account. See §6 for URLs/creds.
 11. **Error & loading states** — user-facing errors (toasts) on network failures,
     spinners on live loads, retry. Currently failures fall back silently to sample.
 12. **Empty-state copy** — friendly "nothing yet / here's what to do" states.
-13. **Wire or hide placeholder buttons** — Settings, Search, Bell, Inbox, ⋯/More,
-    Add-people all have empty actions today (see [[plannit-live-feedback]]).
-14. **Tests** — the Deno scheduler tests now run in CI (`functions-test.yml`)
-    alongside the iOS compile. Add XCTest (unit + a few UI smoke tests) —
-    `SlotFinder`'s constraint math is the obvious first target. Consider an
-    Appetize-based smoke check in CI.
+13. **Wire or hide placeholder buttons** — Add-people ✅ and the ＋ ✅ are wired;
+    Settings, Search, Bell, Inbox and ⋯/More still do nothing.
+14. **Tests** — ✅ two suites run on every push: **XCTest** (`ios/PlannitTests`,
+    22 tests — constraint maths, date/slot mapping, ownership and badge rules)
+    via `xcodebuild test` in `ios-build.yml`, and **Deno** (19 tests including
+    `scheduler.stress.test.ts` — scale, DST, timezones, degenerate input) via
+    `functions-test.yml`. Manual pass: [`manual-test-plan.md`](manual-test-plan.md).
+    _Still missing:_ UI tests, and nothing exercises the Supabase client against
+    a real (or faked) backend — repository mapping is only covered by eye.
 15. **Accessibility & Dynamic Type**, and decide on **dark mode** (design system is
     light-only today).
 
@@ -165,10 +168,11 @@ account. See §6 for URLs/creds.
 
 ## 5. Repository map
 ```
-docs/            research, proposal, cost, decisions, backend contracts, THIS roadmap
+docs/            research, proposal, cost, decisions, backend contracts, THIS roadmap,
+                 manual-test-plan (the pass a machine can't do)
 design-system/   tokens, components, iOS ui_kit, app icon (source of truth for UI)
 supabase/        migrations, RLS, seed, Edge Functions (find-slots, send-push)
-ios/             SwiftUI app
+ios/             SwiftUI app (+ PlannitTests, run by xcodebuild test in CI)
   Plannit/App        entry, RootView (flow+tabs), AppModel, Info.plist, entitlements
   Plannit/Theme      tokens → Swift (color, type, metrics, icon, group hues)
   Plannit/Components  design-system components as SwiftUI views
