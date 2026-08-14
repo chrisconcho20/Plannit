@@ -47,10 +47,27 @@ xcodebuild -project Plannit.xcodeproj -scheme Plannit \
   -destination 'platform=iOS Simulator,name=iPhone 15' build
 ```
 
-### Live backend (optional, later)
+### Live backend
 Fill `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `Plannit/App/Info.plist`. Until
-both are set the app stays in demo mode. Full data + Sign in with Apple + APNs
-wiring is the next milestone.
+both are set the app stays in demo mode. In live mode:
+
+- **Continue with Apple** runs a real Sign in with Apple flow and exchanges the
+  identity token for a Supabase session (`Services/SupabaseClient.swift`,
+  `Services/AppleSignIn.swift`).
+- Connecting the calendar uploads privacy-safe **busy blocks** (no titles) so the
+  date-finder can compute group availability.
+- The Supabase project's Auth → Apple provider must be configured, and the app
+  needs a real bundle id + Team (see `../docs/backend/setup-runbook.md`).
+
+Still on the roadmap: loading live groups/events/proposals into the list screens
+and calling `find-slots` from the New Plan flow (the client method
+`invokeFunction("find-slots", …)` is already there).
+
+## Continuous integration (build without a Mac)
+
+`.github/workflows/ios-build.yml` compiles the app on a **macOS GitHub Actions
+runner** on every push that touches `ios/**`. Check the repo's **Actions** tab
+for pass/fail — this is how the Swift is validated when no local Mac is available.
 
 ## Structure
 
