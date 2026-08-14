@@ -48,6 +48,12 @@ struct NewGroupInsert: Encodable {
     let name: String
     let owner_id: String
 }
+struct GroupRefDTO: Decodable { let id: String }
+struct MembershipInsert: Encodable {
+    let group_id: String
+    let user_id: String
+    let role: String       // "owner" | "admin" | "member"
+}
 
 struct EventDTO: Decodable, Identifiable {
     let id: String
@@ -217,6 +223,35 @@ final class SupabaseClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         req.httpBody = try JSONEncoder().encode(values)
+        _ = try await sendRaw(req)
+    }
+
+    /// Insert and read the rows back (PostgREST `return=representation`) — for
+    /// when you need the generated id, e.g. a new group's memberships.
+    func insertReturning<T: Encodable, R: Decodable>(_ table: String, values: T) async throws -> R {
+        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("rest/v1/\(table)"))
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        req.httpBody = try JSONEncoder().encode(values)
+        return try await send(req)
+    }
+
+    /// DELETE the rows matching `match` (raw PostgREST filters). RLS decides
+    /// whether you're allowed to — a forbidden delete removes nothing.
+    func delete(_ table: String, match: [String: String]) async throws {
+        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
+                                  resolvingAgainstBaseURL: false)!
+        comps.queryItems = match.map { URLQueryItem(name: $0.key, value: $0.value) }
+        var req = URLRequest(url: comps.url!)
+        req.httpMethod = "DELETE"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         _ = try await sendRaw(req)
     }
 

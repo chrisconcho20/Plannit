@@ -6,16 +6,22 @@ import SwiftUI
 enum Sample {
     static let me = "You Concho"
 
+    static let people = PMember.named(
+        ["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"])
+
     static let groups: [PGroup] = [
         PGroup(id: "soccer", name: "Soccer", hue: .teal,
-               members: ["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"],
+               members: PMember.named(["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"]),
                note: "Tuesday + weekend games"),
         PGroup(id: "family", name: "Family", hue: .amber,
-               members: ["Maya Ellis", "Ada Kim", "Rae Loft"], note: "Birthdays and Sunday lunch"),
+               members: PMember.named(["Maya Ellis", "Ada Kim", "Rae Loft"]),
+               note: "Birthdays and Sunday lunch"),
         PGroup(id: "work", name: "Work", hue: .sky,
-               members: ["Theo Sand", "Sam Roe", "Jo Vane", "Ada Kim"], note: "Offsites only, nothing else"),
+               members: PMember.named(["Theo Sand", "Sam Roe", "Jo Vane", "Ada Kim"]),
+               note: "Offsites only, nothing else"),
         PGroup(id: "flat", name: "Flatmates", hue: .indigo,
-               members: ["Sam Roe", "Rae Loft"], note: "Bills, bins, film nights"),
+               members: PMember.named(["Sam Roe", "Rae Loft"]),
+               note: "Bills, bins, film nights"),
     ]
 
     /// Demo events hang off today rather than a fixed month, so the sample

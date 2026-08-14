@@ -4,18 +4,22 @@ import Foundation
 // repositories: sample data in demo mode, Supabase in live mode. This keeps the
 // UI identical while the source swaps behind Config.isLiveBackend.
 
+@MainActor
 protocol DataRepository {
     func fetchGroups() async throws -> [PGroup]
     func fetchEvents() async throws -> [PEvent]
     func fetchProposals() async throws -> [PProposal]
+    func fetchPeople() async throws -> [PMember]
 }
 
 struct SampleRepository: DataRepository {
     func fetchGroups() async -> [PGroup] { Sample.groups }
     func fetchEvents() async -> [PEvent] { Sample.events }
     func fetchProposals() async -> [PProposal] { Sample.proposals }
+    func fetchPeople() async -> [PMember] { Sample.people }
 }
 
+@MainActor
 struct SupabaseRepository: DataRepository {
     private let client = SupabaseClient.shared
 
@@ -26,13 +30,27 @@ struct SupabaseRepository: DataRepository {
         return dtos.map { dto in
             // A member with no display name still counts — dropping them made
             // groups look empty ("1 of 0 free"). Name them rather than lose them.
-            let members = (dto.group_memberships ?? []).map { membership -> String in
+            let members = (dto.group_memberships ?? []).compactMap { membership -> PMember? in
+                guard let id = membership.user_id ?? membership.profiles?.id else { return nil }
                 let name = membership.profiles?.display_name ?? ""
-                return name.isEmpty ? "Member" : name
+                return PMember(id: id, name: name.isEmpty ? "Member" : name)
             }
             return PGroup(id: dto.id, name: dto.name, hue: GroupHue.forName(dto.name),
-                          members: members, note: "")
+                          members: members, note: "", ownerId: dto.owner_id)
         }
+    }
+
+    /// Everyone you're allowed to see: RLS returns your own profile, your
+    /// friends', and anyone you already share a group with. Until friend
+    /// requests exist (roadmap phase 3) that co-member set *is* the directory.
+    func fetchPeople() async throws -> [PMember] {
+        let rows: [ProfileDTO] = try await client.select(
+            "profiles", columns: "id,display_name,timezone",
+            query: ["order": "display_name.asc"])
+        let me = client.userId
+        return rows
+            .filter { $0.id != me }
+            .map { PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name) }
     }
 
     func fetchEvents() async throws -> [PEvent] {

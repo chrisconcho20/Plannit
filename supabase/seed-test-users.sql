@@ -21,7 +21,7 @@
 
 do $$
 declare
-  owner_email  text := 'chrisconcho20@gmail.com';
+  owner_email  text := 'johnnysilverhands@gmail.com';
   owner_tz     text := 'America/Los_Angeles';
   owner_uid    uuid;
   test_ids     uuid[];

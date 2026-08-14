@@ -5,12 +5,30 @@ import SwiftUI
 
 enum EventSource: String, Codable { case plannit, device }
 
+/// Someone you can put in a group. Carries the profile id, not just a name, so
+/// members can actually be added and removed.
+struct PMember: Identifiable, Hashable {
+    let id: String
+    let name: String
+
+    /// For sample data, where the name is the only identity there is.
+    static func named(_ names: [String]) -> [PMember] { names.map { PMember(id: $0, name: $0) } }
+}
+
 struct PGroup: Identifiable, Hashable {
     let id: String
     let name: String
     let hue: GroupHue
-    let members: [String]
+    let members: [PMember]
     let note: String
+    /// nil in demo mode, where there's nobody to check against.
+    var ownerId: String? = nil
+
+    var memberNames: [String] { members.map(\.name) }
+    func isOwned(by userId: String?) -> Bool {
+        guard let ownerId, let userId else { return true }   // demo: you own everything
+        return ownerId == userId
+    }
 }
 
 struct PEvent: Identifiable, Hashable {

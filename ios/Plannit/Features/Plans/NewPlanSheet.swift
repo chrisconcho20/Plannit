@@ -163,7 +163,7 @@ struct NewPlanSheet: View {
                 VStack(spacing: 14) {
                     PIcon("hourglass", size: 30, color: .statusFree)
                     Text("Checking everyone’s calendars…").textStyle(.headline, color: .textStrong)
-                    AvatarStack(names: group?.members ?? [], size: 30, max: 6)
+                    AvatarStack(names: group?.memberNames ?? [], size: 30, max: 6)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 30)
@@ -190,7 +190,7 @@ struct NewPlanSheet: View {
                 ForEach(slots) { slot in
                     SlotCard(day: slot.day, date: slot.date, time: slot.time,
                              freeCount: slot.free, total: total,
-                             people: Array((group?.members ?? []).prefix(slot.free)),
+                             people: Array((group?.memberNames ?? []).prefix(slot.free)),
                              best: slot.best)
                 }
             }

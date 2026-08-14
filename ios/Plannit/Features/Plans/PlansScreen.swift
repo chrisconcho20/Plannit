@@ -101,7 +101,7 @@ struct PlanDetailView: View {
                             Button { withAnimation(Motion.fast) { selectedSlot = slot.id } } label: {
                                 SlotCard(day: slot.day, date: slot.date, time: slot.time,
                                          freeCount: slot.free, total: proposal.total,
-                                         people: Array(proposal.group.members.prefix(slot.free)),
+                                         people: Array(proposal.group.memberNames.prefix(slot.free)),
                                          best: slot.best, selected: selectedSlot == slot.id)
                             }
                             .buttonStyle(CardPressStyle())

@@ -18,6 +18,9 @@ final class AppModel: ObservableObject {
     @Published var groups: [PGroup] = Sample.groups
     @Published var events: [PEvent] = Sample.events
     @Published var proposals: [PProposal] = Sample.proposals
+    /// People you can add to a group. Until friend requests land this is
+    /// everyone RLS lets you see: your groups' co-members.
+    @Published var people: [PMember] = Sample.people
 
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
@@ -34,9 +37,11 @@ final class AppModel: ObservableObject {
             let g = try await repo.fetchGroups()
             let e = try await repo.fetchEvents()
             let p = try await repo.fetchProposals()
+            let who = try await repo.fetchPeople()
             groups = g
             events = e
             proposals = p
+            people = who
         } catch {
             // Keep whatever we have (sample seed) on failure.
         }
@@ -155,22 +160,105 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Create a group. Persists to Supabase in live mode; appends locally in demo.
-    func createGroup(name: String) async {
+    /// Create a group with its starting members. Persists to Supabase in live
+    /// mode; appends locally in demo.
+    @discardableResult
+    func createGroup(name: String, members: [PMember] = []) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if Config.isLiveBackend, let uid = userId {
-            do {
-                try await SupabaseClient.shared.insert(
-                    "groups", values: NewGroupInsert(name: trimmed, owner_id: uid))
-                await loadData()   // reload so the new group (and its owner membership) appears
-            } catch {
-                // leave existing groups on failure
-            }
-        } else {
+        guard !trimmed.isEmpty else { return false }
+
+        guard Config.isLiveBackend, let uid = userId else {
             groups.append(PGroup(id: UUID().uuidString, name: trimmed,
-                                 hue: GroupHue.forName(trimmed), members: [], note: ""))
+                                 hue: GroupHue.forName(trimmed), members: members, note: ""))
+            return true
         }
+
+        do {
+            // Read the row back for its generated id — the memberships need it.
+            let created: [GroupRefDTO] = try await SupabaseClient.shared.insertReturning(
+                "groups", values: NewGroupInsert(name: trimmed, owner_id: uid))
+            if let group = created.first, !members.isEmpty {
+                try await SupabaseClient.shared.insert("group_memberships", values: members.map {
+                    MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")
+                })
+            }
+            await loadData()   // the owner membership is added by a DB trigger
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Add people to an existing group. RLS: owners only.
+    @discardableResult
+    func addMembers(to group: PGroup, members: [PMember]) async -> Bool {
+        guard !members.isEmpty else { return true }
+        guard Config.isLiveBackend else {
+            replaceGroup(group.id) { PGroup(id: $0.id, name: $0.name, hue: $0.hue,
+                                            members: $0.members + members, note: $0.note,
+                                            ownerId: $0.ownerId) }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.insert("group_memberships", values: members.map {
+                MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")
+            })
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Remove someone from a group. RLS: the owner, or you removing yourself.
+    @discardableResult
+    func removeMember(_ member: PMember, from group: PGroup) async -> Bool {
+        guard Config.isLiveBackend else {
+            replaceGroup(group.id) { PGroup(id: $0.id, name: $0.name, hue: $0.hue,
+                                            members: $0.members.filter { $0.id != member.id },
+                                            note: $0.note, ownerId: $0.ownerId) }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.delete("group_memberships", match: [
+                "group_id": "eq.\(group.id)", "user_id": "eq.\(member.id)",
+            ])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Delete a group (owner) — cascades its memberships, shares and proposals.
+    @discardableResult
+    func deleteGroup(_ group: PGroup) async -> Bool {
+        guard Config.isLiveBackend else {
+            groups.removeAll { $0.id == group.id }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.delete("groups", match: ["id": "eq.\(group.id)"])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Leave a group you don't own.
+    @discardableResult
+    func leaveGroup(_ group: PGroup) async -> Bool {
+        guard let uid = userId else {
+            groups.removeAll { $0.id == group.id }
+            return true
+        }
+        return await removeMember(PMember(id: uid, name: displayName), from: group)
+    }
+
+    private func replaceGroup(_ id: String, _ transform: (PGroup) -> PGroup) {
+        guard let i = groups.firstIndex(where: { $0.id == id }) else { return }
+        groups[i] = transform(groups[i])
     }
 
     // MARK: Calendar
