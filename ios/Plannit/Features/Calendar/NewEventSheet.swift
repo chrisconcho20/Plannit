@@ -161,10 +161,15 @@ struct NewEventSheet: View {
     }
 
     /// Nearest chip to a real duration, so editing a 90-minute event doesn't
-    /// silently round it away without showing you.
+    /// silently round it away without showing you. Ordered, not a dictionary:
+    /// an exact tie (90 minutes) must always resolve the same way — down.
     static func label(forMinutes minutes: Int) -> String {
-        let options = ["30m": 30, "1h": 60, "2h": 120, "3h": 180]
-        return options.min { abs($0.value - minutes) < abs($1.value - minutes) }?.key ?? "1h"
+        let options = [("30m", 30), ("1h", 60), ("2h", 120), ("3h", 180)]
+        var best = options[0]
+        for option in options.dropFirst() where abs(option.1 - minutes) < abs(best.1 - minutes) {
+            best = option
+        }
+        return best.0   // strict <, so a tie keeps the shorter chip
     }
 
     /// "30m" → 30 · "2h" → 120.
