@@ -7,25 +7,54 @@ struct GroupsScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var showNewGroup = false
     @State private var pendingRemoval: PGroup?
+    @State private var searching = false
+    @State private var query = ""
+
+    /// Match on the group's name or on who's in it — "which group has Maya in
+    /// it" is as natural a question as searching by name.
+    private var shown: [PGroup] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return model.groups }
+        return model.groups.filter {
+            $0.name.lowercased().contains(q) || $0.memberNames.contains { $0.lowercased().contains(q) }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Groups").textStyle(.title1, color: .textStrong)
                 Spacer()
-                IconButton(icon: "search", variant: .secondary, size: 40, iconSize: 18,
-                           accessibilityLabel: "Search") {}
+                IconButton(icon: searching ? "x" : "search", variant: .secondary, size: 40,
+                           iconSize: 18, accessibilityLabel: searching ? "Close search" : "Search") {
+                    withAnimation(Motion.fast) {
+                        searching.toggle()
+                        if !searching { query = "" }
+                    }
+                }
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
+
+            if searching {
+                PTextField(placeholder: "Search groups and people", text: $query, icon: "search")
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.bottom, 6)
+            }
 
             ScrollView {
                 if let error = model.loadError {
                     LoadBanner(message: error) { Task { await model.loadData() } }
                 }
-                SectionLabel("Your groups") { Text("\(model.groups.count)").textStyle(.caption, color: .textFaint) }
+                SectionLabel(query.isEmpty ? "Your groups" : "Matches") {
+                    Text("\(shown.count)").textStyle(.caption, color: .textFaint)
+                }
+                if shown.isEmpty && !query.isEmpty {
+                    EmptyState(icon: "search", title: "No matches",
+                               message: "No group or person matches “\(query)”.")
+                }
                 LazyVStack(spacing: Space.gapList) {
-                    ForEach(model.groups) { group in
+                    ForEach(shown) { group in
                         let owned = group.isOwned(by: model.userId)
                         SwipeRow(title: owned ? "Delete" : "Leave",
                                  icon: owned ? "trash-2" : "x") {

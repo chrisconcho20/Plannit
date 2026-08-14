@@ -208,6 +208,48 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Take your vote back — you can be undecided, and a stale vote is worse
+    /// than none when the organiser is reading the tally.
+    @discardableResult
+    func removeVote(on proposal: PProposal) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            replaceProposal(proposal.id) {
+                var p = $0
+                if let old = p.myVoteSlotId { p.voteCounts[old] = max(0, (p.voteCounts[old] ?? 1) - 1) }
+                p.myVoteSlotId = nil
+                p.votes = p.voteCounts.values.reduce(0, +)
+                return p
+            }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.delete("votes", match: [
+                "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
+            ])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Call the whole thing off. RLS allows the creator or the group's owner;
+    /// slots and votes go with it by cascade.
+    @discardableResult
+    func cancelPlan(_ proposal: PProposal) async -> Bool {
+        guard Config.isLiveBackend else {
+            proposals.removeAll { $0.id == proposal.id }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.delete("proposals", match: ["id": "eq.\(proposal.id)"])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Lock a time in: mark the proposal finalized, then put the winning slot on
     /// the calendar as a real event shared with the group.
     @discardableResult

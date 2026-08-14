@@ -51,7 +51,7 @@ struct CalendarScreen: View {
     }
 
     private var events: [PEvent] {
-        if mode == .month, let selectedDate {
+        if mode != .list, let selectedDate {
             return model.events.filter { $0.isOn(selectedDate) }.sorted { $0.start < $1.start }
         }
         let now = cal.startOfDay(for: Date())
@@ -59,7 +59,7 @@ struct CalendarScreen: View {
     }
 
     private var sectionTitle: String {
-        if mode == .month, let selectedDate {
+        if mode != .list, let selectedDate {
             let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
             return f.string(from: selectedDate)
         }
@@ -99,6 +99,10 @@ struct CalendarScreen: View {
                         }
                         .padding(.horizontal, Space.gutter)
                         .padding(.top, 4)
+                    } else if mode == .week {
+                        PlannitCard(elevation: 1) { weekStrip }
+                            .padding(.horizontal, Space.gutter)
+                            .padding(.top, 4)
                     }
 
                     SectionLabel(sectionTitle)
@@ -117,7 +121,7 @@ struct CalendarScreen: View {
 
                     if events.isEmpty && model.deviceEvents.isEmpty {
                         EmptyState(icon: "calendar", title: "Nothing here",
-                                   message: mode == .month
+                                   message: mode != .list
                                             ? "No events on this day."
                                             : "Nothing coming up.",
                                    actionTitle: "New event") { showNewEvent = true }
@@ -164,6 +168,88 @@ struct CalendarScreen: View {
         .padding(.top, 6)
         .padding(.bottom, 6)
     }
+
+    /// The seven days around the selected one. A week can straddle two months,
+    /// so days carry their own date rather than a day-of-month number.
+    private var weekDays: [Date] {
+        let anchor = selectedDate ?? Date()
+        let startOfWeek = cal.dateInterval(of: .weekOfYear, for: anchor)?.start ?? anchor
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: startOfWeek) }
+    }
+
+    private func select(_ date: Date) {
+        withAnimation(Motion.fast) {
+            visibleMonth = date
+            selectedDay = cal.component(.day, from: date)
+        }
+    }
+
+    private func dots(for date: Date) -> [Color] {
+        var out = model.events.filter { $0.isOn(date) }.map(\.hue.color)
+        out += model.deviceEvents.filter { cal.isDate($0.start, inSameDayAs: date) }
+            .map { _ in GroupHue.coral.color }
+        return out
+    }
+
+    private var weekStrip: some View {
+        VStack(spacing: 8) {
+            HStack {
+                IconButton(icon: "chevron-left", variant: .ghost, size: 32, iconSize: 16,
+                           accessibilityLabel: "Previous week") {
+                    if let d = cal.date(byAdding: .day, value: -7, to: selectedDate ?? Date()) {
+                        select(d)
+                    }
+                }
+                Spacer()
+                Text(weekTitle).textStyle(.headline, color: .textStrong)
+                Spacer()
+                IconButton(icon: "chevron-right", variant: .ghost, size: 32, iconSize: 16,
+                           accessibilityLabel: "Next week") {
+                    if let d = cal.date(byAdding: .day, value: 7, to: selectedDate ?? Date()) {
+                        select(d)
+                    }
+                }
+            }
+            HStack(spacing: 2) {
+                ForEach(weekDays, id: \.self) { day in
+                    let isSelected = selectedDate.map { cal.isDate($0, inSameDayAs: day) } ?? false
+                    let isToday = cal.isDateInToday(day)
+                    VStack(spacing: 3) {
+                        Text(Self.weekdayLetter.string(from: day))
+                            .textStyle(.overline, color: .textFaint)
+                        Text("\(cal.component(.day, from: day))")
+                            .font(.system(size: 16, weight: isToday || isSelected ? .bold : .regular,
+                                          design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(isSelected ? Color.white
+                                             : (isToday ? Color.actionPrimary : Color.textBody))
+                            .frame(width: 34, height: 34)
+                            .background(isSelected ? Color.actionPrimary : .clear)
+                            .clipShape(Circle())
+                        HStack(spacing: 3) {
+                            ForEach(Array(dots(for: day).prefix(3).enumerated()), id: \.offset) { _, c in
+                                Circle().fill(c).frame(width: 5, height: 5)
+                            }
+                        }
+                        .frame(height: 5)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { select(day) }
+                }
+            }
+        }
+    }
+
+    private var weekTitle: String {
+        guard let first = weekDays.first, let last = weekDays.last else { return "" }
+        let f = DateFormatter(); f.dateFormat = "d MMM"
+        return "\(f.string(from: first)) – \(f.string(from: last))"
+    }
+
+    private static let weekdayLetter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEEEE"; return f
+    }()
 
     private var monthBar: some View {
         HStack {

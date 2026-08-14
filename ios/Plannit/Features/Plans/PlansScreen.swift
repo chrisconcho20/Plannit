@@ -106,6 +106,7 @@ struct PlanDetailView: View {
     @State private var selectedSlot: String?
     @State private var busy = false
     @State private var toast: String?
+    @State private var confirmCancel = false
 
     /// Re-read from the model so votes and the lock-in land without a reopen.
     private var live: PProposal { model.proposals.first { $0.id == proposal.id } ?? proposal }
@@ -191,9 +192,25 @@ struct PlanDetailView: View {
                 IconButton(icon: "chevron-left", variant: .secondary, size: 40, iconSize: 18,
                            accessibilityLabel: "Back") { dismiss() }
                 Spacer()
+                if canFinalize {
+                    Button(role: .destructive) { confirmCancel = true } label: {
+                        Text("Cancel plan").textStyle(.subhead, color: .statusDanger)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, Space.gutter).padding(.vertical, 6)
             .background(.ultraThinMaterial)
+        }
+        .confirmationDialog("Cancel “\(live.title)”?", isPresented: $confirmCancel,
+                            titleVisibility: .visible) {
+            Button("Cancel this plan", role: .destructive) {
+                Task { await model.cancelPlan(live) }
+                dismiss()
+            }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text("The times and everyone's votes go with it.")
         }
         .overlay(alignment: .top) {
             if let toast {
@@ -228,6 +245,14 @@ struct PlanDetailView: View {
                     .disabled(voteDisabled)
                     .opacity(voteDisabled ? 0.5 : 1)
 
+                if live.myVoteSlotId != nil {
+                    Button { removeVote() } label: {
+                        Text("Remove my vote").textStyle(.subhead, color: .textMuted)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                }
+
                 if canFinalize {
                     PlannitButton(title: busy ? "Locking in…" : "Lock in this time",
                                   variant: .free, size: .md, icon: "calendar-check",
@@ -248,6 +273,15 @@ struct PlanDetailView: View {
     }
     private var voteDisabled: Bool {
         chosen == nil || busy || live.myVoteSlotId == selectedSlot
+    }
+
+    private func removeVote() {
+        busy = true
+        Task {
+            let ok = await model.removeVote(on: live)
+            busy = false
+            show(ok ? "Vote removed" : "Couldn't remove your vote. Try again.")
+        }
     }
 
     private func castVote() {
