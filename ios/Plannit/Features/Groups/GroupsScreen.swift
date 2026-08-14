@@ -175,6 +175,8 @@ struct NewGroupSheet: View {
     }
 
     private func toggle(_ p: String) {
-        withAnimation(Motion.fast) { _ = selected.contains(p) ? selected.remove(p) : selected.insert(p) }
+        withAnimation(Motion.fast) {
+            if selected.contains(p) { _ = selected.remove(p) } else { _ = selected.insert(p) }
+        }
     }
 }

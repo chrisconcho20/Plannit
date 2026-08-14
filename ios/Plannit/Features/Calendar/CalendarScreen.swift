@@ -241,6 +241,8 @@ struct ShareSheet: View {
     }
 
     private func toggle(_ id: String) {
-        withAnimation(Motion.fast) { _ = shared.contains(id) ? shared.remove(id) : shared.insert(id) }
+        withAnimation(Motion.fast) {
+            if shared.contains(id) { _ = shared.remove(id) } else { _ = shared.insert(id) }
+        }
     }
 }

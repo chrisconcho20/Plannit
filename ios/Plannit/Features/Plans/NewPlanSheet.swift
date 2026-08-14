@@ -105,7 +105,11 @@ struct NewPlanSheet: View {
                         .background(on ? Color.actionPrimary : Color.sunk)
                         .clipShape(Circle())
                         .contentShape(Circle())
-                        .onTapGesture { withAnimation(Motion.fast) { _ = on ? days.remove(i) : days.insert(i) } }
+                        .onTapGesture {
+                            withAnimation(Motion.fast) {
+                                if on { _ = days.remove(i) } else { _ = days.insert(i) }
+                            }
+                        }
                 }
             }
 
