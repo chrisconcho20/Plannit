@@ -36,15 +36,18 @@ function b64url(input: ArrayBuffer | Uint8Array | string): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function pemToDer(pem: string): Uint8Array {
+// Returns the ArrayBuffer itself: TS 5.7 made Uint8Array generic over its
+// backing buffer, and only an ArrayBuffer-backed view satisfies BufferSource.
+function pemToDer(pem: string): ArrayBuffer {
   const body = pem
     .replace(/-----BEGIN [^-]+-----/g, "")
     .replace(/-----END [^-]+-----/g, "")
     .replace(/\s+/g, "");
   const raw = atob(body);
-  const der = new Uint8Array(raw.length);
+  const buffer = new ArrayBuffer(raw.length);
+  const der = new Uint8Array(buffer);
   for (let i = 0; i < raw.length; i++) der[i] = raw.charCodeAt(i);
-  return der;
+  return buffer;
 }
 
 // APNs recommends reusing a provider token and refreshing it well under 60 min.
