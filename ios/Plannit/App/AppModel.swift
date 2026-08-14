@@ -39,6 +39,7 @@ final class AppModel: ObservableObject {
     @Published var autoFriendEveryone = false
 
     private let calendar = CalendarService()
+    private let realtime = RealtimeService()
     private var appleCoordinator: AppleSignInCoordinator?
     private var calendarObserver: NSObjectProtocol?
 
@@ -84,6 +85,7 @@ final class AppModel: ObservableObject {
             autoFriendEveryone = beta
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
+            await realtime.sync(groupIds: g.map(\.id))
         } catch {
             loadError = Self.message(for: error)
         }
@@ -94,6 +96,29 @@ final class AppModel: ObservableObject {
     // A full loadData() is seven round trips. A write only invalidates part of
     // the screen, and the polling loops below run every few seconds, so both use
     // the narrowest refresh that's still correct.
+
+    // MARK: Live updates
+    //
+    // Broadcast tells us *that* something changed in a group; we then refresh
+    // that slice. LiveRefresh polling stays on as the safety net, so a socket
+    // that never connects only costs latency.
+    func startRealtime() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        realtime.onChange = { [weak self] change in
+            Task { @MainActor in
+                switch change {
+                case .proposals: await self?.refreshProposals()
+                case .events:    await self?.refreshEvents()
+                case .groups:    await self?.refreshGroups()
+                }
+            }
+        }
+        await realtime.sync(groupIds: groups.map(\.id))
+    }
+
+    func stopRealtime() async {
+        await realtime.stop()
+    }
 
     func refreshProposals() async {
         guard Config.isLiveBackend, signedIn else { return }
@@ -159,6 +184,7 @@ final class AppModel: ObservableObject {
 
     /// Sign out: forget the session and drop every trace of the account's data.
     func signOut() {
+        Task { await stopRealtime() }
         SupabaseClient.shared.signOut()
         signedIn = false
         userId = nil

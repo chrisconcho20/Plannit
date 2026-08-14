@@ -15,12 +15,24 @@ settings:
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: ""   # Codemagic manages signing; leave empty
 
+# The one third-party dependency (decision D-16). Only the Realtime product:
+# our REST/auth layer stays hand-rolled. Pinned exactly rather than a range —
+# the SDK needs Xcode 16.4/Swift 6.1 and the CI runner is on exactly 16.4, so a
+# minor bump could break the build without us touching anything.
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    exactVersion: 2.55.1
+
 targets:
   Plannit:
     type: application
     platform: iOS
     sources:
       - path: Plannit
+    dependencies:
+      - package: Supabase
+        product: Realtime
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.plannit.app

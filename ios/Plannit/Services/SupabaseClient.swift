@@ -307,6 +307,10 @@ final class SupabaseClient {
         return accessToken
     }
 
+    /// A token that's good right now, refreshing first if it's about to expire.
+    /// The Realtime SDK calls this on every connect and reconnect.
+    func currentToken() async -> String? { await authorized() }
+
     private func clearSession() {
         accessToken = nil; refreshToken = nil; userId = nil
         userEmail = nil; expiresAt = nil

@@ -109,14 +109,21 @@ struct RootView: View {
         .task {
             await model.resumeCalendarIfAuthorized()
             await model.loadData()
+            await model.startRealtime()
         }
         // A full reconcile every time we come back: EventKit can't tell us about
         // edits made while we were away (sync-contract §Background refresh).
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
             Task {
+                // iOS suspends us shortly after backgrounding and the socket
+                // dies with it, so drop it deliberately and rebuild on return.
+                guard phase == .active else {
+                    await model.stopRealtime()
+                    return
+                }
                 await model.syncCalendar()
                 await model.loadData()
+                await model.startRealtime()
             }
         }
     }
