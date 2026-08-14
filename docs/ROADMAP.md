@@ -81,11 +81,15 @@ account. See §6 for URLs/creds.
 
 ### Phase 3 — Social graph
 6. **Friends** — friend requests / accept (tables exist: `friendships`), a
-   people search, and pending-requests UI. Prereq for member-adding and
-   share-to-user.
-7. **Group management** — add members (needs friends), leave/rename, and **hue
-   persistence** (needs a `hue` column or mapping table — currently derived from
-   name; see known issues).
+   people search, and pending-requests UI. **Now the main gap:** group
+   member-adding works, but the pool of people you can add is only "profiles RLS
+   lets you see" = your groups' co-members. You cannot reach someone you don't
+   already share a group with, and removing the last shared group makes them
+   invisible again. Friend requests are what break that circularity.
+7. **Group management** — ~~add members~~ ✅, ~~remove members / delete / leave~~ ✅
+   (2026-08-14, `Features/Groups/GroupsScreen.swift`). Still to do: **rename a
+   group**, and **hue persistence** (needs a `hue` column or mapping table —
+   currently derived from name; see known issues).
 
 ### Phase 4 — Notifications
 8. **APNs client** — request permission, register the device token into
@@ -127,17 +131,19 @@ account. See §6 for URLs/creds.
 - **Session not persisted** (in-memory token) — relaunch logs you out. (Phase 5.9)
 - **Group hue not persisted** — no `hue` column; derived from name, so the hue
   picker in "New group" is cosmetic. Add a column or accept derived.
-- **Group create can't add real members** — needs the friends system; today it
-  creates the group with just the owner. For testing, `supabase/seed-test-users.sql`
-  drops five real people into every group you own.
+- **You can only add people you already share a group with** — there's no friend
+  system, so the people picker is fed by whatever `profiles` RLS returns. For
+  testing, `supabase/seed-test-users.sql` drops five real people into every group
+  you own. (Phase 3.6)
+- **Slot avatars are approximate** — `PGroup` now carries member ids, so mapping
+  a slot's `availableUserIds` to real faces is finally possible; the UI still
+  shows the first N members.
 - **Placeholder buttons** do nothing (see Phase 5.13).
 - **`fetchProposals` returns `[]`** in live mode (stub) — Plans tab is empty live.
 - **No offline support / no retry** — network failure silently keeps sample data
   (the date-finder is the exception: it now surfaces a real error + retry).
 - **A sent plan is invisible live** — `find-slots` persists the proposal, but the
   Plans tab can't read it back until 1.2 lands.
-- **Slot avatars are approximate** — a slot shows the first N group members, not
-  the actual `availableUserIds`; `PGroup` carries member names, not ids.
 - **Sample data still leaks into live mode** — `AppModel` seeds sample groups/
   events/proposals, so a failed or empty live load shows demo content. The Plans
   tab is the visible case (see above).
