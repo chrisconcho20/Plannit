@@ -165,8 +165,10 @@ account. See §6 for URLs/creds.
 
 ## 3. Known issues / tech debt
 - **No realtime** — votes, shares and new plans appear on the next load, not as
-  they happen. `postgres_changes` subscriptions are specced in the API contract
-  but unused. This is the next structural gap now that phase 1 is complete.
+  they happen. Researched: [`realtime-research.md`](realtime-research.md)
+  recommends **Broadcast from Database** (not the `postgres_changes` the API
+  contract specs) plus the official `Realtime` SPM module, after optimistic
+  writes. PowerSync is the local-first alternative if offline moves up.
 - **Group hue is device-local** — the picker works, but the colour lives in
   UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
 - **Reaching a stranger needs their exact email** — by design (the directory
