@@ -56,11 +56,16 @@ account. See §6 for URLs/creds.
    1/3/6/12 months, default 6) stored under `SearchWindow.key`.
    _Follow-up:_ slot avatars still show the first N group members rather than the
    real `availableUserIds` (needs member ids on `PGroup`).
-2. **Live proposals + voting** — `SupabaseRepository.fetchProposals` (embed
-   `proposal_slots`, group, `votes`), render in `PlansScreen`/`PlanDetailView`;
-   wire vote insert and **Lock in** → set `proposals.finalized_slot_id` + status,
-   and create the winning `event`. Files: `Services/DataRepository.swift`,
-   `Features/Plans/PlansScreen.swift`.
+2. ~~**Live proposals + voting**~~ ✅ **done (2026-08-14).** `fetchProposals`
+   reads proposals + group members + votes, and slots in a second query (the two
+   FKs between `proposals` and `proposal_slots` make an embed ambiguous).
+   `PlanDetailView` votes (one choice per proposal — casting replaces your last),
+   shows per-slot counts and "Your pick", and **Lock in** (creator or group owner,
+   matching RLS) sets `finalized_slot_id` + status, creates the winning `event`
+   and shares it to the group. Slots carry `available_user_ids`, so cards show
+   the faces of whoever is actually free.
+   _Next here:_ no realtime — votes appear on reload, not as they land; no
+   "unvote"; a locked-in plan can't be reopened or cancelled.
 3. **Event sharing to groups (live)** — `ShareSheet` currently demo; insert
    `event_shares` rows. Files: `Features/Calendar/CalendarScreen.swift`.
 
@@ -135,15 +140,9 @@ account. See §6 for URLs/creds.
   system, so the people picker is fed by whatever `profiles` RLS returns. For
   testing, `supabase/seed-test-users.sql` drops five real people into every group
   you own. (Phase 3.6)
-- **Slot avatars are approximate** — `PGroup` now carries member ids, so mapping
-  a slot's `availableUserIds` to real faces is finally possible; the UI still
-  shows the first N members.
 - **Placeholder buttons** do nothing (see Phase 5.13).
-- **`fetchProposals` returns `[]`** in live mode (stub) — Plans tab is empty live.
 - **No offline support / no retry** — network failure silently keeps sample data
   (the date-finder is the exception: it now surfaces a real error + retry).
-- **A sent plan is invisible live** — `find-slots` persists the proposal, but the
-  Plans tab can't read it back until 1.2 lands.
 - **Sample data still leaks into live mode** — `AppModel` seeds sample groups/
   events/proposals, so a failed or empty live load shows demo content. The Plans
   tab is the visible case (see above).
