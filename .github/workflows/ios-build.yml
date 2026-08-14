@@ -34,17 +34,8 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
-      - name: Build for iOS Simulator
-        working-directory: ios
-        run: |
-          xcodebuild build \
-            -project Plannit.xcodeproj \
-            -scheme Plannit \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO
-
-      # Unit tests need a concrete simulator, and the runner's device list
-      # changes with the image — pick whatever iPhone it actually has.
+      # Tests need a concrete simulator, and the runner's device list changes
+      # with the image — pick whatever iPhone it actually has.
       - name: Pick a simulator
         id: sim
         run: |
@@ -53,7 +44,10 @@ jobs:
           echo "Using $NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Run unit tests
+      # One invocation, not two. This used to run `xcodebuild build` and then
+      # `xcodebuild test`, compiling everything twice — 135s + 252s on a runner
+      # billed at 10x. `test` builds what `build` did.
+      - name: Build and test
         working-directory: ios
         run: |
           xcodebuild test \
