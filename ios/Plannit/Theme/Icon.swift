@@ -27,6 +27,7 @@ struct PIcon: View {
         // calendar
         "calendar": "calendar", "calendar-days": "calendar",
         "calendar-check": "calendar.badge.checkmark", "calendar-plus": "calendar.badge.plus",
+        "calendar-x": "calendar.badge.exclamationmark", "circle-alert": "exclamationmark.circle.fill",
         "calendar-heart": "calendar", "clock": "clock", "hourglass": "hourglass", "repeat": "repeat",
         // people
         "users": "person.2.fill", "user": "person.fill", "user-plus": "person.badge.plus",

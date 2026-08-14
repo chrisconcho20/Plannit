@@ -65,6 +65,7 @@ struct FindSlotsRequest: Encodable {
     let groupId: String
     let title: String
     let constraints: SlotConstraintsDTO
+    let maxResults: Int
     let persist: Bool
 }
 struct FoundSlotDTO: Decodable {
@@ -73,7 +74,9 @@ struct FoundSlotDTO: Decodable {
     let score: Int
     let availableUserIds: [String]
 }
+struct ProposalRefDTO: Decodable { let id: String }
 struct FindSlotsResponse: Decodable {
+    let proposal: ProposalRefDTO?   // omitted when persist:false
     let slots: [FoundSlotDTO]
 }
 

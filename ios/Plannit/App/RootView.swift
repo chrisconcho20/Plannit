@@ -40,7 +40,9 @@ struct RootView: View {
             NewPlanSheet(groups: model.groups) { name, group in
                 showNewPlan = false
                 tab = .plans
-                showToast("\(name) sent to \(group) — 4 have voted already")
+                showToast(model.isLiveBackend
+                          ? "\(name) sent to \(group) — we’ll ping you as votes come in"
+                          : "\(name) sent to \(group) — 4 have voted already")
             }
         }
         .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }

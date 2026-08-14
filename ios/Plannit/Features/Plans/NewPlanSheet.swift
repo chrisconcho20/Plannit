@@ -18,6 +18,9 @@ struct NewPlanSheet: View {
     @State private var timeOfDay = "Afternoon"
     @State private var duration = "2h"
     @State private var finding = false
+    @State private var sending = false
+    @State private var slots: [PSlot] = []
+    @State private var errorText: String?
 
     private let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -32,8 +35,10 @@ struct NewPlanSheet: View {
     }
 
     private var total: Int { group?.members.count ?? 0 }
+    private var isLive: Bool { Config.isLiveBackend }
 
-    private var foundSlots: [PSlot] {
+    /// Demo-mode stand-in for the scheduler's output.
+    private var sampleSlots: [PSlot] {
         [PSlot(day: "SAT", date: 16, time: "2:00 – 4:00 PM", free: total, best: true),
          PSlot(day: "SUN", date: 17, time: "11:00 AM – 1:00 PM", free: max(0, total - 1)),
          PSlot(day: "SAT", date: 23, time: "3:00 – 5:00 PM", free: max(0, total - 1))]
@@ -156,12 +161,23 @@ struct NewPlanSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 30)
+            } else if let errorText {
+                EmptyState(icon: "circle-alert", title: "Couldn’t check calendars",
+                           message: errorText, actionTitle: "Try again") { findTimes() }
+                    .frame(maxWidth: .infinity)
+            } else if slots.isEmpty {
+                EmptyState(icon: "calendar-x", title: "No times work",
+                           message: "Nobody’s free for \(duration) \(timeOfDay.lowercased()) in the next \(SlotFinder.searchWeeks) weeks. Try more days or a shorter plan.",
+                           actionTitle: "Change the plan") {
+                    withAnimation(Motion.base) { step = 1 }
+                }
+                .frame(maxWidth: .infinity)
             } else {
                 HStack(spacing: 8) {
                     PIcon("circle-check", size: 18, color: .statusFree)
                     Text(constraintSummary).textStyle(.footnote, color: .textMuted)
                 }
-                ForEach(foundSlots) { slot in
+                ForEach(slots) { slot in
                     SlotCard(day: slot.day, date: slot.date, time: slot.time,
                              freeCount: slot.free, total: total,
                              people: Array((group?.members ?? []).prefix(slot.free)),
@@ -185,24 +201,108 @@ struct NewPlanSheet: View {
                 .padding(Space.gutter)
             case 1:
                 PlannitButton(title: "Find times", variant: .free, size: .lg, icon: "wand-sparkles", fullWidth: true) {
-                    withAnimation(Motion.base) { step = 2; finding = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                        withAnimation(Motion.base) { finding = false }
-                    }
+                    findTimes()
                 }
                 .disabled(days.isEmpty).opacity(days.isEmpty ? 0.5 : 1)
                 .padding(Space.gutter)
             default:
-                PlannitButton(title: "Send to group to vote", variant: .primary, size: .lg,
-                              icon: "send", fullWidth: true) {
-                    onFound(title.isEmpty ? "New plan" : title, group?.name ?? "your group")
-                    dismiss()
+                PlannitButton(title: sending ? "Sending…" : "Send to group to vote",
+                              variant: .primary, size: .lg, icon: "send", fullWidth: true) {
+                    send()
                 }
-                .disabled(finding).opacity(finding ? 0.5 : 1)
+                .disabled(sendDisabled).opacity(sendDisabled ? 0.5 : 1)
                 .padding(Space.gutter)
             }
         }
         .background(.ultraThinMaterial)
+    }
+
+    private var sendDisabled: Bool { finding || sending || slots.isEmpty }
+
+    // MARK: Actions
+
+    /// Run the scheduler. Live mode previews real slots (`persist: false`) so an
+    /// abandoned sheet never leaves an orphan proposal behind; the proposal is
+    /// written only when the user sends it to the group.
+    private func findTimes() {
+        errorText = nil
+        withAnimation(Motion.base) { step = 2; finding = true }
+
+        guard isLive, let selected = group else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                slots = sampleSlots
+                withAnimation(Motion.base) { finding = false }
+            }
+            return
+        }
+
+        Task {
+            do {
+                let res = try await invokeFindSlots(group: selected, persist: false)
+                slots = res.slots.enumerated().map { i, dto in
+                    SlotFinder.slot(from: dto, best: i == 0)
+                }
+            } catch {
+                slots = []
+                errorText = Self.message(for: error)
+            }
+            withAnimation(Motion.base) { finding = false }
+        }
+    }
+
+    /// Persist the proposal so the group can vote on it.
+    private func send() {
+        guard isLive, let selected = group else {
+            onFound(planTitle, group?.name ?? "your group")
+            dismiss()
+            return
+        }
+
+        sending = true
+        Task {
+            do {
+                _ = try await invokeFindSlots(group: selected, persist: true)
+                sending = false
+                onFound(planTitle, selected.name)
+                dismiss()
+            } catch {
+                sending = false
+                errorText = Self.message(for: error)
+            }
+        }
+    }
+
+    @MainActor
+    private func invokeFindSlots(group: PGroup, persist: Bool) async throws -> FindSlotsResponse {
+        let body = FindSlotsRequest(
+            groupId: group.id,
+            title: planTitle,
+            constraints: SlotFinder.constraints(days: days, timeOfDay: timeOfDay,
+                                                duration: duration,
+                                                memberCount: group.members.count),
+            maxResults: SlotFinder.maxResults,
+            persist: persist)
+        return try await SupabaseClient.shared.invokeFunction("find-slots", body: body)
+    }
+
+    private var planTitle: String { title.isEmpty ? "New plan" : title }
+
+    private static func message(for error: Error) -> String {
+        guard let e = error as? SupabaseError else {
+            return "Couldn’t reach Plannit. Check your connection and try again."
+        }
+        switch e {
+        case .notConfigured:
+            return "You’re signed out — sign in and try again."
+        case .decoding:
+            return "Plannit sent something we couldn’t read. Try again."
+        case .http(let code, _):
+            switch code {
+            case 401: return "Your session expired — sign in and try again."
+            case 403: return "You’re not a member of that group any more."
+            default:  return "The scheduler failed (\(code)). Try again in a moment."
+            }
+        }
     }
 
     private func fieldLabel(_ text: String) -> some View {
