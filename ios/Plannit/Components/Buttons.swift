@@ -103,8 +103,15 @@ struct IconButton: View {
                 .font(.system(size: iconSize, weight: .semibold))
         }
         .buttonStyle(IconButtonStyle(variant: variant, size: size))
+        // The circle can be as small as the design calls for, but the *target*
+        // never goes below Apple's 44pt minimum — several of ours are 32pt, and
+        // a missed tap on "remove member" is worse than a little extra padding.
+        .frame(minWidth: Self.minimumTarget, minHeight: Self.minimumTarget)
+        .contentShape(Rectangle())
         .accessibilityLabel(accessibilityLabel)
     }
+
+    static let minimumTarget: CGFloat = 44
 }
 
 struct IconButtonStyle: ButtonStyle {
