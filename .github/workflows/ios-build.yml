@@ -2,9 +2,12 @@ name: iOS Build
 
 # Compiles the SwiftUI app on a macOS runner so the code is validated without a
 # local Mac. Builds for the simulator (no signing needed).
+#
+# NOT on push. macOS runners bill at 10x, and a compile on every commit was the
+# single biggest drain on the Actions quota — several commits of one piece of
+# work each paid for a full build. Run it from the Actions tab (or
+# `gh workflow run ios-build.yml`) once a batch of work is ready.
 on:
-  push:
-    paths: ["ios/**", ".github/workflows/ios-build.yml"]
   pull_request:
     paths: ["ios/**"]
   workflow_dispatch:
