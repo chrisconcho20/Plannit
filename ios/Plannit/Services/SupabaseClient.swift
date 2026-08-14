@@ -82,7 +82,8 @@ struct BusyBlockInsert: Encodable {
     let end_at: String
 }
 
-// A proposal with everything the Plans tab needs, in one embedded query.
+// A proposal with its group and votes. Slots are fetched separately — see
+// SupabaseRepository.fetchProposals for why.
 struct ProposalRowDTO: Decodable, Identifiable {
     let id: String
     let group_id: String
@@ -93,7 +94,6 @@ struct ProposalRowDTO: Decodable, Identifiable {
     let created_at: String?
     let constraints: StoredConstraintsDTO?
     let groups: GroupDTO?
-    let proposal_slots: [ProposalSlotDTO]?
     let votes: [VoteDTO]?
 }
 /// The `constraints` jsonb as stored by find-slots — enough to describe the ask.
@@ -105,6 +105,7 @@ struct StoredConstraintsDTO: Decodable {
 }
 struct ProposalSlotDTO: Decodable, Identifiable {
     let id: String
+    let proposal_id: String?
     let start_at: String
     let end_at: String
     let score: Int

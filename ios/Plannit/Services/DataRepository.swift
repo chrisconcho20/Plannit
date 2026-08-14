@@ -59,26 +59,34 @@ struct SupabaseRepository: DataRepository {
         return dtos.map(Self.map)
     }
 
-    /// One embedded query for the whole Plans tab: the proposal, its group (with
-    /// members, so scores have a denominator and faces), its slots, and every
-    /// vote. RLS scopes all of it to groups you belong to.
+    /// The Plans tab in two queries: proposals (with their group's members, so
+    /// scores have a denominator and faces, plus every vote), then the slots.
+    ///
+    /// The slots are fetched separately on purpose. `proposals` and
+    /// `proposal_slots` reference each other — `proposal_slots.proposal_id` one
+    /// way, `proposals.finalized_slot_id` the other — so a PostgREST embed is
+    /// ambiguous and needs a hint that depends on generated constraint names.
+    /// A second query is cheaper than that fragility. RLS scopes both to the
+    /// groups you belong to.
     func fetchProposals() async throws -> [PProposal] {
         let rows: [ProposalRowDTO] = try await client.select(
             "proposals",
             columns: """
                      id,group_id,created_by,title,status,finalized_slot_id,created_at,constraints,\
                      groups(id,name,owner_id,avatar_url,group_memberships(user_id,profiles(id,display_name))),\
-                     proposal_slots(id,start_at,end_at,score,available_user_ids),\
                      votes(slot_id,user_id,response)
                      """,
             query: ["order": "created_at.desc"])
+        guard !rows.isEmpty else { return [] }
 
+        let slotsByProposal = try await fetchSlots(for: rows.map(\.id))
         let me = client.userId
+
         return rows.map { row in
             let group = Self.mapGroup(row.groups, fallbackId: row.group_id)
             // Best turnout first, ties broken by the earliest date — the same
             // ranking the scheduler used when it wrote them.
-            let slots = (row.proposal_slots ?? []).sorted { a, b in
+            let slots = (slotsByProposal[row.id] ?? []).sorted { a, b in
                 a.score != b.score ? a.score > b.score : a.start_at < b.start_at
             }
             let best = slots.first?.id
@@ -101,6 +109,13 @@ struct SupabaseRepository: DataRepository {
                 finalizedSlotId: row.finalized_slot_id,
                 createdBy: row.created_by)
         }
+    }
+
+    private func fetchSlots(for proposalIds: [String]) async throws -> [String: [ProposalSlotDTO]] {
+        let rows: [ProposalSlotDTO] = try await client.select(
+            "proposal_slots", columns: "id,proposal_id,start_at,end_at,score,available_user_ids",
+            query: ["proposal_id": "in.(\(proposalIds.joined(separator: ",")))"])
+        return Dictionary(grouping: rows.filter { $0.proposal_id != nil }, by: { $0.proposal_id! })
     }
 
     private static func mapGroup(_ dto: GroupDTO?, fallbackId: String) -> PGroup {
