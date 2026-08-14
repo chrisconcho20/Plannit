@@ -6,8 +6,16 @@ import SwiftUI
 struct CalendarScreen: View {
     enum Mode: String, CaseIterable { case month = "Month", week = "Week", list = "List" }
 
+    @EnvironmentObject private var model: AppModel
     @State private var mode: Mode = .month
     @State private var selectedDay: Int? = 16
+
+    private static let deviceTimeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE d · h:mm a"; return f
+    }()
+    private static func deviceTime(_ d: DeviceEvent) -> String {
+        d.isAllDay ? "All day" : deviceTimeFormatter.string(from: d.start)
+    }
 
     private var events: [PEvent] {
         if mode == .month, let day = selectedDay {
@@ -48,9 +56,23 @@ struct CalendarScreen: View {
                     }
                     .padding(.horizontal, Space.gutter)
 
-                    if events.isEmpty {
+                    if events.isEmpty && model.deviceEvents.isEmpty {
                         EmptyState(icon: "calendar", title: "Nothing here",
                                    message: "No events on this day. Tap ＋ to find a time with a group.")
+                    }
+
+                    if !model.deviceEvents.isEmpty {
+                        SectionLabel("From your calendar") {
+                            Text("\(model.deviceEvents.count)").textStyle(.caption, color: .textFaint)
+                        }
+                        LazyVStack(spacing: Space.gapList) {
+                            ForEach(model.deviceEvents) { device in
+                                EventCard(title: device.title, time: Self.deviceTime(device),
+                                          location: device.location, hue: .coral, group: nil,
+                                          people: [], icon: "calendar", badge: "Private", badgeTone: .neutral)
+                            }
+                        }
+                        .padding(.horizontal, Space.gutter)
                     }
 
                     Color.clear.frame(height: 120)
@@ -60,6 +82,7 @@ struct CalendarScreen: View {
         .background(Color.appBg)
         .navigationBarHidden(true)
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
+        .onAppear { model.refreshCalendar() }
     }
 
     private var header: some View {

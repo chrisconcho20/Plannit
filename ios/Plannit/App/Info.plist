@@ -27,6 +27,13 @@
     <key>NSCalendarsUsageDescription</key>
     <string>Plannit syncs with your calendar to find times your groups are free.</string>
 
+    <!-- Backend config. Leave empty for demo mode (sample data). Fill in to test
+         against the live Supabase project (see docs/backend/setup-runbook.md). -->
+    <key>SUPABASE_URL</key>
+    <string></string>
+    <key>SUPABASE_ANON_KEY</key>
+    <string></string>
+
     <!-- Deep link for Sign in with Apple / auth callback -->
     <key>CFBundleURLTypes</key>
     <array>

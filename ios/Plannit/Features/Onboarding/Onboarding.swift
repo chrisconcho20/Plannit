@@ -57,7 +57,9 @@ struct WelcomeView: View {
 }
 
 struct ConnectCalendarView: View {
-    var onDone: () -> Void
+    var connect: () async -> Void
+    var onSkip: () -> Void
+    @State private var connecting = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -78,10 +80,14 @@ struct ConnectCalendarView: View {
             }
             Spacer()
             VStack(spacing: 10) {
-                PlannitButton(title: "Connect calendar", variant: .primary, size: .lg,
-                              icon: "calendar", fullWidth: true, action: onDone)
+                PlannitButton(title: connecting ? "Connecting…" : "Connect calendar",
+                              variant: .primary, size: .lg, icon: "calendar", fullWidth: true) {
+                    connecting = true
+                    Task { @MainActor in await connect() }
+                }
+                .disabled(connecting)
                 PlannitButton(title: "Not now", variant: .ghost, size: .md,
-                              fullWidth: true, action: onDone)
+                              fullWidth: true, action: onSkip)
             }
             .padding(.horizontal, Space.gutter)
             .padding(.bottom, 8)

@@ -6,6 +6,7 @@ enum Tab: Hashable { case calendar, groups, plans, you }
 struct RootView: View {
     enum Flow { case welcome, connect, app }
 
+    @StateObject private var model = AppModel()
     @State private var flow: Flow = .welcome
     @State private var tab: Tab = .calendar
     @State private var showNewPlan = false
@@ -19,11 +20,15 @@ struct RootView: View {
             case .welcome:
                 WelcomeView(onStart: { flow = .connect }, onSignIn: { flow = .app })
             case .connect:
-                ConnectCalendarView(onDone: { flow = .app })
+                ConnectCalendarView(
+                    connect: { await model.connectCalendar(); flow = .app },
+                    onSkip: { flow = .app }
+                )
             case .app:
                 appShell
             }
         }
+        .environmentObject(model)
         .sheet(isPresented: $showNewPlan) {
             NewPlanSheet { name, group in
                 showNewPlan = false

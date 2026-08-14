@@ -19,7 +19,38 @@ No XcodeGen? Create a new iOS App in Xcode (SwiftUI, iOS 17), delete its stub
 files, and drag the `Plannit/` folder in. Set the app icon to `AppIcon` and add
 the calendar usage strings + `plannit` URL scheme from `Plannit/App/Info.plist`.
 
-Set your **Team ID** in `project.yml` (`DEVELOPMENT_TEAM`) before signing.
+Set your **Team ID** in `project.yml` (`DEVELOPMENT_TEAM`) before signing (not
+needed to run in the simulator).
+
+## Run on the iOS Simulator (demo mode)
+
+```bash
+cd ios
+brew install xcodegen        # once
+xcodegen generate
+open Plannit.xcodeproj
+```
+
+In Xcode pick an **iPhone 15** simulator and press **⌘R**. The app launches in
+**demo mode** — no backend, no Apple Developer account, no sign-in required — so
+you can click through the entire app (onboarding → calendar → groups → the
+date-finder → plans → settings) on sample data immediately.
+
+**Exercise the real calendar (end-to-end in the simulator):**
+1. On the "Connect your calendar" onboarding screen, tap **Connect calendar** → **Allow**.
+2. Open the Simulator's built-in **Calendar** app and add a couple of events.
+3. Back in Plannit, the Calendar tab shows them under **"From your calendar"**.
+
+Prefer the command line?
+```bash
+xcodebuild -project Plannit.xcodeproj -scheme Plannit \
+  -destination 'platform=iOS Simulator,name=iPhone 15' build
+```
+
+### Live backend (optional, later)
+Fill `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `Plannit/App/Info.plist`. Until
+both are set the app stays in demo mode. Full data + Sign in with Apple + APNs
+wiring is the next milestone.
 
 ## Structure
 
