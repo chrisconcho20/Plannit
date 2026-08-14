@@ -205,6 +205,7 @@ codemagic.yaml      Codemagic → TestFlight (needs Apple Developer account)
   §5b) to activate push triggers. Also configure Auth → Apple provider for
   on-device Sign in with Apple.
 - **Not yet acquired:** Apple Developer Program ($99/yr) — gates real Apple
-  sign-in, APNs, and on-device/TestFlight testing.
+  sign-in, APNs, and TestFlight. **Not** needed to run on your own iPhone from a
+  Mac: [`../ios/DEVICE-TESTING.md`](../ios/DEVICE-TESTING.md).
 - **Keep `ios/Plannit/App/Info.plist` Supabase keys EMPTY** in the repo (demo
   default). Live creds are injected only in `ios-appetize-live.yml` at build time.

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Empty on purpose. A free Apple ID ("personal team") can't sign
+         Sign in with Apple or push, so building Plannit.entitlements on one
+         fails outright. Nothing in the app calls Sign in with Apple yet — live
+         mode signs in with dev email — so dropping it costs nothing today.
+         See DEVICE-TESTING.md; switch back to Plannit.entitlements once
+         there's a paid membership. -->
+</dict>
+</plist>

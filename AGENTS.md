@@ -35,8 +35,11 @@ app locally**. Validate and test entirely through cloud services:
   - After a build, the run **Summary** prints the URL; the workflow also echoes
     `Appetize URL: …` in the log.
 
-Native-on-physical-iPhone needs an Apple Developer account + Codemagic
-([`ios/CODEMAGIC.md`](ios/CODEMAGIC.md)) — not available yet.
+**On a real iPhone** — a Mac + a *free* Apple ID is enough to install on your own
+device: [`ios/DEVICE-TESTING.md`](ios/DEVICE-TESTING.md). That's the only place
+the EventKit work can actually be verified. TestFlight (other people's phones,
+push, real Sign in with Apple) still needs the paid program + Codemagic
+([`ios/CODEMAGIC.md`](ios/CODEMAGIC.md)).
 
 ## Demo vs live mode
 
