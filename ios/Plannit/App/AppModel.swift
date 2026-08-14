@@ -12,12 +12,33 @@ final class AppModel: ObservableObject {
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
 
+    // Screen data — seeded with sample data so demo mode works with no loading.
+    @Published var groups: [PGroup] = Sample.groups
+    @Published var events: [PEvent] = Sample.events
+    @Published var proposals: [PProposal] = Sample.proposals
+
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
 
     nonisolated init() {}
 
     var isLiveBackend: Bool { Config.isLiveBackend }
+
+    /// Load screen data. Demo mode keeps the sample seed; live mode pulls from Supabase.
+    func loadData() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        let repo = SupabaseRepository()
+        do {
+            let g = try await repo.fetchGroups()
+            let e = try await repo.fetchEvents()
+            let p = try await repo.fetchProposals()
+            groups = g
+            events = e
+            proposals = p
+        } catch {
+            // Keep whatever we have (sample seed) on failure.
+        }
+    }
 
     // MARK: Auth
     /// Real Sign in with Apple → Supabase session. Returns false on cancel/failure.

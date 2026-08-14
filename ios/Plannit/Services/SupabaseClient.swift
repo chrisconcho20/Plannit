@@ -20,6 +20,17 @@ struct GroupDTO: Decodable, Identifiable {
     let avatar_url: String?
 }
 
+struct EventDTO: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let notes: String?
+    let location: String?
+    let start_at: String
+    let end_at: String
+    let all_day: Bool
+    let source: String
+}
+
 struct BusyBlockInsert: Encodable {
     let user_id: String
     let start_at: String   // ISO-8601

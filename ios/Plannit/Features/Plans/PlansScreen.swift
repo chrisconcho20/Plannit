@@ -5,6 +5,8 @@ import SwiftUI
 // Mirrors ui_kits/plannit-ios/PlansScreen.jsx.
 
 struct PlansScreen: View {
+    @EnvironmentObject private var model: AppModel
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -19,7 +21,7 @@ struct PlansScreen: View {
             ScrollView {
                 SectionLabel("Awaiting your vote")
                 LazyVStack(spacing: Space.gapList) {
-                    ForEach(Sample.proposals) { proposal in
+                    ForEach(model.proposals) { proposal in
                         NavigationLink(value: proposal) { ProposalRow(proposal: proposal) }
                             .buttonStyle(CardPressStyle())
                     }

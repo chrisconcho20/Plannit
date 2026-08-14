@@ -19,9 +19,9 @@ struct CalendarScreen: View {
 
     private var events: [PEvent] {
         if mode == .month, let day = selectedDay {
-            return Sample.events.filter { $0.day == day }
+            return model.events.filter { $0.day == day }
         }
-        return Sample.events.sorted { $0.day < $1.day }
+        return model.events.sorted { $0.day < $1.day }
     }
 
     private var sectionTitle: String {

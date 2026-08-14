@@ -6,6 +6,7 @@ import SwiftUI
 // Mirrors the ＋ flow in ui_kits/plannit-ios/PlansScreen.jsx.
 
 struct NewPlanSheet: View {
+    var groups: [PGroup] = Sample.groups
     var preselected: PGroup? = nil
     var onFound: (_ name: String, _ group: String) -> Void
 
@@ -21,7 +22,9 @@ struct NewPlanSheet: View {
     private let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-    init(preselected: PGroup? = nil, onFound: @escaping (String, String) -> Void) {
+    init(groups: [PGroup] = Sample.groups, preselected: PGroup? = nil,
+         onFound: @escaping (String, String) -> Void) {
+        self.groups = groups
         self.preselected = preselected
         self.onFound = onFound
         _group = State(initialValue: preselected)
@@ -63,7 +66,7 @@ struct NewPlanSheet: View {
     // MARK: Step 0 — group
     private var groupStep: some View {
         VStack(spacing: Space.gapList) {
-            ForEach(Sample.groups) { g in
+            ForEach(groups) { g in
                 Button { withAnimation(Motion.fast) { group = g } } label: {
                     HStack(spacing: 14) {
                         RoundedRectangle(cornerRadius: Radius.md, style: .continuous)

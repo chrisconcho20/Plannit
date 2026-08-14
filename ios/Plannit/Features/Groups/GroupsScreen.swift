@@ -4,6 +4,7 @@ import SwiftUI
 // Mirrors ui_kits/plannit-ios/GroupsScreen.jsx.
 
 struct GroupsScreen: View {
+    @EnvironmentObject private var model: AppModel
     @State private var showNewGroup = false
 
     var body: some View {
@@ -18,9 +19,9 @@ struct GroupsScreen: View {
             .padding(.vertical, 6)
 
             ScrollView {
-                SectionLabel("Your groups") { Text("\(Sample.groups.count)").textStyle(.caption, color: .textFaint) }
+                SectionLabel("Your groups") { Text("\(model.groups.count)").textStyle(.caption, color: .textFaint) }
                 LazyVStack(spacing: Space.gapList) {
-                    ForEach(Sample.groups) { group in
+                    ForEach(model.groups) { group in
                         NavigationLink(value: group) {
                             GroupCard(name: group.name, note: group.note, hue: group.hue, members: group.members)
                         }
@@ -47,10 +48,11 @@ struct GroupsScreen: View {
 
 struct GroupDetailView: View {
     let group: PGroup
+    @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var showNewPlan = false
 
-    private var sharedEvents: [PEvent] { Sample.events.filter { $0.group == group.name } }
+    private var sharedEvents: [PEvent] { model.events.filter { $0.group == group.name } }
 
     var body: some View {
         ScrollView {
@@ -118,7 +120,9 @@ struct GroupDetailView: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
         }
-        .sheet(isPresented: $showNewPlan) { NewPlanSheet(preselected: group) { _, _ in showNewPlan = false } }
+        .sheet(isPresented: $showNewPlan) {
+            NewPlanSheet(groups: model.groups, preselected: group) { _, _ in showNewPlan = false }
+        }
     }
 }
 

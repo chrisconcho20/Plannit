@@ -39,7 +39,7 @@ struct RootView: View {
         }
         .environmentObject(model)
         .sheet(isPresented: $showNewPlan) {
-            NewPlanSheet { name, group in
+            NewPlanSheet(groups: model.groups) { name, group in
                 showNewPlan = false
                 tab = .plans
                 showToast("\(name) sent to \(group) — 4 have voted already")
@@ -74,6 +74,7 @@ struct RootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .task { await model.loadData() }
     }
 
     @ViewBuilder
