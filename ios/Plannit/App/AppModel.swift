@@ -69,6 +69,24 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Create a group. Persists to Supabase in live mode; appends locally in demo.
+    func createGroup(name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if Config.isLiveBackend, let uid = userId {
+            do {
+                try await SupabaseClient.shared.insert(
+                    "groups", values: NewGroupInsert(name: trimmed, owner_id: uid))
+                await loadData()   // reload so the new group (and its owner membership) appears
+            } catch {
+                // leave existing groups on failure
+            }
+        } else {
+            groups.append(PGroup(id: UUID().uuidString, name: trimmed,
+                                 hue: GroupHue.forName(trimmed), members: [], note: ""))
+        }
+    }
+
     // MARK: Calendar
     func connectCalendar() async {
         let granted = await calendar.requestAccess()

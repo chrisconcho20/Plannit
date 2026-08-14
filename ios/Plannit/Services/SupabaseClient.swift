@@ -18,6 +18,18 @@ struct GroupDTO: Decodable, Identifiable {
     let name: String
     let owner_id: String
     let avatar_url: String?
+    let group_memberships: [MembershipEmbedDTO]?   // PostgREST embedded resource
+}
+struct MembershipEmbedDTO: Decodable {
+    let profiles: ProfileEmbedDTO?
+}
+struct ProfileEmbedDTO: Decodable {
+    let display_name: String?
+}
+
+struct NewGroupInsert: Encodable {
+    let name: String
+    let owner_id: String
 }
 
 struct EventDTO: Decodable, Identifiable {

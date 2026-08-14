@@ -43,7 +43,7 @@ struct RootView: View {
                 showToast("\(name) sent to \(group) — 4 have voted already")
             }
         }
-        .sheet(isPresented: $showNewGroup) { NewGroupSheet() }
+        .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }
         .animation(Motion.base, value: flow)
     }
 

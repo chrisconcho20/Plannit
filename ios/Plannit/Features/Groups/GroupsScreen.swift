@@ -42,7 +42,7 @@ struct GroupsScreen: View {
         .navigationBarHidden(true)
         .navigationDestination(for: PGroup.self) { GroupDetailView(group: $0) }
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
-        .sheet(isPresented: $showNewGroup) { NewGroupSheet() }
+        .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }
     }
 }
 
@@ -127,10 +127,12 @@ struct GroupDetailView: View {
 }
 
 struct NewGroupSheet: View {
+    @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var hue: GroupHue = .teal
     @State private var selected: Set<String> = []
+    @State private var busy = false
 
     private let people = ["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"]
 
@@ -162,10 +164,18 @@ struct NewGroupSheet: View {
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, 4)
             }
-            PlannitButton(title: "Create group", variant: .primary, size: .lg, fullWidth: true) { dismiss() }
+            PlannitButton(title: busy ? "Creating…" : "Create group", variant: .primary, size: .lg,
+                          fullWidth: true) {
+                busy = true
+                Task { @MainActor in
+                    await model.createGroup(name: name)
+                    busy = false
+                    dismiss()
+                }
+            }
                 .padding(Space.gutter)
-                .disabled(name.isEmpty)
-                .opacity(name.isEmpty ? 0.5 : 1)
+                .disabled(name.isEmpty || busy)
+                .opacity(name.isEmpty || busy ? 0.5 : 1)
         }
         .background(Color.appBg)
         .presentationDetents([.large])

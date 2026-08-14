@@ -20,9 +20,15 @@ struct SupabaseRepository: DataRepository {
     private let client = SupabaseClient.shared
 
     func fetchGroups() async throws -> [PGroup] {
-        let dtos: [GroupDTO] = try await client.select("groups")
-        return dtos.map {
-            PGroup(id: $0.id, name: $0.name, hue: GroupHue.forName($0.name), members: [], note: "")
+        // Embed memberships → profiles so we get real member names in one query.
+        let dtos: [GroupDTO] = try await client.select(
+            "groups", columns: "*,group_memberships(profiles(display_name))")
+        return dtos.map { dto in
+            let members = (dto.group_memberships ?? [])
+                .compactMap { $0.profiles?.display_name }
+                .filter { !$0.isEmpty }
+            return PGroup(id: dto.id, name: dto.name, hue: GroupHue.forName(dto.name),
+                          members: members, note: "")
         }
     }
 
