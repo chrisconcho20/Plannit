@@ -14,7 +14,7 @@ enum PBtnSize {
         switch self {
         case .sm: return .subhead
         case .md: return .headline
-        case .lg: return PlannitTextStyle(size: 17, weight: .bold, design: .rounded, trackingEm: -0.006, lineHeight: 1)
+        case .lg: return PlannitTextStyle(size: 17, weight: .bold, design: .rounded, trackingEm: -0.006, lineHeight: 1, role: .headline)
         }
     }
 }
