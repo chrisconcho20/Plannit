@@ -57,6 +57,7 @@ struct MembershipInsert: Encodable {
 
 struct EventDTO: Decodable, Identifiable {
     let id: String
+    let owner_id: String
     let title: String
     let notes: String?
     let location: String?
@@ -64,6 +65,11 @@ struct EventDTO: Decodable, Identifiable {
     let end_at: String
     let all_day: Bool
     let source: String
+    let event_shares: [EventShareEmbedDTO]?   // only one FK to events — safe to embed
+}
+struct EventShareEmbedDTO: Decodable {
+    let group_id: String?
+    let shared_user_id: String?
 }
 
 struct EventInsert: Encodable {

@@ -35,7 +35,7 @@ final class AppModel: ObservableObject {
         let repo = SupabaseRepository()
         do {
             let g = try await repo.fetchGroups()
-            let e = try await repo.fetchEvents()
+            let e = try await repo.fetchEvents(groups: g)
             let p = try await repo.fetchProposals()
             let who = try await repo.fetchPeople()
             groups = g
@@ -185,6 +185,47 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: Events
+
+    /// Set exactly which groups can see an event: adds the shares you ticked,
+    /// removes the ones you unticked. Sharing is the *only* way an event leaves
+    /// your own calendar, so this is the whole per-group visibility pillar.
+    /// RLS: only the event's owner may write shares.
+    @discardableResult
+    func shareEvent(_ event: PEvent, with groupIds: Set<String>) async -> Bool {
+        let current = Set(event.sharedGroupIds)
+        let added = groupIds.subtracting(current)
+        let removed = current.subtracting(groupIds)
+        guard !added.isEmpty || !removed.isEmpty else { return true }
+
+        guard Config.isLiveBackend else {
+            if let i = events.firstIndex(where: { $0.id == event.id }) {
+                var e = events[i]
+                e.sharedGroupIds = Array(groupIds)
+                e.group = groups.first { groupIds.contains($0.id) }?.name
+                e.badge = groupIds.isEmpty ? "Private" : nil
+                events[i] = e
+            }
+            return true
+        }
+
+        do {
+            if !removed.isEmpty {
+                try await SupabaseClient.shared.delete("event_shares", match: [
+                    "event_id": "eq.\(event.id)",
+                    "group_id": "in.(\(removed.joined(separator: ",")))",
+                ])
+            }
+            if !added.isEmpty {
+                try await SupabaseClient.shared.insert("event_shares", values: added.map {
+                    EventShareInsert(event_id: event.id, group_id: $0)
+                })
+            }
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
 
     /// Create an event on your own calendar. Private until it's shared.
     @discardableResult

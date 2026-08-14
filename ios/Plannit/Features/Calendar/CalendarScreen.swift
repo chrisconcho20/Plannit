@@ -176,8 +176,23 @@ struct CalendarScreen: View {
 
 struct EventDetailView: View {
     let event: PEvent
+    @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var showShare = false
+
+    /// Re-read so the visibility row updates as soon as sharing changes.
+    private var live: PEvent { model.events.first { $0.id == event.id } ?? event }
+    private var isOwner: Bool { live.isOwned(by: model.userId) }
+
+    /// "Private" · "Shared with Soccer" · "Shared with Soccer + 2 more".
+    private var visibility: String {
+        let names = live.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id }?.name }
+        switch names.count {
+        case 0:  return live.source == .device ? "Private (from your calendar)" : "Private — only you"
+        case 1:  return "Shared with \(names[0])"
+        default: return "Shared with \(names[0]) + \(names.count - 1) more"
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -201,9 +216,7 @@ struct EventDetailView: View {
                 VStack(spacing: 0) {
                     detailRow("clock", "Time", event.time)
                     if let location = event.location { detailRow("map-pin", "Place", location) }
-                    detailRow(event.source == .device ? "lock" : "users",
-                              "Visibility",
-                              event.source == .device ? "Private (from your calendar)" : "Shared with \(event.group ?? "group")")
+                    detailRow(live.isPrivate ? "lock" : "users", "Visibility", visibility)
                 }
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, 8)
@@ -223,10 +236,23 @@ struct EventDetailView: View {
                     }
                 }
 
-                PlannitButton(title: "Share to a group", variant: .primary, size: .lg,
-                              icon: "share-2", fullWidth: true) { showShare = true }
+                // Sharing is the owner's call — RLS won't let anyone else write
+                // shares, so we don't offer a button that can only fail.
+                if isOwner {
+                    PlannitButton(title: live.isPrivate ? "Share to a group" : "Change who can see it",
+                                  variant: .primary, size: .lg,
+                                  icon: "share-2", fullWidth: true) { showShare = true }
+                        .padding(.horizontal, Space.gutter)
+                        .padding(.top, 20)
+                } else {
+                    HStack(spacing: 8) {
+                        PIcon("users", size: 16, color: .textFaint)
+                        Text("Shared with you — only the owner can change this.")
+                            .textStyle(.footnote, color: .textMuted)
+                    }
                     .padding(.horizontal, Space.gutter)
                     .padding(.top, 20)
+                }
 
                 Color.clear.frame(height: 40)
             }
@@ -245,7 +271,7 @@ struct EventDetailView: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
         }
-        .sheet(isPresented: $showShare) { ShareSheet(event: event) }
+        .sheet(isPresented: $showShare) { ShareSheet(event: live).environmentObject(model) }
     }
 
     private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {
@@ -260,11 +286,23 @@ struct EventDetailView: View {
     }
 }
 
-// Per-group visibility sheet.
+// Per-group visibility sheet — the one place an event stops being private.
+// Ticking a group inserts an `event_shares` row; unticking deletes it.
 struct ShareSheet: View {
     let event: PEvent
+
+    @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var shared: Set<String> = []
+    @State private var shared: Set<String>
+    @State private var saving = false
+    @State private var errorText: String?
+
+    init(event: PEvent) {
+        self.event = event
+        _shared = State(initialValue: Set(event.sharedGroupIds))
+    }
+
+    private var changed: Bool { shared != Set(event.sharedGroupIds) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -278,42 +316,73 @@ struct ShareSheet: View {
             .padding(.horizontal, Space.gutter)
             .padding(.bottom, 8)
 
-            Text("Choose which groups can see it. Everything else stays private.")
+            Text(shared.isEmpty
+                 ? "Only you can see this. Pick the groups that should see it too."
+                 : "Everyone in a ticked group can see this event. Untick to take it back.")
                 .textStyle(.footnote, color: .textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Space.gutter)
                 .padding(.bottom, 12)
 
-            VStack(spacing: Space.gapInline) {
-                ForEach(Sample.groups) { group in
-                    Button { toggle(group.id) } label: {
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                                .fill(group.hue.color).frame(width: 34, height: 34)
-                                .overlay(PIcon("users", size: 16, color: .white))
-                            Text(group.name).textStyle(.headline, color: .textStrong)
-                            Spacer()
-                            PIcon(shared.contains(group.id) ? "circle-check" : "circle",
-                                  size: 22, color: shared.contains(group.id) ? .actionPrimary : .textFaint)
-                        }
-                        .padding(Space.card)
-                        .background(Color.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                            .strokeBorder(Color.hairline, lineWidth: 1))
+            ScrollView {
+                VStack(spacing: Space.gapInline) {
+                    if model.groups.isEmpty {
+                        EmptyState(icon: "users", title: "No groups yet",
+                                   message: "Make a group first — then you can share events with it.")
                     }
-                    .buttonStyle(CardPressStyle())
+                    ForEach(model.groups) { group in
+                        Button { toggle(group.id) } label: {
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                    .fill(group.hue.color).frame(width: 34, height: 34)
+                                    .overlay(PIcon("users", size: 16, color: .white))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(group.name).textStyle(.headline, color: .textStrong)
+                                    Text("\(group.members.count) people")
+                                        .textStyle(.caption, color: .textMuted)
+                                }
+                                Spacer()
+                                PIcon(shared.contains(group.id) ? "circle-check" : "circle",
+                                      size: 22, color: shared.contains(group.id) ? .actionPrimary : .textFaint)
+                            }
+                            .padding(Space.card)
+                            .background(Color.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                                .strokeBorder(shared.contains(group.id) ? Color.actionPrimary : Color.hairline,
+                                              lineWidth: shared.contains(group.id) ? 2 : 1))
+                        }
+                        .buttonStyle(CardPressStyle())
+                    }
+                    if let errorText {
+                        Text(errorText).textStyle(.footnote, color: .statusDanger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
+                .padding(.horizontal, Space.gutter)
             }
-            .padding(.horizontal, Space.gutter)
 
-            Spacer(minLength: 0)
-            PlannitButton(title: "Done", variant: .primary, size: .lg, fullWidth: true) { dismiss() }
-                .padding(Space.gutter)
+            PlannitButton(title: saving ? "Saving…" : (changed ? "Save" : "Done"),
+                          variant: .primary, size: .lg, fullWidth: true) {
+                changed ? save() : dismiss()
+            }
+            .disabled(saving)
+            .opacity(saving ? 0.5 : 1)
+            .padding(Space.gutter)
         }
         .background(Color.appBg)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
+    }
+
+    private func save() {
+        saving = true
+        errorText = nil
+        Task {
+            let ok = await model.shareEvent(event, with: shared)
+            saving = false
+            if ok { dismiss() } else { errorText = "Couldn’t update sharing. Only the event's owner can." }
+        }
     }
 
     private func toggle(_ id: String) {

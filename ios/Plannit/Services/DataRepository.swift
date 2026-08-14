@@ -7,14 +7,15 @@ import Foundation
 @MainActor
 protocol DataRepository {
     func fetchGroups() async throws -> [PGroup]
-    func fetchEvents() async throws -> [PEvent]
+    /// `groups` resolves an event's shares to a group name for display.
+    func fetchEvents(groups: [PGroup]) async throws -> [PEvent]
     func fetchProposals() async throws -> [PProposal]
     func fetchPeople() async throws -> [PMember]
 }
 
 struct SampleRepository: DataRepository {
     func fetchGroups() async -> [PGroup] { Sample.groups }
-    func fetchEvents() async -> [PEvent] { Sample.events }
+    func fetchEvents(groups: [PGroup]) async -> [PEvent] { Sample.events }
     func fetchProposals() async -> [PProposal] { Sample.proposals }
     func fetchPeople() async -> [PMember] { Sample.people }
 }
@@ -53,10 +54,14 @@ struct SupabaseRepository: DataRepository {
             .map { PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name) }
     }
 
-    func fetchEvents() async throws -> [PEvent] {
+    func fetchEvents(groups: [PGroup]) async throws -> [PEvent] {
+        // Embedding the shares tells us, in the same round trip, which groups
+        // can see each event — that's what makes an event "shared" in the UI.
         let dtos: [EventDTO] = try await client.select(
-            "events", query: ["deleted_at": "is.null", "order": "start_at.asc"])
-        return dtos.map(Self.map)
+            "events", columns: "*,event_shares(group_id,shared_user_id)",
+            query: ["deleted_at": "is.null", "order": "start_at.asc"])
+        let names = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        return dtos.map { Self.map($0, groups: names) }
     }
 
     /// The Plans tab in two queries: proposals (with their group's members, so
@@ -162,21 +167,26 @@ struct SupabaseRepository: DataRepository {
         return parts.joined(separator: " · ")
     }
 
-    private static func map(_ d: EventDTO) -> PEvent {
+    private static func map(_ d: EventDTO, groups: [String: PGroup]) -> PEvent {
         let start = parseDate(d.start_at) ?? Date()
         let end = parseDate(d.end_at)
         let isDevice = d.source == "device"
+        let sharedIds = (d.event_shares ?? []).compactMap(\.group_id)
+        let firstGroup = sharedIds.compactMap { groups[$0] }.first
+
         return PEvent(
             id: d.id, start: start, title: d.title, time: timeLabel(start, end),
             location: d.location,
-            // Device events stay coral (they read as "yours, private"); Plannit
-            // events take a stable hue from their title so the calendar dots and
-            // the card agree, and the same event keeps its colour across loads.
-            hue: isDevice ? .coral : GroupHue.forName(d.title),
+            group: firstGroup?.name,
+            // A shared event takes its group's colour so the calendar reads at a
+            // glance; private ones keep a stable hue derived from the title.
+            hue: firstGroup?.hue ?? (isDevice ? .coral : GroupHue.forName(d.title)),
             icon: "calendar",
-            badge: isDevice ? "Private" : nil,
+            badge: sharedIds.isEmpty ? "Private" : nil,
             badgeTone: .neutral,
-            source: isDevice ? .device : .plannit
+            source: isDevice ? .device : .plannit,
+            ownerId: d.owner_id,
+            sharedGroupIds: sharedIds
         )
     }
 

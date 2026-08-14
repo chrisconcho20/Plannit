@@ -87,7 +87,11 @@ struct GroupDetailView: View {
     private var live: PGroup { model.groups.first { $0.id == group.id } ?? group }
     private var isOwner: Bool { live.isOwned(by: model.userId) }
 
-    private var sharedEvents: [PEvent] { model.events.filter { $0.group == group.name } }
+    // Events actually shared with this group — matched by id, not by name.
+    private var sharedEvents: [PEvent] {
+        model.events.filter { $0.sharedGroupIds.contains(group.id) }
+            .sorted { $0.start < $1.start }
+    }
 
     var body: some View {
         ScrollView {

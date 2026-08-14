@@ -46,6 +46,17 @@ struct PEvent: Identifiable, Hashable {
     var badge: String? = nil
     var badgeTone: BadgeTone = .neutral
     var source: EventSource = .plannit
+    /// nil in demo mode; otherwise the profile that owns the event — only they
+    /// may share it (RLS on `event_shares`).
+    var ownerId: String? = nil
+    /// Groups this event is visible to. Empty = private to the owner.
+    var sharedGroupIds: [String] = []
+
+    var isPrivate: Bool { sharedGroupIds.isEmpty }
+    func isOwned(by userId: String?) -> Bool {
+        guard let ownerId, let userId else { return true }   // demo: everything is yours
+        return ownerId == userId
+    }
 
     var day: Int { Calendar.current.component(.day, from: start) }
     func isOn(_ date: Date) -> Bool { Calendar.current.isDate(start, inSameDayAs: date) }
