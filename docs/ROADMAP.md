@@ -103,12 +103,17 @@ account. See §6 for URLs/creds.
    real device — see phase 6.
 
 ### Phase 3 — Social graph
-6. **Friends** — friend requests / accept (tables exist: `friendships`), a
-   people search, and pending-requests UI. **Now the main gap:** group
-   member-adding works, but the pool of people you can add is only "profiles RLS
-   lets you see" = your groups' co-members. You cannot reach someone you don't
-   already share a group with, and removing the last shared group makes them
-   invisible again. Friend requests are what break that circularity.
+6. ~~**Friends**~~ ✅ **structure done (2026-08-14).** `0005_friends_beta.sql`
+   adds `app_config` (runtime switches), the `auto_friend_everyone` trigger and
+   backfill, and three SECURITY DEFINER functions — `my_friends`,
+   `my_friend_requests`, `find_profile_by_email` — for the things RLS correctly
+   hides. You → **Friends**: accept/decline incoming, remove a friend, see
+   outgoing, add by exact email. Group pickers draw from friends, falling back
+   to visible co-members.
+   **Beta behaviour:** every new account is auto-friended to everyone, so
+   testing needs no request dance. Switching it off is an UPDATE on `app_config`.
+   _Still to do:_ invite links (D-14 territory), blocking, and a friends-only
+   privacy option for sharing (`event_shares.shared_user_id` is still unused).
 7. ~~**Group management**~~ ✅ **done (2026-08-14).** Add / remove members,
    delete, leave, and rename + recolour. The hue is stored **on-device** per
    group (no `hue` column yet) and falls back to the name-derived colour —
@@ -164,10 +169,8 @@ account. See §6 for URLs/creds.
   but unused. This is the next structural gap now that phase 1 is complete.
 - **Group hue is device-local** — the picker works, but the colour lives in
   UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
-- **You can only add people you already share a group with** — there's no friend
-  system, so the people picker is fed by whatever `profiles` RLS returns. For
-  testing, `supabase/seed-test-users.sql` drops five real people into every group
-  you own. (Phase 3.6)
+- **Reaching a stranger needs their exact email** — by design (the directory
+  isn't enumerable), but it means invite links matter more than they look.
 - **Placeholder buttons** do nothing (see Phase 5.13).
 - **No offline support / no retry** — network failure silently keeps sample data
   (the date-finder is the exception: it now surfaces a real error + retry).

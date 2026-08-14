@@ -152,6 +152,35 @@ Implemented in `ios/Plannit/Services/SlotFinder.swift`.
 
 ---
 
+## Friends
+
+`friendships` holds one row per pair (`uq_friendship_pair` makes direction
+irrelevant), and RLS shows a row only to the two people in it. Three functions
+exist because RLS deliberately hides what the client would otherwise need:
+
+| Function | Why it isn't a plain query |
+|---|---|
+| `my_friends()` | `friendships` has two FKs to `profiles`, so an embed is ambiguous |
+| `my_friend_requests()` | a *pending* requester isn't a friend yet, so `profiles` RLS hides their name — you'd be judging a request from "Member" |
+| `find_profile_by_email(p_email)` | you can't see a stranger's profile at all. Exact, case-insensitive match, returns `id` + `display_name` only, so the directory can't be enumerated |
+
+Writes are plain table operations: insert a `pending` row to ask (RLS enforces
+`requester_id = auth.uid()`), update it to `accepted` to agree, delete to
+decline or unfriend.
+
+### Beta: everyone is a friend
+
+`app_config.auto_friend_everyone` is `true` while testing. A trigger on
+`profiles` makes each new account accepted-friends with every existing one, and
+0005 backfilled the accounts that already existed. To turn it off:
+
+```sql
+update public.app_config set value = 'false' where key = 'auto_friend_everyone';
+```
+
+Existing friendships survive; only new accounts stop being auto-added. The app
+reads the flag and drops the "everyone is your friend" line when it's off.
+
 ## Push notifications
 Register the device's APNs token into `device_tokens` after sign-in (RLS lets a
 user write only their own). Sending is server-side only. Full details:

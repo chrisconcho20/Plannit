@@ -50,6 +50,14 @@ struct SupabaseRepository: DataRepository {
         }
     }
 
+    /// Is the beta's auto-friend switch on? The Friends screen says so out
+    /// loud, and it should stop saying it the moment the flag flips.
+    func fetchAutoFriendFlag() async -> Bool {
+        let rows: [ConfigRowDTO]? = try? await client.select(
+            "app_config", columns: "key,value", query: ["key": "eq.auto_friend_everyone"])
+        return rows?.first?.value ?? false
+    }
+
     /// Your accepted friends, via `my_friends()` — `friendships` has two foreign
     /// keys to `profiles`, so an embed would be ambiguous.
     func fetchFriends() async throws -> [PMember] {

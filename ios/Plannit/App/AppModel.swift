@@ -33,6 +33,10 @@ final class AppModel: ObservableObject {
     /// Accepted friends, and requests in both directions.
     @Published var friends: [PMember] = Config.isLiveBackend ? [] : Sample.people
     @Published var friendRequests: [PFriendRequest] = []
+    /// Beta switch (`app_config.auto_friend_everyone`): everyone who joins is
+    /// already your friend. Read from the server so the copy stops being true
+    /// the moment it's switched off.
+    @Published var autoFriendEveryone = false
 
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
@@ -70,12 +74,14 @@ final class AppModel: ObservableObject {
             let who = try await repo.fetchPeople()
             let mates = try await repo.fetchFriends()
             let requests = try await repo.fetchFriendRequests()
+            let beta = await repo.fetchAutoFriendFlag()
             groups = g
             events = e
             proposals = p
             people = who
             friends = mates
             friendRequests = requests
+            autoFriendEveryone = beta
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
         } catch {

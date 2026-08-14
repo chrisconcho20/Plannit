@@ -101,6 +101,20 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 | 6.9 | Plan → vote → **Remove my vote** | The count drops and the Plans badge comes back |
 | 6.10 | Plan → **Cancel plan** (as organiser) | It disappears for everyone |
 
+## 6b. Friends (beta auto-friending)
+
+Needs `supabase db push` for `0005_friends_beta.sql` first.
+
+| # | Do this | Expect |
+|---|---|---|
+| 6b.1 | You → **Friends** | Everyone seeded is already listed, with the beta note at the bottom |
+| 6b.2 | Add a friend → a real email → Find them | The account, with **Send request** |
+| 6b.3 | Add a friend → a made-up email | "No Plannit account with that email" — no hint about who exists |
+| 6b.4 | Add a friend → someone already a friend | "You're already friends" |
+| 6b.5 | Remove a friend, then reopen a group you share | They're still in the group — unfriending isn't kicking |
+| 6b.6 | New group → People | Your friends are listed |
+| 6b.7 | In the SQL editor: `update public.app_config set value='false' where key='auto_friend_everyone';` then create a new account | The new account starts with **no** friends, and the beta note is gone. Set it back to `'true'` afterwards |
+
 ## 7. Try to break it
 
 | # | Do this | Expect |
@@ -119,6 +133,6 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 
 - **No realtime** — another person's vote appears on reload, not live.
 - **No reopening a locked plan** — cancel it and run the finder again.
-- **Friends don't exist** — you can only add people you already share a group
-  with, so a brand-new account sees nobody until it's seeded.
+- **No invite links** — reaching someone new needs their exact sign-up email.
+- **No blocking** — removing a friend just deletes the row.
 - **Group colour is device-local** — your teammates see the name-derived one.

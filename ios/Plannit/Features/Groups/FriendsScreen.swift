@@ -77,12 +77,14 @@ struct FriendsScreen: View {
                     .padding(.horizontal, Space.gutter)
                     .padding(.top, 18)
 
-                Text("Beta: everyone who joins Plannit is added as a friend automatically.")
-                    .textStyle(.caption, color: .textFaint)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, Space.gutter)
-                    .padding(.top, 10)
+                if model.autoFriendEveryone {
+                    Text("Beta: everyone who joins Plannit is added as a friend automatically.")
+                        .textStyle(.caption, color: .textFaint)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Space.gutter)
+                        .padding(.top, 10)
+                }
 
                 Color.clear.frame(height: 60)
             }
