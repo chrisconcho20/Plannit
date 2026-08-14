@@ -105,13 +105,13 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 
 | # | Do this | Expect |
 |---|---|---|
-| 6.1 | Create a group with **no** members, then find a date | It works (a group of one) — no divide-by-zero, no "0 of 0" |
-| 6.2 | Very long group name / event title (50+ chars) | Text wraps or truncates; no layout blowout |
-| 6.3 | Emoji + accents in a display name | Renders in avatars and member lists |
-| 6.4 | Double-tap Send / Vote / Lock in fast | One plan, one vote, one event — buttons disable while saving |
-| 6.5 | Background the app mid-save, come back | No duplicate rows |
-| 6.6 | Rotate / small device | Sheets stay usable, footers stay reachable |
-| 6.7 | Relaunch the preview | **Known issue:** you're signed out — the session is in memory only (roadmap 5.9) |
+| 7.1 | Create a group with **no** members, then find a date | It works (a group of one) — no divide-by-zero, no "0 of 0" |
+| 7.2 | Very long group name / event title (50+ chars) | Text wraps or truncates; no layout blowout |
+| 7.3 | Emoji + accents in a display name | Renders in avatars and member lists |
+| 7.4 | Double-tap Send / Vote / Lock in fast | One plan, one vote, one event — buttons disable while saving |
+| 7.5 | Background the app mid-save, come back | No duplicate rows |
+| 7.6 | Rotate / small device | Sheets stay usable, footers stay reachable |
+| 7.7 | Sign in as two accounts on two browsers, vote on both | **Known gap:** neither sees the other until it reloads — no realtime yet |
 
 ---
 
