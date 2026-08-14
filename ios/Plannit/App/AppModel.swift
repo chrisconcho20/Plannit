@@ -56,6 +56,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Dev email/password sign-in (for browser/simulator live testing).
+    func signInWithEmail(_ email: String, _ password: String) async -> Bool {
+        do {
+            let uid = try await SupabaseClient.shared.signInWithEmail(email, password: password)
+            userId = uid
+            signedIn = true
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     // MARK: Calendar
     func connectCalendar() async {
         let granted = await calendar.requestAccess()

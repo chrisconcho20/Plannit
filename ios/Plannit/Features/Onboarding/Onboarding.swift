@@ -94,3 +94,68 @@ struct ConnectCalendarView: View {
         }
     }
 }
+
+// Dev email/password sign-in — shown only in live mode so the backend can be
+// tested in the browser/simulator without Sign in with Apple.
+struct LiveSignInView: View {
+    var onSignedIn: () -> Void
+    @EnvironmentObject private var model: AppModel
+    @State private var email = ""
+    @State private var password = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                    .fill(Color.actionPrimary).frame(width: 72, height: 72)
+                    .overlay(PIcon("calendar-heart", size: 36, color: .white, weight: .bold))
+                    .primaryGlow()
+                Text("Plannit").textStyle(.display, color: .textStrong)
+                Text("Dev sign-in · live backend").textStyle(.subhead, color: .textMuted)
+            }
+            Spacer()
+            VStack(spacing: 12) {
+                PTextField(placeholder: "Email", text: $email, icon: "user")
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                secureField
+                if let error {
+                    Text(error).textStyle(.footnote, color: .statusDanger)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                PlannitButton(title: busy ? "Signing in…" : "Sign in", variant: .primary, size: .lg,
+                              fullWidth: true) { signIn() }
+                    .disabled(busy || email.isEmpty || password.isEmpty)
+                    .opacity(busy || email.isEmpty || password.isEmpty ? 0.5 : 1)
+            }
+            .padding(.horizontal, Space.gutter)
+            Spacer()
+        }
+    }
+
+    private var secureField: some View {
+        HStack(spacing: 10) {
+            PIcon("lock", size: 18, color: .textFaint)
+            SecureField("Password", text: $password).textStyle(.body, color: .textStrong)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 48)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+            .strokeBorder(Color.lineStrong, lineWidth: 1))
+    }
+
+    private func signIn() {
+        busy = true
+        error = nil
+        Task { @MainActor in
+            let ok = await model.signInWithEmail(email, password)
+            busy = false
+            if ok { onSignedIn() } else { error = "Couldn't sign in. Check the email and password." }
+        }
+    }
+}

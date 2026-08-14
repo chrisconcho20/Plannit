@@ -1,0 +1,78 @@
+name: iOS Appetize Preview (Live)
+
+# Builds a LIVE-backend preview: injects Supabase creds into Info.plist at build
+# time (they are NOT committed), builds an unsigned simulator .app, and uploads
+# it to a SECOND Appetize app so it stays separate from the demo preview.
+# Manual trigger only. Setup: ios/LIVE-PREVIEW.md
+on:
+  workflow_dispatch:
+
+jobs:
+  appetize-live:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_1*.app | sort -V | tail -1)"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Inject Supabase config (build-time only, not committed)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Set SUPABASE_URL and SUPABASE_ANON_KEY repo secrets — see ios/LIVE-PREVIEW.md"
+            exit 1
+          fi
+          plutil -replace SUPABASE_URL -string "$SUPABASE_URL" ios/Plannit/App/Info.plist
+          plutil -replace SUPABASE_ANON_KEY -string "$SUPABASE_ANON_KEY" ios/Plannit/App/Info.plist
+          echo "Injected live Supabase config."
+
+      - name: Build simulator .app (no signing)
+        working-directory: ios
+        run: |
+          xcodebuild build \
+            -project Plannit.xcodeproj \
+            -scheme Plannit \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip the .app
+        working-directory: ios
+        run: |
+          APP=$(find build/Build/Products -name "Plannit.app" -type d | head -1)
+          ( cd "$(dirname "$APP")" && zip -r -y "$GITHUB_WORKSPACE/Plannit-live.zip" "Plannit.app" >/dev/null )
+          ls -la "$GITHUB_WORKSPACE/Plannit-live.zip"
+
+      - name: Upload to Appetize (live app)
+        env:
+          APPETIZE_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          PUBLIC_KEY: ${{ vars.APPETIZE_LIVE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$APPETIZE_TOKEN" ]; then echo "::error::APPETIZE_API_TOKEN not set"; exit 1; fi
+          BASE="https://api.appetize.io/v1/apps"
+          [ -n "$PUBLIC_KEY" ] && BASE="$BASE/$PUBLIC_KEY"
+          RESP=$(curl -s -u "${APPETIZE_TOKEN}:" -X POST "$BASE" \
+            -F "file=@$GITHUB_WORKSPACE/Plannit-live.zip" \
+            -F "platform=ios")
+          KEY=$(echo "$RESP" | jq -r '.publicKey // empty')
+          if [ -z "$KEY" ]; then echo "Appetize response: $RESP"; echo "::error::Appetize upload failed"; exit 1; fi
+          {
+            echo "### 📱 Plannit LIVE preview"
+            echo ""
+            echo "Sign in with your Supabase test user (email + password):"
+            echo ""
+            echo "**https://appetize.io/app/$KEY?device=iphone15&osVersion=18.0**"
+            echo ""
+            echo "\`publicKey: $KEY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Live Appetize URL: https://appetize.io/app/$KEY"

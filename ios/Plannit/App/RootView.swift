@@ -18,16 +18,14 @@ struct RootView: View {
             Color.appBg.ignoresSafeArea()
             switch flow {
             case .welcome:
-                WelcomeView(
-                    onStart: {
-                        if Config.isLiveBackend {
-                            Task { @MainActor in if await model.signInWithApple() { flow = .connect } }
-                        } else {
-                            flow = .connect
-                        }
-                    },
-                    onSignIn: { flow = .app }
-                )
+                if Config.isLiveBackend {
+                    LiveSignInView { flow = .app }
+                } else {
+                    WelcomeView(
+                        onStart: { flow = .connect },
+                        onSignIn: { flow = .app }
+                    )
+                }
             case .connect:
                 ConnectCalendarView(
                     connect: { await model.connectCalendar(); flow = .app },

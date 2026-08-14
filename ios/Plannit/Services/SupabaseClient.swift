@@ -103,6 +103,25 @@ final class SupabaseClient {
         return s.user.id
     }
 
+    // MARK: Auth — email/password (dev sign-in for browser/simulator testing).
+    @discardableResult
+    func signInWithEmail(_ email: String, password: String) async throws -> String {
+        guard let baseURL else { throw SupabaseError.notConfigured }
+        var comps = URLComponents(url: baseURL.appendingPathComponent("auth/v1/token"),
+                                  resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "grant_type", value: "password")]
+        var req = URLRequest(url: comps.url!)
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["email": email, "password": password])
+
+        let s: SupabaseSession = try await send(req)
+        accessToken = s.access_token
+        userId = s.user.id
+        return s.user.id
+    }
+
     var isSignedIn: Bool { accessToken != nil }
 
     func signOut() { accessToken = nil; userId = nil }
