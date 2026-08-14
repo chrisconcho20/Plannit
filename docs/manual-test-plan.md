@@ -115,6 +115,24 @@ Needs `supabase db push` for `0005_friends_beta.sql` first.
 | 6b.6 | New group → People | Your friends are listed |
 | 6b.7 | In the SQL editor: `update public.app_config set value='false' where key='auto_friend_everyone';` then create a new account | The new account starts with **no** friends, and the beta note is gone. Set it back to `'true'` afterwards |
 
+## 6c. Live updates (needs `db push` for 0006)
+
+Two browser sessions, two accounts: yours and `maya@plannit.test` / `plannit123`.
+
+| # | Do this | Expect |
+|---|---|---|
+| 6c.1 | Open the same plan in both | Both show the same counts |
+| 6c.2 | Vote as Maya | **Your** screen updates within a second or two, untouched |
+| 6c.3 | Vote as you | Your card moves **instantly** (optimistic), before the network |
+| 6c.4 | Lock in as you | Maya's plan moves to Locked in on its own |
+| 6c.5 | Share an event with the group | It appears in the other session's group |
+| 6c.6 | Background one session for a minute, come back | It catches up immediately (the socket is dropped on background by design) |
+| 6c.7 | Turn the network off, vote | The card still moves, then reverts with an error when the write fails |
+
+If nothing arrives live but everything appears within ~20 seconds, the socket
+isn't connecting and the polling fallback is carrying it — check that 0006 is
+applied and that the channel is private.
+
 ## 7. Try to break it
 
 | # | Do this | Expect |
@@ -131,7 +149,6 @@ Needs `supabase db push` for `0005_friends_beta.sql` first.
 
 ## Known gaps (don't file these)
 
-- **No realtime** — another person's vote appears on reload, not live.
 - **No reopening a locked plan** — cancel it and run the finder again.
 - **No invite links** — reaching someone new needs their exact sign-up email.
 - **No blocking** — removing a friend just deletes the row.

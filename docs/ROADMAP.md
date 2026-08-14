@@ -164,11 +164,12 @@ account. See §6 for URLs/creds.
 ---
 
 ## 3. Known issues / tech debt
-- **No realtime** — votes, shares and new plans appear on the next load, not as
-  they happen. Researched: [`realtime-research.md`](realtime-research.md)
-  recommends **Broadcast from Database** (not the `postgres_changes` the API
-  contract specs) plus the official `Realtime` SPM module, after optimistic
-  writes. PowerSync is the local-first alternative if offline moves up.
+- ~~**No realtime**~~ ✅ **done (2026-08-14, D-16).** Broadcast from Database
+  (`0006`) sends a hint per group topic; the app subscribes with the official
+  `Realtime` SPM module and refreshes that slice. Voting is optimistic, writes
+  refresh only what they touched, and `LiveRefresh` polling stays as the safety
+  net. Research and the local-first fallback: [`realtime-research.md`](realtime-research.md).
+  _Unverified:_ needs two live sessions to confirm end to end.
 - **Group hue is device-local** — the picker works, but the colour lives in
   UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
 - **Reaching a stranger needs their exact email** — by design (the directory

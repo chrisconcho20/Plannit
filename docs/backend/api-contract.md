@@ -66,8 +66,34 @@ try await client.from("busy_blocks")
   .upsert(blocks).execute()
 ```
 
-### Realtime
-Subscribe to `postgres_changes` on `events`, `proposals`, `proposal_slots`, and `votes` filtered by the relevant `group_id`/`proposal_id` to drive the live group feed and voting UI.
+### Realtime — Broadcast, not Postgres Changes
+
+Decision **D-16** (see [`../realtime-research.md`](../realtime-research.md)):
+Supabase recommends Broadcast over `postgres_changes`, and for us the argument
+is privacy and shape rather than scale.
+
+Subscribe to the **private** channel `group:<group_id>` and listen for the event
+`change`. Migration 0006 broadcasts from triggers on `proposals`, `votes`,
+`proposal_slots`, `event_shares`, `group_memberships` and `groups`.
+
+The payload is a hint, never the row:
+
+```jsonc
+{ "kind": "proposals" }   // or "events" | "groups"
+```
+
+Clients re-fetch that slice (`refreshProposals` / `refreshEvents` /
+`refreshGroups`). Nothing sensitive crosses the socket, and the local copy can't
+drift from the server's.
+
+- The channel **must** be created with `private: true`, or the policy on
+  `realtime.messages` isn't applied at all.
+- Membership is the whole authorization rule: `is_group_member(topic_group_id(realtime.topic()), auth.uid())`.
+- Push a refreshed JWT to the socket or the connection is dropped when the token
+  expires. In Swift, pass an `accessToken` closure to `RealtimeClientOptions`.
+- Broadcasts are best-effort by design: every trigger swallows its own errors, so
+  a write never fails because Realtime is unhappy. Clients keep a polling
+  fallback.
 
 ---
 
