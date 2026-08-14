@@ -15,13 +15,14 @@ struct PlansScreen: View {
             HStack {
                 Text("Plans").textStyle(.title1, color: .textStrong)
                 Spacer()
-                IconButton(icon: "inbox", variant: .secondary, size: 40, iconSize: 18,
-                           accessibilityLabel: "Archive") {}
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
 
             ScrollView {
+                if let error = model.loadError {
+                    LoadBanner(message: error) { Task { await model.loadData() } }
+                }
                 if !open.isEmpty {
                     SectionLabel("Awaiting your vote") {
                         Text("\(open.count)").textStyle(.caption, color: .textFaint)
@@ -52,6 +53,7 @@ struct PlansScreen: View {
                 }
                 Color.clear.frame(height: 120)
             }
+            .refreshable { await model.loadData() }
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
@@ -282,6 +284,7 @@ struct PlanDetailView: View {
 struct YouScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var showRename = false
+    @State private var confirmSignOut = false
     @State private var twoWaySync = true
     @State private var shareAvailability = true
     @State private var pushDateFound = true
@@ -293,8 +296,6 @@ struct YouScreen: View {
             HStack {
                 Text("You").textStyle(.title1, color: .textStrong)
                 Spacer()
-                IconButton(icon: "settings", variant: .secondary, size: 40, iconSize: 18,
-                           accessibilityLabel: "Settings") {}
             }
             .padding(.horizontal, Space.gutter).padding(.vertical, 6)
 
@@ -348,8 +349,15 @@ struct YouScreen: View {
                     toggleRow("user-plus", "Invites & requests", "Friend requests and shared events", $pushInvites)
                 }
 
-                PlannitButton(title: "Sign out", variant: .danger, size: .md, fullWidth: true) {}
-                    .padding(.horizontal, Space.gutter).padding(.top, 16)
+                PlannitButton(title: "Sign out", variant: .danger, size: .md, fullWidth: true) {
+                    confirmSignOut = true
+                }
+                .padding(.horizontal, Space.gutter).padding(.top, 16)
+
+                Text("Plannit \(Bundle.appVersion)")
+                    .textStyle(.caption, color: .textFaint)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 10)
                 Color.clear.frame(height: 120)
             }
         }
@@ -357,6 +365,12 @@ struct YouScreen: View {
         .navigationBarHidden(true)
         .sheet(isPresented: $showRename) {
             DisplayNameSheet(current: model.displayName).environmentObject(model)
+        }
+        .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            Button("Sign out", role: .destructive) { model.signOut() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You'll need your email and password to get back in.")
         }
     }
 

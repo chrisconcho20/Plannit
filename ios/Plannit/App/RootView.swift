@@ -4,11 +4,11 @@ enum Tab: Hashable { case calendar, groups, plans, you }
 
 // Top-level flow: onboarding -> tabbed app, with the FAB, tab bar and toast.
 struct RootView: View {
-    enum Flow { case welcome, connect, app }
+    enum Flow { case restoring, welcome, connect, app }
 
     @StateObject private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
-    @State private var flow: Flow = .welcome
+    @State private var flow: Flow = Config.isLiveBackend ? .restoring : .welcome
     @State private var tab: Tab = .calendar
     @State private var showCreate = false
     @State private var showNewPlan = false
@@ -20,6 +20,10 @@ struct RootView: View {
         ZStack {
             Color.appBg.ignoresSafeArea()
             switch flow {
+            case .restoring:
+                // A stored session means we can go straight in; this beat stops
+                // the sign-in screen flashing before we know.
+                ProgressView().tint(.actionPrimary)
             case .welcome:
                 if Config.isLiveBackend {
                     LiveSignInView { flow = .app }
@@ -39,6 +43,15 @@ struct RootView: View {
             }
         }
         .environmentObject(model)
+        // Straight back in if the Keychain still has a session.
+        .task {
+            guard flow == .restoring else { return }
+            flow = await model.restoreSession() ? .app : .welcome
+        }
+        // Signing out anywhere returns to the front door.
+        .onChange(of: model.signedIn) { _, signedIn in
+            if !signedIn, flow == .app { flow = .welcome }
+        }
         // The ＋ asks what you're making rather than guessing from the tab.
         .sheet(isPresented: $showCreate) {
             CreateSheet(group: model.openGroup,

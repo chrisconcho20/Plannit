@@ -20,6 +20,9 @@ struct GroupsScreen: View {
             .padding(.vertical, 6)
 
             ScrollView {
+                if let error = model.loadError {
+                    LoadBanner(message: error) { Task { await model.loadData() } }
+                }
                 SectionLabel("Your groups") { Text("\(model.groups.count)").textStyle(.caption, color: .textFaint) }
                 LazyVStack(spacing: Space.gapList) {
                     ForEach(model.groups) { group in
@@ -45,6 +48,7 @@ struct GroupsScreen: View {
 
                 Color.clear.frame(height: 120)
             }
+            .refreshable { await model.loadData() }
         }
         .background(Color.appBg)
         .navigationBarHidden(true)

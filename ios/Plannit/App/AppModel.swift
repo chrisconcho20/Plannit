@@ -14,13 +14,19 @@ final class AppModel: ObservableObject {
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
 
-    // Screen data — seeded with sample data so demo mode works with no loading.
-    @Published var groups: [PGroup] = Sample.groups
-    @Published var events: [PEvent] = Sample.events
-    @Published var proposals: [PProposal] = Sample.proposals
+    // Screen data. Demo mode starts on sample data so the app is explorable with
+    // no network; live mode starts EMPTY, because showing someone else's sample
+    // groups while their real ones load is a lie.
+    @Published var groups: [PGroup] = Config.isLiveBackend ? [] : Sample.groups
+    @Published var events: [PEvent] = Config.isLiveBackend ? [] : Sample.events
+    @Published var proposals: [PProposal] = Config.isLiveBackend ? [] : Sample.proposals
     /// People you can add to a group. Until friend requests land this is
     /// everyone RLS lets you see: your groups' co-members.
-    @Published var people: [PMember] = Sample.people
+    @Published var people: [PMember] = Config.isLiveBackend ? [] : Sample.people
+    /// Live-load state, so screens can say "loading" and "that failed" instead
+    /// of quietly showing nothing.
+    @Published var isLoading = false
+    @Published var loadError: String?
     /// The group you're currently looking at, so the ＋ can act in its context
     /// instead of guessing from the tab.
     @Published var openGroup: PGroup?
@@ -47,9 +53,12 @@ final class AppModel: ObservableObject {
 
     var isLiveBackend: Bool { Config.isLiveBackend }
 
-    /// Load screen data. Demo mode keeps the sample seed; live mode pulls from Supabase.
+    /// Load screen data. Demo mode keeps the sample seed; live mode pulls from
+    /// Supabase and reports failure rather than swallowing it.
     func loadData() async {
         guard Config.isLiveBackend, signedIn else { return }
+        isLoading = true
+        defer { isLoading = false }
         let repo = SupabaseRepository()
         do {
             let g = try await repo.fetchGroups()
@@ -60,10 +69,53 @@ final class AppModel: ObservableObject {
             events = e
             proposals = p
             people = who
+            loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
         } catch {
-            // Keep whatever we have (sample seed) on failure.
+            loadError = Self.message(for: error)
         }
+    }
+
+    static func message(for error: Error) -> String {
+        guard let e = error as? SupabaseError else {
+            return "Couldn't reach Plannit. Check your connection."
+        }
+        switch e {
+        case .notConfigured: return "You're signed out — sign in and try again."
+        case .decoding:      return "Plannit sent something we couldn't read."
+        case .http(let code, _):
+            switch code {
+            case 401: return "Your session expired — sign in again."
+            case 403: return "You don't have access to that."
+            default:  return "Plannit is having trouble (\(code))."
+            }
+        }
+    }
+
+    /// Pick a signed-in session back up from the Keychain on launch.
+    func restoreSession() async -> Bool {
+        guard Config.isLiveBackend, SupabaseClient.shared.restoreSession() else { return false }
+        userId = SupabaseClient.shared.userId
+        userEmail = SupabaseClient.shared.userEmail
+        signedIn = true
+        await loadProfile()
+        await loadData()
+        return true
+    }
+
+    /// Sign out: forget the session and drop every trace of the account's data.
+    func signOut() {
+        SupabaseClient.shared.signOut()
+        signedIn = false
+        userId = nil
+        userEmail = nil
+        displayName = Sample.me
+        openGroup = nil
+        groups = Config.isLiveBackend ? [] : Sample.groups
+        events = Config.isLiveBackend ? [] : Sample.events
+        proposals = Config.isLiveBackend ? [] : Sample.proposals
+        people = Config.isLiveBackend ? [] : Sample.people
+        loadError = nil
     }
 
     // MARK: Profile

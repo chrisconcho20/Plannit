@@ -86,6 +86,9 @@ struct CalendarScreen: View {
             header
             ScrollView {
                 VStack(spacing: 0) {
+                    if let error = model.loadError {
+                        LoadBanner(message: error) { Task { await model.loadData() } }
+                    }
                     if mode == .month {
                         PlannitCard(elevation: 1) {
                             VStack(spacing: 8) {
@@ -137,6 +140,7 @@ struct CalendarScreen: View {
                     Color.clear.frame(height: 120)
                 }
             }
+            .refreshable { await model.loadData() }
         }
         .background(Color.appBg)
         .navigationBarHidden(true)

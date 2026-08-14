@@ -9,7 +9,21 @@ import Foundation
 struct SupabaseSession: Decodable {
     let access_token: String
     let refresh_token: String
+    let expires_in: Int?
     let user: SupabaseUser
+}
+
+/// What we keep in the Keychain between launches.
+struct StoredSession: Codable {
+    let accessToken: String
+    let refreshToken: String
+    let userId: String
+    let email: String?
+    let expiresAt: Date
+
+    /// Treat a token as spent a minute early — a request that starts valid can
+    /// still arrive expired.
+    var isFresh: Bool { expiresAt.timeIntervalSinceNow > 60 }
 }
 struct SupabaseUser: Decodable {
     let id: String
@@ -186,8 +200,88 @@ final class SupabaseClient {
     private(set) var accessToken: String?
     private(set) var userId: String?
     private(set) var userEmail: String?
+    private var refreshToken: String?
+    private var expiresAt: Date?
+
+    private static let sessionKey = "supabase.session"
 
     nonisolated init() {}
+
+    // MARK: Session persistence
+
+    /// Reload the session saved at last sign-in. Returns true when there's
+    /// something to work with — an expired access token is fine, `authorized()`
+    /// refreshes it before the next request.
+    @discardableResult
+    func restoreSession() -> Bool {
+        guard Config.isLiveBackend,
+              let stored = Keychain.load(StoredSession.self, for: Self.sessionKey)
+        else { return false }
+        accessToken = stored.accessToken
+        refreshToken = stored.refreshToken
+        userId = stored.userId
+        userEmail = stored.email
+        expiresAt = stored.expiresAt
+        return true
+    }
+
+    private func store(_ session: SupabaseSession) {
+        accessToken = session.access_token
+        refreshToken = session.refresh_token
+        userId = session.user.id
+        userEmail = session.user.email ?? userEmail
+        expiresAt = Date().addingTimeInterval(TimeInterval(session.expires_in ?? 3600))
+        guard let expiresAt, let userId else { return }
+        Keychain.save(StoredSession(accessToken: session.access_token,
+                                    refreshToken: session.refresh_token,
+                                    userId: userId, email: userEmail, expiresAt: expiresAt),
+                      for: Self.sessionKey)
+    }
+
+    /// Swap the refresh token for a new access token. Supabase rotates the
+    /// refresh token too, so the result is stored like any other sign-in.
+    @discardableResult
+    private func refreshSession() async -> Bool {
+        guard let baseURL, let token = refreshToken else { return false }
+        var comps = URLComponents(url: baseURL.appendingPathComponent("auth/v1/token"),
+                                  resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
+        var req = URLRequest(url: comps.url!)
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONEncoder().encode(["refresh_token": token])
+
+        do {
+            let (data, resp) = try await session.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let s = try? JSONDecoder().decode(SupabaseSession.self, from: data)
+            else {
+                // The refresh token is dead (revoked, or rotated by another
+                // device) — drop it so we don't spin retrying.
+                clearSession()
+                return false
+            }
+            store(s)
+            return true
+        } catch {
+            return false   // offline: keep the session, try again later
+        }
+    }
+
+    /// The access token to send, refreshed first if it's about to expire.
+    private func authorized() async -> String? {
+        if let expiresAt, expiresAt.timeIntervalSinceNow <= 60, refreshToken != nil {
+            await refreshSession()
+        }
+        return accessToken
+    }
+
+    private func clearSession() {
+        accessToken = nil; refreshToken = nil; userId = nil
+        userEmail = nil; expiresAt = nil
+        Keychain.delete(Self.sessionKey)
+    }
 
     var isConfigured: Bool { Config.isLiveBackend }
     private var baseURL: URL? { URL(string: Config.supabaseURL) }
@@ -208,9 +302,7 @@ final class SupabaseClient {
             ["provider": "apple", "id_token": idToken, "nonce": nonce])
 
         let s: SupabaseSession = try await send(req)
-        accessToken = s.access_token
-        userId = s.user.id
-        userEmail = s.user.email
+        store(s)
         return s.user.id
     }
 
@@ -228,22 +320,20 @@ final class SupabaseClient {
         req.httpBody = try JSONEncoder().encode(["email": email, "password": password])
 
         let s: SupabaseSession = try await send(req)
-        accessToken = s.access_token
-        userId = s.user.id
-        userEmail = s.user.email
+        store(s)
         return s.user.id
     }
 
     var isSignedIn: Bool { accessToken != nil }
 
-    func signOut() { accessToken = nil; userId = nil; userEmail = nil }
+    func signOut() { clearSession() }
 
     // MARK: PostgREST
     /// `query` takes raw PostgREST filters, e.g. `["deleted_at": "is.null",
     /// "order": "start_at.asc"]`.
     func select<T: Decodable>(_ table: String, columns: String = "*",
                               query: [String: String] = [:]) async throws -> T {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
                                   resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "select", value: columns)]
@@ -256,7 +346,7 @@ final class SupabaseClient {
 
     /// PATCH the rows matching `match` (raw PostgREST filters, as above).
     func update<T: Encodable>(_ table: String, values: T, match: [String: String]) async throws {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
                                   resolvingAgainstBaseURL: false)!
         comps.queryItems = match.map { URLQueryItem(name: $0.key, value: $0.value) }
@@ -271,7 +361,7 @@ final class SupabaseClient {
     }
 
     func insert<T: Encodable>(_ table: String, values: T) async throws {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var req = URLRequest(url: baseURL.appendingPathComponent("rest/v1/\(table)"))
         req.httpMethod = "POST"
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -285,7 +375,7 @@ final class SupabaseClient {
     /// Insert and read the rows back (PostgREST `return=representation`) — for
     /// when you need the generated id, e.g. a new group's memberships.
     func insertReturning<T: Encodable, R: Decodable>(_ table: String, values: T) async throws -> R {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var req = URLRequest(url: baseURL.appendingPathComponent("rest/v1/\(table)"))
         req.httpMethod = "POST"
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -299,7 +389,7 @@ final class SupabaseClient {
     /// DELETE the rows matching `match` (raw PostgREST filters). RLS decides
     /// whether you're allowed to — a forbidden delete removes nothing.
     func delete(_ table: String, match: [String: String]) async throws {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
                                   resolvingAgainstBaseURL: false)!
         comps.queryItems = match.map { URLQueryItem(name: $0.key, value: $0.value) }
@@ -313,7 +403,7 @@ final class SupabaseClient {
 
     // MARK: Edge Functions
     func invokeFunction<Req: Encodable, Res: Decodable>(_ name: String, body: Req) async throws -> Res {
-        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
         var req = URLRequest(url: baseURL.appendingPathComponent("functions/v1/\(name)"))
         req.httpMethod = "POST"
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -331,9 +421,19 @@ final class SupabaseClient {
     }
 
     @discardableResult
-    private func sendRaw(_ req: URLRequest) async throws -> Data {
+    private func sendRaw(_ req: URLRequest, allowRetry: Bool = true) async throws -> Data {
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw SupabaseError.http(-1, "no response") }
+
+        // A token can expire between the freshness check and the server reading
+        // it. One refresh-and-retry turns that into a non-event.
+        if http.statusCode == 401, allowRetry, refreshToken != nil,
+           await refreshSession(), let token = accessToken {
+            var retry = req
+            retry.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            return try await sendRaw(retry, allowRetry: false)
+        }
+
         guard (200..<300).contains(http.statusCode) else {
             throw SupabaseError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
         }
