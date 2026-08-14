@@ -81,6 +81,7 @@ struct GroupsScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
+        .liveRefresh(every: 30) { await model.refreshGroups() }
         .navigationDestination(for: PGroup.self) { GroupDetailView(group: $0) }
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
         .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }

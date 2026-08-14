@@ -89,6 +89,47 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Partial refreshes
+    //
+    // A full loadData() is seven round trips. A write only invalidates part of
+    // the screen, and the polling loops below run every few seconds, so both use
+    // the narrowest refresh that's still correct.
+
+    func refreshProposals() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        if let fresh = try? await SupabaseRepository().fetchProposals() {
+            proposals = fresh
+            loadError = nil
+        }
+    }
+
+    func refreshEvents() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        if let fresh = try? await SupabaseRepository().fetchEvents(groups: groups) {
+            events = fresh
+            loadError = nil
+            mirrorToDeviceCalendar()
+        }
+    }
+
+    /// Groups carry their members, so this covers add/remove/rename too.
+    func refreshGroups() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        let repo = SupabaseRepository()
+        if let fresh = try? await repo.fetchGroups() {
+            groups = fresh
+            loadError = nil
+        }
+        if let who = try? await repo.fetchPeople() { people = who }
+    }
+
+    func refreshFriends() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        let repo = SupabaseRepository()
+        if let mates = try? await repo.fetchFriends() { friends = mates }
+        if let requests = try? await repo.fetchFriendRequests() { friendRequests = requests }
+    }
+
     static func message(for error: Error) -> String {
         guard let e = error as? SupabaseError else {
             return "Couldn't reach Plannit. Check your connection."
@@ -178,7 +219,7 @@ final class AppModel: ObservableObject {
                 "profiles", values: DisplayNameUpdate(display_name: trimmed),
                 match: ["id": "eq.\(uid)"])
             displayName = trimmed
-            await loadData()               // group member lists carry the name
+            await refreshGroups()   // group member lists carry the name
             return true
         } catch {
             return false
@@ -228,7 +269,7 @@ final class AppModel: ObservableObject {
         do {
             try await SupabaseClient.shared.insert("friendships", values: FriendshipInsert(
                 requester_id: uid, addressee_id: person.id, status: "pending"))
-            await loadData()
+            await refreshFriends()
             return true
         } catch {
             return false
@@ -253,7 +294,7 @@ final class AppModel: ObservableObject {
                 try await SupabaseClient.shared.delete("friendships",
                                                        match: ["id": "eq.\(request.id)"])
             }
-            await loadData()
+            await refreshFriends()
             return true
         } catch {
             return false
@@ -276,7 +317,7 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.delete("friendships", match: [
                 "requester_id": "eq.\(person.id)", "addressee_id": "eq.\(uid)",
             ])
-            await loadData()
+            await refreshFriends()
             return true
         } catch {
             return false
@@ -287,29 +328,41 @@ final class AppModel: ObservableObject {
 
     /// Vote for one slot. A vote is a choice, not a tally, so this replaces any
     /// vote you'd already cast on this proposal.
+    ///
+    /// Applied locally first: tapping a slot should move immediately, not after
+    /// two round trips. The server is the truth — if it refuses, we put the old
+    /// state back and say so.
     @discardableResult
     func vote(for slot: PSlot, on proposal: PProposal) async -> Bool {
-        guard Config.isLiveBackend, let uid = userId else {
-            replaceProposal(proposal.id) {
-                var p = $0
-                if let old = p.myVoteSlotId { p.voteCounts[old] = max(0, (p.voteCounts[old] ?? 1) - 1) }
-                p.voteCounts[slot.id, default: 0] += 1
-                p.myVoteSlotId = slot.id
-                p.votes = p.voteCounts.values.reduce(0, +)
-                return p
-            }
-            return true
-        }
+        let rollback = proposals
+        applyVote(slot.id, on: proposal.id)
+
+        guard Config.isLiveBackend, let uid = userId else { return true }
         do {
             try await SupabaseClient.shared.delete("votes", match: [
                 "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
             ])
             try await SupabaseClient.shared.insert("votes", values: VoteInsert(
                 proposal_id: proposal.id, slot_id: slot.id, user_id: uid, response: "yes"))
-            await loadData()
+            await refreshProposals()   // picks up everyone else's votes too
             return true
         } catch {
+            proposals = rollback
             return false
+        }
+    }
+
+    /// The local half of voting, shared by the optimistic path and demo mode.
+    private func applyVote(_ slotId: String?, on proposalId: String) {
+        replaceProposal(proposalId) {
+            var p = $0
+            if let previous = p.myVoteSlotId {
+                p.voteCounts[previous] = max(0, (p.voteCounts[previous] ?? 1) - 1)
+            }
+            if let slotId { p.voteCounts[slotId, default: 0] += 1 }
+            p.myVoteSlotId = slotId
+            p.votes = p.voteCounts.values.reduce(0, +)
+            return p
         }
     }
 
@@ -317,23 +370,18 @@ final class AppModel: ObservableObject {
     /// than none when the organiser is reading the tally.
     @discardableResult
     func removeVote(on proposal: PProposal) async -> Bool {
-        guard Config.isLiveBackend, let uid = userId else {
-            replaceProposal(proposal.id) {
-                var p = $0
-                if let old = p.myVoteSlotId { p.voteCounts[old] = max(0, (p.voteCounts[old] ?? 1) - 1) }
-                p.myVoteSlotId = nil
-                p.votes = p.voteCounts.values.reduce(0, +)
-                return p
-            }
-            return true
-        }
+        let rollback = proposals
+        applyVote(nil, on: proposal.id)
+
+        guard Config.isLiveBackend, let uid = userId else { return true }
         do {
             try await SupabaseClient.shared.delete("votes", match: [
                 "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
             ])
-            await loadData()
+            await refreshProposals()
             return true
         } catch {
+            proposals = rollback
             return false
         }
     }
@@ -348,7 +396,7 @@ final class AppModel: ObservableObject {
         }
         do {
             try await SupabaseClient.shared.delete("proposals", match: ["id": "eq.\(proposal.id)"])
-            await loadData()
+            await refreshProposals()
             return true
         } catch {
             return false
@@ -387,7 +435,8 @@ final class AppModel: ObservableObject {
                         event_id: event.id, group_id: proposal.group.id))
                 }
             }
-            await loadData()
+            await refreshProposals()
+            await refreshEvents()
             return true
         } catch {
             return false
@@ -428,7 +477,7 @@ final class AppModel: ObservableObject {
                 title: title, location: place,
                 start_at: iso.string(from: start), end_at: iso.string(from: end)),
                 match: ["id": "eq.\(event.id)"])
-            await loadData()
+            await refreshEvents()
             return true
         } catch {
             return false
@@ -449,7 +498,7 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.update(
                 "events", values: EventTombstone(deleted_at: iso.string(from: Date())),
                 match: ["id": "eq.\(event.id)"])
-            await loadData()
+            await refreshEvents()
             return true
         } catch {
             return false
@@ -473,7 +522,7 @@ final class AppModel: ObservableObject {
         do {
             try await SupabaseClient.shared.update("groups", values: GroupRename(name: trimmed),
                                                    match: ["id": "eq.\(group.id)"])
-            await loadData()
+            await refreshGroups()
             return true
         } catch {
             return false
@@ -514,7 +563,7 @@ final class AppModel: ObservableObject {
                     EventShareInsert(event_id: event.id, group_id: $0)
                 })
             }
-            await loadData()
+            await refreshEvents()
             return true
         } catch {
             return false
@@ -552,7 +601,7 @@ final class AppModel: ObservableObject {
                 try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
                     event_id: event.id, group_id: group.id))
             }
-            await loadData()
+            await refreshEvents()
             return true
         } catch {
             return false
@@ -616,7 +665,7 @@ final class AppModel: ObservableObject {
                     MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")
                 })
             }
-            await loadData()   // the owner membership is added by a DB trigger
+            await refreshGroups()   // the owner membership is added by a DB trigger
             return true
         } catch {
             return false
@@ -637,7 +686,7 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.insert("group_memberships", values: members.map {
                 MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")
             })
-            await loadData()
+            await refreshGroups()
             return true
         } catch {
             return false
@@ -657,7 +706,7 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.delete("group_memberships", match: [
                 "group_id": "eq.\(group.id)", "user_id": "eq.\(member.id)",
             ])
-            await loadData()
+            await refreshGroups()
             return true
         } catch {
             return false
@@ -673,7 +722,7 @@ final class AppModel: ObservableObject {
         }
         do {
             try await SupabaseClient.shared.delete("groups", match: ["id": "eq.\(group.id)"])
-            await loadData()
+            await refreshGroups()
             return true
         } catch {
             return false

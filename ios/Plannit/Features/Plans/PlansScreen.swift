@@ -57,6 +57,7 @@ struct PlansScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
+        .liveRefresh(every: 20) { await model.refreshProposals() }
         .navigationDestination(for: PProposal.self) { PlanDetailView(proposal: $0) }
     }
 }
@@ -224,6 +225,7 @@ struct PlanDetailView: View {
             selectedSlot = live.myVoteSlotId ?? live.finalizedSlotId
                 ?? live.slots.first(where: { $0.best })?.id
         }
+        .liveRefresh(every: 10) { await model.refreshProposals() }
     }
 
     // Vote first; locking a time in is the organiser's call and comes second.

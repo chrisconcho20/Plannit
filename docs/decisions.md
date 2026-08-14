@@ -54,6 +54,49 @@ Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 | D-14 | Non-user participation | Web link in Phase 2 / App-only | **Web link in Phase 2** (beats Howbout's invite wall) | Accepted |
 | D-15 | First TestFlight scope | Through the scheduler / Phases 1–2 only | **Through the scheduler** (ship the wedge) | Accepted |
 
+### Amendments
+
+| ID | Decision | Options | Choice ★ | Status |
+|---|---|---|---|---|
+| D-16 | Realtime *mechanism* (refines D-13) | `postgres_changes` / **Broadcast from Database** / local-first sync engine | **Broadcast from Database**, consumed via the official `Realtime` SPM module | Accepted 2026-08-14 |
+
+**D-16 in full.** D-13 chose "Realtime + APNs" as the transport but not the
+mechanism, and the API contract assumed `postgres_changes`. Supabase now
+documents that as the option that "does not scale as well" and recommends
+Broadcast from Database. For Plannit the deciding factor isn't scale — six-person
+groups will never approach the ~3,000-subscriber cliff — it's **shape**:
+broadcast picks the topic (`group:<uuid>`, which `is_group_member` from 0002
+already authorises) and the payload, so a sensitive column never goes on the wire
+at all, rather than relying on per-client RLS re-evaluation to filter it. Taking
+only the `Realtime` SPM product is the first dependency in the iOS app, accepted
+because owning a Phoenix protocol client means owning the JWT-refresh-on-socket
+behaviour that silently disconnects clients when missed. Research and sources:
+[`realtime-research.md`](realtime-research.md).
+
+**The alternative we did not take, and when to reopen it.** A local-first sync
+engine — realistically **PowerSync** (full local SQLite, Swift SDK, non-invasive
+Supabase integration) — would deliver realtime, offline and optimistic writes as
+one architectural property instead of three features. It was rejected *for now*
+as disproportionate: a service in the data path, sync rules restating what RLS
+already says, and moving writes off PostgREST to an upload endpoint. It would
+also **supersede D-02 (GRDB for the offline cache)** rather than sit alongside it.
+
+Reopen D-16 if any of these show up:
+
+- **Offline becomes a real requirement** (roadmap 5.10) — building a GRDB cache
+  by hand is most of the work PowerSync already does, and doing both is waste.
+- **Broadcast triggers become a maintenance drag** — if every new table needs a
+  bespoke trigger + policy and they drift from RLS, the duplication argument that
+  counts against PowerSync starts counting against us instead.
+- **Write latency or conflict handling gets fiddly** — if we find ourselves
+  hand-rolling a mutation queue with retries and rollback, that's the sync
+  engine's job, done better.
+- **Another platform appears** (Android, web link per D-14) — PowerSync's
+  multi-platform SDKs would then amortise, where our Swift-only work doesn't.
+
+Migrating later is not free but is bounded: the schema and RLS stay, and the
+broadcast triggers are dropped rather than rewritten.
+
 ## Open questions (product / go-to-market)
 
 - **Who are the first ~20 beta users?** A named friend group de-risks cold-start and gives real calendars to sync.
