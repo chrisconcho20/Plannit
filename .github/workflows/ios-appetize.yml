@@ -1,0 +1,75 @@
+name: iOS Appetize Preview
+
+# Builds an unsigned iOS Simulator .app (no Apple Developer account needed) and
+# uploads it to Appetize.io so the app can be run in a browser on any device —
+# Windows laptop or phone. Requires one repo secret: APPETIZE_API_TOKEN.
+# Setup: ios/APPETIZE.md
+on:
+  workflow_dispatch:
+  push:
+    paths: ["ios/**", ".github/workflows/ios-appetize.yml"]
+
+jobs:
+  appetize:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_1*.app | sort -V | tail -1)"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build simulator .app (no signing)
+        working-directory: ios
+        run: |
+          xcodebuild build \
+            -project Plannit.xcodeproj \
+            -scheme Plannit \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip the .app
+        working-directory: ios
+        run: |
+          APP=$(find build/Build/Products -name "Plannit.app" -type d | head -1)
+          echo "Found app at: $APP"
+          ( cd "$(dirname "$APP")" && zip -r -y "$GITHUB_WORKSPACE/Plannit-sim.zip" "Plannit.app" >/dev/null )
+          ls -la "$GITHUB_WORKSPACE/Plannit-sim.zip"
+
+      - name: Upload to Appetize
+        env:
+          APPETIZE_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          PUBLIC_KEY: ${{ vars.APPETIZE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$APPETIZE_TOKEN" ]; then
+            echo "::warning::APPETIZE_API_TOKEN not set — built the .app but skipped upload. See ios/APPETIZE.md."
+            exit 0
+          fi
+          BASE="https://api.appetize.io/v1/apps"
+          [ -n "$PUBLIC_KEY" ] && BASE="$BASE/$PUBLIC_KEY"
+          RESP=$(curl -s -u "${APPETIZE_TOKEN}:" -X POST "$BASE" \
+            -F "file=@$GITHUB_WORKSPACE/Plannit-sim.zip" \
+            -F "platform=ios")
+          KEY=$(echo "$RESP" | jq -r '.publicKey // empty')
+          if [ -z "$KEY" ]; then
+            echo "Appetize response: $RESP"
+            echo "::error::Appetize upload failed"
+            exit 1
+          fi
+          {
+            echo "### 📱 Plannit preview is live"
+            echo ""
+            echo "Open in any browser (Windows laptop or phone):"
+            echo ""
+            echo "**https://appetize.io/app/$KEY?device=iphone15&osVersion=18.0**"
+            echo ""
+            echo "\`publicKey: $KEY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Appetize URL: https://appetize.io/app/$KEY"
