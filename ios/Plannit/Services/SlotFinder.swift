@@ -17,6 +17,17 @@ enum TimeOfDay: String {
         case .evening:   return (17 * 60, 22 * 60)
         }
     }
+
+    /// Name a stored window back — "afternoon", or "12:00–17:00" if it was
+    /// hand-rolled rather than one of ours.
+    static func describing(from: Int, to: Int) -> String {
+        if let match = [morning, afternoon, evening].first(
+            where: { $0.window.start == from && $0.window.end == to }) {
+            return match.rawValue.lowercased()
+        }
+        func clock(_ m: Int) -> String { String(format: "%d:%02d", m / 60, m % 60) }
+        return "\(clock(from))–\(clock(to))"
+    }
 }
 
 /// How far ahead the date-finder looks. A date that works for *everyone* always
@@ -88,7 +99,8 @@ enum SlotFinder {
                      date: Calendar.current.component(.day, from: start),
                      time: timeRange(start, end),
                      free: dto.score,
-                     best: best)
+                     best: best,
+                     availableIds: dto.availableUserIds)
     }
 
     /// "2:00 – 4:00 PM" — the meridiem is only repeated when it changes.

@@ -52,12 +52,16 @@ struct PEvent: Identifiable, Hashable {
 }
 
 struct PSlot: Identifiable, Hashable {
-    let id = UUID()
+    /// The `proposal_slots` row id once a proposal exists; a throwaway uuid
+    /// while the slot is still just a search result.
+    var id: String = UUID().uuidString
     let day: String
     let date: Int
     let time: String
     let free: Int
     var best: Bool = false
+    /// Profile ids of the members free then — lets the card show real faces.
+    var availableIds: [String] = []
 }
 
 struct PAvailability: Identifiable, Hashable {
@@ -75,7 +79,27 @@ struct PProposal: Identifiable, Hashable {
     var votes: Int = 0
     let slots: [PSlot]
     var availability: [PAvailability] = []
+    /// Votes cast per slot id, and which slot you picked.
+    var voteCounts: [String: Int] = [:]
+    var myVoteSlotId: String? = nil
+    /// Set once someone locks a time in.
+    var finalizedSlotId: String? = nil
+    /// Who created it — only they (or the group's owner) may lock a time in.
+    var createdBy: String? = nil
+
     var total: Int { group.members.count }
+    var isFinalized: Bool { finalizedSlotId != nil }
+    func canFinalize(_ userId: String?) -> Bool {
+        guard let userId else { return true }              // demo
+        return createdBy == nil || createdBy == userId || group.ownerId == userId
+    }
+    /// The names of the members free for a slot, for the avatar row.
+    func people(for slot: PSlot) -> [String] {
+        guard !slot.availableIds.isEmpty else {
+            return Array(group.memberNames.prefix(slot.free))   // demo fallback
+        }
+        return group.members.filter { slot.availableIds.contains($0.id) }.map(\.name)
+    }
 
     static func == (a: PProposal, b: PProposal) -> Bool { a.id == b.id }
     func hash(into h: inout Hasher) { h.combine(id) }

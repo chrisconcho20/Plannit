@@ -99,6 +99,91 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Voting
+
+    /// Vote for one slot. A vote is a choice, not a tally, so this replaces any
+    /// vote you'd already cast on this proposal.
+    @discardableResult
+    func vote(for slot: PSlot, on proposal: PProposal) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            replaceProposal(proposal.id) {
+                var p = $0
+                if let old = p.myVoteSlotId { p.voteCounts[old] = max(0, (p.voteCounts[old] ?? 1) - 1) }
+                p.voteCounts[slot.id, default: 0] += 1
+                p.myVoteSlotId = slot.id
+                p.votes = p.voteCounts.values.reduce(0, +)
+                return p
+            }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.delete("votes", match: [
+                "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
+            ])
+            try await SupabaseClient.shared.insert("votes", values: VoteInsert(
+                proposal_id: proposal.id, slot_id: slot.id, user_id: uid, response: "yes"))
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Lock a time in: mark the proposal finalized, then put the winning slot on
+    /// the calendar as a real event shared with the group.
+    @discardableResult
+    func lockIn(slot: PSlot, on proposal: PProposal) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            replaceProposal(proposal.id) {
+                var p = $0
+                p.finalizedSlotId = slot.id
+                return p
+            }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.update(
+                "proposals",
+                values: ProposalFinalizeUpdate(finalized_slot_id: slot.id, status: "finalized"),
+                match: ["id": "eq.\(proposal.id)"])
+
+            // The event belongs to whoever locked it in, and is shared with the
+            // group so everyone can see it (events are private by default).
+            if let times = try await slotTimes(slot.id, proposalId: proposal.id) {
+                let iso = ISO8601DateFormatter()
+                let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
+                    "events", values: EventInsert(
+                        owner_id: uid, title: proposal.title, location: nil,
+                        start_at: iso.string(from: times.start), end_at: iso.string(from: times.end),
+                        timezone: TimeZone.current.identifier, source: "plannit"))
+                if let event = created.first {
+                    try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
+                        event_id: event.id, group_id: proposal.group.id))
+                }
+            }
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Read the slot's real start/end back — `PSlot` only carries display strings.
+    private func slotTimes(_ slotId: String, proposalId: String) async throws -> (start: Date, end: Date)? {
+        let rows: [ProposalSlotDTO] = try await SupabaseClient.shared.select(
+            "proposal_slots", columns: "id,start_at,end_at,score,available_user_ids",
+            query: ["id": "eq.\(slotId)"])
+        guard let row = rows.first,
+              let start = SupabaseRepository.parseISO(row.start_at),
+              let end = SupabaseRepository.parseISO(row.end_at) else { return nil }
+        return (start, end)
+    }
+
+    private func replaceProposal(_ id: String, _ transform: (PProposal) -> PProposal) {
+        guard let i = proposals.firstIndex(where: { $0.id == id }) else { return }
+        proposals[i] = transform(proposals[i])
+    }
+
     // MARK: Events
 
     /// Create an event on your own calendar. Private until it's shared.

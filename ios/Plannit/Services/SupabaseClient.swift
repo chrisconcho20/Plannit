@@ -82,6 +82,55 @@ struct BusyBlockInsert: Encodable {
     let end_at: String
 }
 
+// A proposal with everything the Plans tab needs, in one embedded query.
+struct ProposalRowDTO: Decodable, Identifiable {
+    let id: String
+    let group_id: String
+    let created_by: String
+    let title: String
+    let status: String
+    let finalized_slot_id: String?
+    let created_at: String?
+    let constraints: StoredConstraintsDTO?
+    let groups: GroupDTO?
+    let proposal_slots: [ProposalSlotDTO]?
+    let votes: [VoteDTO]?
+}
+/// The `constraints` jsonb as stored by find-slots — enough to describe the ask.
+struct StoredConstraintsDTO: Decodable {
+    let allowedWeekdays: [Int]?
+    let dayStartMinutes: Int?
+    let dayEndMinutes: Int?
+    let durationMinutes: Int?
+}
+struct ProposalSlotDTO: Decodable, Identifiable {
+    let id: String
+    let start_at: String
+    let end_at: String
+    let score: Int
+    let available_user_ids: [String]?
+}
+struct VoteDTO: Decodable {
+    let slot_id: String
+    let user_id: String
+    let response: String
+}
+struct VoteInsert: Encodable {
+    let proposal_id: String
+    let slot_id: String
+    let user_id: String
+    let response: String   // "yes" | "no" | "maybe"
+}
+struct ProposalFinalizeUpdate: Encodable {
+    let finalized_slot_id: String
+    let status: String     // "finalized"
+}
+struct EventShareInsert: Encodable {
+    let event_id: String
+    let group_id: String
+}
+struct EventRefDTO: Decodable { let id: String }
+
 // Mirrors the Edge Function Constraints (supabase/functions/_shared/scheduler.ts).
 struct SlotConstraintsDTO: Encodable {
     let windowStart: Int64

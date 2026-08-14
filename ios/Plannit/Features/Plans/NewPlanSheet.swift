@@ -190,7 +190,7 @@ struct NewPlanSheet: View {
                 ForEach(slots) { slot in
                     SlotCard(day: slot.day, date: slot.date, time: slot.time,
                              freeCount: slot.free, total: total,
-                             people: Array((group?.memberNames ?? []).prefix(slot.free)),
+                             people: people(for: slot),
                              best: slot.best)
                 }
             }
@@ -228,6 +228,16 @@ struct NewPlanSheet: View {
     }
 
     private var sendDisabled: Bool { finding || sending || slots.isEmpty }
+
+    /// The members actually free then — the scheduler tells us who, so show
+    /// their faces rather than the first N people in the group.
+    private func people(for slot: PSlot) -> [String] {
+        guard let group else { return [] }
+        guard !slot.availableIds.isEmpty else {
+            return Array(group.memberNames.prefix(slot.free))     // demo fallback
+        }
+        return group.members.filter { slot.availableIds.contains($0.id) }.map(\.name)
+    }
 
     // MARK: Actions
 

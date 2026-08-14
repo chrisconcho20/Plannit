@@ -59,10 +59,92 @@ struct SupabaseRepository: DataRepository {
         return dtos.map(Self.map)
     }
 
+    /// One embedded query for the whole Plans tab: the proposal, its group (with
+    /// members, so scores have a denominator and faces), its slots, and every
+    /// vote. RLS scopes all of it to groups you belong to.
     func fetchProposals() async throws -> [PProposal] {
-        // Proposals join groups + slots + availability; wire once live mode is
-        // exercised on a real device. Empty for now so live mode degrades cleanly.
-        []
+        let rows: [ProposalRowDTO] = try await client.select(
+            "proposals",
+            columns: """
+                     id,group_id,created_by,title,status,finalized_slot_id,created_at,constraints,\
+                     groups(id,name,owner_id,avatar_url,group_memberships(user_id,profiles(id,display_name))),\
+                     proposal_slots(id,start_at,end_at,score,available_user_ids),\
+                     votes(slot_id,user_id,response)
+                     """,
+            query: ["order": "created_at.desc"])
+
+        let me = client.userId
+        return rows.map { row in
+            let group = Self.mapGroup(row.groups, fallbackId: row.group_id)
+            // Best turnout first, ties broken by the earliest date — the same
+            // ranking the scheduler used when it wrote them.
+            let slots = (row.proposal_slots ?? []).sorted { a, b in
+                a.score != b.score ? a.score > b.score : a.start_at < b.start_at
+            }
+            let best = slots.first?.id
+
+            var counts: [String: Int] = [:]
+            for vote in row.votes ?? [] where vote.response == "yes" {
+                counts[vote.slot_id, default: 0] += 1
+            }
+
+            return PProposal(
+                id: row.id,
+                title: row.title.isEmpty ? "Untitled plan" : row.title,
+                group: group,
+                constraint: Self.describe(row.constraints),
+                status: row.finalized_slot_id == nil ? "voting" : "found",
+                votes: (row.votes ?? []).filter { $0.response == "yes" }.count,
+                slots: slots.map { Self.mapSlot($0, best: $0.id == best) },
+                voteCounts: counts,
+                myVoteSlotId: (row.votes ?? []).first { $0.user_id == me && $0.response == "yes" }?.slot_id,
+                finalizedSlotId: row.finalized_slot_id,
+                createdBy: row.created_by)
+        }
+    }
+
+    private static func mapGroup(_ dto: GroupDTO?, fallbackId: String) -> PGroup {
+        guard let dto else {
+            return PGroup(id: fallbackId, name: "Group", hue: .coral, members: [], note: "")
+        }
+        let members = (dto.group_memberships ?? []).compactMap { m -> PMember? in
+            guard let id = m.user_id ?? m.profiles?.id else { return nil }
+            let name = m.profiles?.display_name ?? ""
+            return PMember(id: id, name: name.isEmpty ? "Member" : name)
+        }
+        return PGroup(id: dto.id, name: dto.name, hue: GroupHue.forName(dto.name),
+                      members: members, note: "", ownerId: dto.owner_id)
+    }
+
+    private static func mapSlot(_ dto: ProposalSlotDTO, best: Bool) -> PSlot {
+        let start = parseDate(dto.start_at) ?? Date()
+        let end = parseDate(dto.end_at)
+        let weekday = DateFormatter(); weekday.dateFormat = "EEE"
+        return PSlot(id: dto.id,
+                     day: weekday.string(from: start).uppercased(),
+                     date: Calendar.current.component(.day, from: start),
+                     time: timeLabel(start, end),
+                     free: dto.score,
+                     best: best,
+                     availableIds: dto.available_user_ids ?? [])
+    }
+
+    /// "Sat, Sun · afternoon · 2h" from the constraints the scheduler stored.
+    private static func describe(_ c: StoredConstraintsDTO?) -> String {
+        guard let c else { return "" }
+        let names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        var parts: [String] = []
+        if let days = c.allowedWeekdays, !days.isEmpty, days.count < 7 {
+            parts.append(days.sorted().compactMap { names.indices.contains($0) ? names[$0] : nil }
+                             .joined(separator: ", "))
+        }
+        if let from = c.dayStartMinutes, let to = c.dayEndMinutes {
+            parts.append(TimeOfDay.describing(from: from, to: to))
+        }
+        if let minutes = c.durationMinutes {
+            parts.append(minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes)m")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private static func map(_ d: EventDTO) -> PEvent {
@@ -96,6 +178,8 @@ struct SupabaseRepository: DataRepository {
     }
 
     /// Parse a Postgres timestamptz, tolerating fractional seconds.
+    static func parseISO(_ s: String) -> Date? { parseDate(s) }
+
     private static func parseDate(_ s: String) -> Date? {
         let withFractional = ISO8601DateFormatter()
         withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
