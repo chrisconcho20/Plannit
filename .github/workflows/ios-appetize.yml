@@ -4,10 +4,16 @@ name: iOS Appetize Preview
 # uploads it to Appetize.io so the app can be run in a browser on any device —
 # Windows laptop or phone. Requires one repo secret: APPETIZE_API_TOKEN.
 # Setup: ios/APPETIZE.md
+#
+# Manual only. This used to rebuild on every push to ios/**, which meant every
+# commit paid for TWO macOS runs (this plus iOS Build) at 10x billing. The demo
+# preview rarely needs to be current — run it from the Actions tab when it does.
 on:
   workflow_dispatch:
-  push:
-    paths: ["ios/**", ".github/workflows/ios-appetize.yml"]
+
+concurrency:
+  group: ios-appetize-demo
+  cancel-in-progress: true
 
 jobs:
   appetize:

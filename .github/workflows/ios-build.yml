@@ -9,6 +9,12 @@ on:
     paths: ["ios/**"]
   workflow_dispatch:
 
+# macOS runners bill at 10x the minutes of Linux, so a superseded run is
+# expensive dead weight: push twice in a minute and the first one is cancelled.
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15   # Sequoia image ships Xcode 16 (reads the project format XcodeGen emits)

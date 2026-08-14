@@ -7,6 +7,10 @@ name: iOS Appetize Preview (Live)
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ios-appetize-live
+  cancel-in-progress: true
+
 jobs:
   appetize-live:
     runs-on: macos-15
