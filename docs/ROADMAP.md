@@ -44,12 +44,15 @@ account. See §6 for URLs/creds.
 ## 2. Roadmap (phased, most valuable first)
 
 ### Phase 1 — Finish the core live loop (the product's reason to exist)
-1. **Live date-finder (`find-slots`)** — in `NewPlanSheet`, when `Config.isLiveBackend`,
-   build a `SlotConstraintsDTO` from the UI (days set → `allowedWeekdays`,
-   time-of-day → `dayStart/EndMinutes`, duration, a window of the next N weeks,
-   the user's timezone, quorum), call `SupabaseClient.invokeFunction("find-slots", …)`,
-   map `FoundSlotDTO`→ display. Contract: [`backend/api-contract.md`](backend/api-contract.md).
-   Files: `Features/Plans/NewPlanSheet.swift`, `Services/SupabaseClient.swift`.
+1. ~~**Live date-finder (`find-slots`)**~~ ✅ **done (2026-08-14).** `Services/SlotFinder.swift`
+   builds the `SlotConstraintsDTO` (days → `allowedWeekdays`, time-of-day →
+   `dayStart/EndMinutes`, duration, a 4-week window from the next whole hour,
+   device timezone, majority quorum) and maps `FoundSlotDTO` → `PSlot`.
+   `NewPlanSheet` previews with `persist:false` and only persists the proposal on
+   **Send to group to vote**, with loading / error / no-results states.
+   _Follow-ups:_ slot avatars still show the first N group members rather than the
+   real `availableUserIds` (needs member ids on `PGroup`); the quorum is a
+   hard-coded majority with no UI.
 2. **Live proposals + voting** — `SupabaseRepository.fetchProposals` (embed
    `proposal_slots`, group, `votes`), render in `PlansScreen`/`PlanDetailView`;
    wire vote insert and **Lock in** → set `proposals.finalized_slot_id` + status,
@@ -119,7 +122,10 @@ account. See §6 for URLs/creds.
   it, which is wrong across months. (Phase 2.4)
 - **Placeholder buttons** do nothing (see Phase 5.13).
 - **`fetchProposals` returns `[]`** in live mode (stub) — Plans tab is empty live.
-- **No offline support / no retry** — network failure silently keeps sample data.
+- **No offline support / no retry** — network failure silently keeps sample data
+  (the date-finder is the exception: it now surfaces a real error + retry).
+- **A sent plan is invisible live** — `find-slots` persists the proposal, but the
+  Plans tab can't read it back until 1.2 lands.
 
 ## 4. Small backlog
 - Loading skeletons; pull-to-refresh; sign-out button wiring; avatar images
