@@ -84,11 +84,20 @@ account. See §6 for URLs/creds.
    live mode and appends locally in demo.
    _Next here:_ events are still create-only — no edit or delete, and the Week
    view is unbuilt (Month/List work).
-5. **Full two-way sync** per [`backend/sync-contract.md`](backend/sync-contract.md):
-   dedicated "Plannit" `EKCalendar`, write Plannit-origin events to the device,
-   `calendarItemExternalIdentifier` mapping, deltas + tombstones, `BGAppRefreshTask`.
-   Today we only *read* device events + upload busy blocks. Files:
-   `Services/CalendarService.swift`, new sync engine.
+5. **Full two-way sync** per [`backend/sync-contract.md`](backend/sync-contract.md).
+   **Done (2026-08-14):** availability is now trustworthy — uncapped, merged
+   (`Services/Availability.swift`, 11 tests), replace-not-append uploads, and it
+   re-syncs on foreground + `EKEventStoreChanged` instead of only on first
+   connect; events marked Free/cancelled/all-day no longer count as busy. Export
+   works: a dedicated **"Plannit" `EKCalendar`** that Plannit-origin events are
+   mirrored into (create/update/remove, keyed by an `events.id → eventIdentifier`
+   map), so a locked-in plan really lands on the device.
+   **Still to do:** the import half — device events as `events` rows keyed by
+   `calendarItemExternalIdentifier` (now carried on `DeviceEvent`), a
+   `last_synced_at` high-water mark, tombstones, and `BGAppRefreshTask`.
+   ⚠️ Verification: EventKit round-trips can't be confirmed on Appetize (fresh
+   empty simulator each session). The import half really wants TestFlight on a
+   real device — see phase 6.
 
 ### Phase 3 — Social graph
 6. **Friends** — friend requests / accept (tables exist: `friendships`), a
