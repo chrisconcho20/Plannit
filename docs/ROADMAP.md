@@ -65,8 +65,14 @@ account. See §6 for URLs/creds.
    `event_shares` rows. Files: `Features/Calendar/CalendarScreen.swift`.
 
 ### Phase 2 — Real calendar, real dates
-4. **Move off the fixed Aug-2026 sample month** — `MonthGrid`/`CalendarScreen`
-   should use the current month and real event dates; derive `marks` from events.
+4. ~~**Move off the fixed Aug-2026 sample month**~~ ✅ **done (2026-08-14).**
+   `PEvent` carries a real `start: Date`; the grid shows the current month (with
+   ‹ › navigation), "today" comes from the clock, and `marks` are derived from
+   the loaded events — no more dots on days with nothing behind them.
+   **New event** (`Features/Calendar/NewEventSheet.swift`) writes to `events` in
+   live mode and appends locally in demo.
+   _Next here:_ events are still create-only — no edit or delete, and the Week
+   view is unbuilt (Month/List work).
 5. **Full two-way sync** per [`backend/sync-contract.md`](backend/sync-contract.md):
    dedicated "Plannit" `EKCalendar`, write Plannit-origin events to the device,
    `calendarItemExternalIdentifier` mapping, deltas + tombstones, `BGAppRefreshTask`.
@@ -122,15 +128,19 @@ account. See §6 for URLs/creds.
 - **Group hue not persisted** — no `hue` column; derived from name, so the hue
   picker in "New group" is cosmetic. Add a column or accept derived.
 - **Group create can't add real members** — needs the friends system; today it
-  creates the group with just the owner.
-- **Calendar is a fixed sample month** (Aug 2026); live events map their day onto
-  it, which is wrong across months. (Phase 2.4)
+  creates the group with just the owner. For testing, `supabase/seed-test-users.sql`
+  drops five real people into every group you own.
 - **Placeholder buttons** do nothing (see Phase 5.13).
 - **`fetchProposals` returns `[]`** in live mode (stub) — Plans tab is empty live.
 - **No offline support / no retry** — network failure silently keeps sample data
   (the date-finder is the exception: it now surfaces a real error + retry).
 - **A sent plan is invisible live** — `find-slots` persists the proposal, but the
   Plans tab can't read it back until 1.2 lands.
+- **Slot avatars are approximate** — a slot shows the first N group members, not
+  the actual `availableUserIds`; `PGroup` carries member names, not ids.
+- **Sample data still leaks into live mode** — `AppModel` seeds sample groups/
+  events/proposals, so a failed or empty live load shows demo content. The Plans
+  tab is the visible case (see above).
 
 ## 4. Small backlog
 - Loading skeletons; pull-to-refresh; sign-out button wiring; avatar images

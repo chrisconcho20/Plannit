@@ -42,10 +42,14 @@ begin
   end if;
 
   -- Your own profile needs a display name, or you show up nameless in groups.
-  update public.profiles
-     set display_name = initcap(split_part(owner_email, '@', 1)),
-         timezone     = coalesce(nullif(timezone, ''), owner_tz)
-   where id = owner_uid and coalesce(display_name, '') = '';
+  -- Insert rather than update: an account created before the profiles trigger
+  -- existed has no row at all, and an UPDATE would silently do nothing.
+  insert into public.profiles (id, display_name, timezone)
+  values (owner_uid, initcap(split_part(owner_email, '@', 1)), owner_tz)
+  on conflict (id) do update
+    set display_name = case when coalesce(profiles.display_name, '') = ''
+                            then excluded.display_name else profiles.display_name end,
+        timezone     = coalesce(nullif(profiles.timezone, ''), excluded.timezone);
 
   -- ---------------------------------------------------------------- users ---
   for u in

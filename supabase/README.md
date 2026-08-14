@@ -11,6 +11,7 @@ for the client-facing contract.
 supabase/
 ├─ config.toml                      # local dev + Apple auth config
 ├─ seed.sql                         # local demo data (3 users, 1 group, busy blocks)
+├─ seed-test-users.sql              # HOSTED test data — 5 people in your groups
 ├─ migrations/
 │  ├─ 0001_init.sql                 # schema: profiles, groups, events, shares, busy_blocks, proposals…
 │  ├─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies
@@ -44,6 +45,30 @@ supabase functions serve find-slots   # serves the scheduler function
 ```
 
 Studio: http://localhost:54323 · API: http://localhost:54321
+
+## Test data in the hosted project
+
+The date-finder is meaningless with a group of one, so
+[`seed-test-users.sql`](seed-test-users.sql) puts five real people in the live
+database. Open the project's **SQL editor**, paste the file, check the
+`owner_email` on the first line is the account you sign in as, and run it. It is
+idempotent — run it again whenever you want the busy blocks moved back to "the
+next few weekends".
+
+| | |
+|---|---|
+| Users | Maya Ellis, Theo Sand, Ada Kim, Sam Roe, Jo Vane |
+| Sign-in | `maya@plannit.test` … / `plannit123` |
+| Groups | added to every group you own (creates "Test Crew" if you own none) |
+
+What the seeded availability is designed to prove, searching afternoons:
+
+- **Saturdays** — Maya, Theo and Ada are busy on the first two, so the earliest
+  date the whole group can make is the *third* Saturday. The results header
+  should say the constraint, not a fallback warning.
+- **Sundays** — Jo is busy every Sunday for six months, so no all-free date
+  exists and you should get "No time works for all 6 … here's the best turnout"
+  with 5-of-6 slots.
 
 ## Test the scheduler
 

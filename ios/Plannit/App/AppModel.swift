@@ -54,11 +54,19 @@ final class AppModel: ObservableObject {
         do {
             let rows: [ProfileDTO] = try await SupabaseClient.shared.select(
                 "profiles", columns: "id,display_name,timezone", query: ["id": "eq.\(uid)"])
-            let name = rows.first?.display_name ?? ""
-            if name.isEmpty {
+            guard let row = rows.first else {
+                // No profile row (account predates the trigger) — a PATCH would
+                // update nothing, so create it.
+                try await SupabaseClient.shared.insert("profiles", values: ProfileInsert(
+                    id: uid, display_name: fallback.capitalized,
+                    timezone: TimeZone.current.identifier))
+                displayName = fallback.capitalized
+                return
+            }
+            if row.display_name.isEmpty {
                 await updateDisplayName(fallback.capitalized)
             } else {
-                displayName = name
+                displayName = row.display_name
             }
         } catch {
             displayName = fallback.capitalized

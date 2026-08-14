@@ -22,6 +22,11 @@ struct ProfileDTO: Decodable {
     let timezone: String?
 }
 struct DisplayNameUpdate: Encodable { let display_name: String }
+struct ProfileInsert: Encodable {
+    let id: String
+    let display_name: String
+    let timezone: String
+}
 
 struct GroupDTO: Decodable, Identifiable {
     let id: String
