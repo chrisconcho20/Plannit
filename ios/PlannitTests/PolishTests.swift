@@ -68,7 +68,9 @@ final class PolishTests: XCTestCase {
         XCTAssertFalse(expired.isFresh)
     }
 
-    func testKeychainRoundTrip() {
+    /// Exercises whichever store is available: the Keychain on a signed build,
+    /// the UserDefaults fallback on an unsigned simulator (CI, Appetize).
+    func testSessionStorageRoundTrip() {
         let key = "test-\(UUID().uuidString)"
         let session = StoredSession(accessToken: "token", refreshToken: "refresh",
                                     userId: "uid", email: "a@b.c",
