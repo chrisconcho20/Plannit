@@ -36,20 +36,47 @@ export interface Slot {
   score: number; // === availableUserIds.length
 }
 
+export interface SlotSearch {
+  slots: Slot[];
+  /** True when every returned slot works for the whole group. */
+  everyoneFree: boolean;
+  /** Members considered — the denominator behind each slot's score. */
+  memberCount: number;
+  /** Availability floor the returned slots met. */
+  quorum: number;
+}
+
 const MINUTE = 60_000;
+
+/** More than half the group, rounded up — the fallback when nobody's all free. */
+export function majorityOf(memberCount: number): number {
+  return Math.max(1, Math.ceil(memberCount / 2));
+}
+
+// One formatter per timezone: constructing an Intl.DateTimeFormat costs far more
+// than using it, and a six-month window asks for thousands of conversions.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatterFor(timeZone: string): Intl.DateTimeFormat {
+  let f = formatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    formatters.set(timeZone, f);
+  }
+  return f;
+}
 
 /** Local weekday (0=Sun) and minutes-from-midnight for a UTC instant in a tz. */
 export function localParts(
   epochMs: number,
   timeZone: string,
 ): { weekday: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date(epochMs));
+  const parts = formatterFor(timeZone).formatToParts(new Date(epochMs));
 
   const map: Record<string, string> = {};
   for (const p of parts) map[p.type] = p.value;
@@ -69,22 +96,25 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
 }
 
 /**
- * Enumerate candidate slots satisfying the hard constraints and rank them by
- * availability. Complexity is O(candidates × members × intervals); with a
- * bounded window and 30-min steps this is a few thousand cheap checks.
+ * Walk the window in chronological order, scoring every candidate slot that
+ * satisfies the hard constraints (allowed weekday, and the whole slot inside the
+ * local time-of-day range on that day). `visit` returning true stops the walk.
+ *
+ * Complexity is O(candidates × members × intervals); with 30-min steps even a
+ * six-month window is a few thousand cheap checks.
  */
-export function findSlots(members: Member[], c: Constraints, maxResults = 10): Slot[] {
-  const quorum = c.quorum ?? members.length;
+function eachCandidate(
+  members: Member[],
+  c: Constraints,
+  visit: (slot: Slot) => boolean | void,
+): void {
   const duration = c.durationMinutes * MINUTE;
   const step = c.stepMinutes * MINUTE;
   const allowed = new Set(c.allowedWeekdays);
-  const slots: Slot[] = [];
 
   for (let start = c.windowStart; start + duration <= c.windowEnd; start += step) {
     const end = start + duration;
 
-    // Hard constraints: allowed weekday, and the whole slot fits inside the
-    // local time-of-day window on that same day.
     const { weekday, minutes } = localParts(start, c.timezone);
     if (!allowed.has(weekday)) continue;
     if (minutes < c.dayStartMinutes) continue;
@@ -96,12 +126,57 @@ export function findSlots(members: Member[], c: Constraints, maxResults = 10): S
       if (!isBusy) availableUserIds.push(m.userId);
     }
 
-    if (availableUserIds.length >= quorum) {
-      slots.push({ start, end, availableUserIds, score: availableUserIds.length });
-    }
+    if (visit({ start, end, availableUserIds, score: availableUserIds.length })) return;
   }
+}
 
-  // Best availability first; ties broken by the earliest date.
+/**
+ * Slots meeting a hard quorum (default: everyone), best availability first with
+ * ties broken by the earliest date. Prefer `findBestSlots` for the product
+ * behaviour — this is the primitive for a caller that means a strict floor.
+ */
+export function findSlots(members: Member[], c: Constraints, maxResults = 10): Slot[] {
+  const quorum = c.quorum ?? members.length;
+  const slots: Slot[] = [];
+  eachCandidate(members, c, (slot) => {
+    if (slot.score >= quorum) slots.push(slot);
+  });
   slots.sort((a, b) => b.score - a.score || a.start - b.start);
   return slots.slice(0, maxResults);
+}
+
+/**
+ * The product behaviour: a date the *whole group* can make always wins, however
+ * far out it is — so we return the earliest all-free slots and stop looking.
+ * Only when the window holds no such date do we fall back to the best partial
+ * turnout (at least `quorum`, defaulting to a majority), so the group is offered
+ * something rather than nothing. The caller tells the user which happened.
+ */
+export function findBestSlots(members: Member[], c: Constraints, maxResults = 10): SlotSearch {
+  const memberCount = members.length;
+  const floor = Math.max(1, Math.min(c.quorum ?? majorityOf(memberCount), memberCount));
+  const everyone: Slot[] = [];
+  const partial: Slot[] = [];
+
+  eachCandidate(members, c, (slot) => {
+    if (slot.score === memberCount) {
+      everyone.push(slot);
+      // Candidates arrive in time order, so the first maxResults all-free slots
+      // are already the answer — no need to search the rest of the window.
+      if (everyone.length >= maxResults) return true;
+    } else if (slot.score >= floor) {
+      partial.push(slot);
+    }
+  });
+
+  if (everyone.length) {
+    return { slots: everyone, everyoneFree: true, memberCount, quorum: memberCount };
+  }
+  partial.sort((a, b) => b.score - a.score || a.start - b.start);
+  return {
+    slots: partial.slice(0, maxResults),
+    everyoneFree: false,
+    memberCount,
+    quorum: floor,
+  };
 }

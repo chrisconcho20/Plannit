@@ -9,7 +9,7 @@
 // Privacy: only the aggregate available_user_ids ever leaves this function.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { findSlots, type Constraints, type Member } from "../_shared/scheduler.ts";
+import { findBestSlots, type Constraints, type Member } from "../_shared/scheduler.ts";
 
 interface RequestBody {
   groupId: string;
@@ -85,10 +85,12 @@ Deno.serve(async (req) => {
     });
   }
 
-  const slots = findSlots([...byUser.values()], body.constraints, body.maxResults ?? 10);
+  // Prefers a date the whole group can make; falls back to the best turnout.
+  const search = findBestSlots([...byUser.values()], body.constraints, body.maxResults ?? 10);
+  const { slots, everyoneFree, memberCount, quorum } = search;
 
   // Preview mode — compute without persisting.
-  if (body.persist === false) return json({ slots });
+  if (body.persist === false) return json({ slots, everyoneFree, memberCount, quorum });
 
   const { data: proposal, error: propErr } = await admin
     .from("proposals")
@@ -130,9 +132,12 @@ Deno.serve(async (req) => {
             userIds: recipients,
             notification: {
               title: "Plannit found a date",
-              body: body.title
-                ? `"${body.title}" — ${slots.length} option${slots.length > 1 ? "s" : ""} to vote on`
-                : `${slots.length} option${slots.length > 1 ? "s" : ""} to vote on`,
+              body: [
+                body.title ? `"${body.title}" — ` : "",
+                everyoneFree
+                  ? `${slots.length} time${slots.length > 1 ? "s" : ""} everyone can make`
+                  : `best turnout ${slots[0].score} of ${memberCount} — vote on ${slots.length} option${slots.length > 1 ? "s" : ""}`,
+              ].join(""),
               data: { proposalId: proposal.id, groupId: body.groupId },
               collapseId: `proposal-${proposal.id}`,
             },
@@ -144,5 +149,5 @@ Deno.serve(async (req) => {
     // Swallow push errors — the proposal already succeeded.
   }
 
-  return json({ proposal, slots });
+  return json({ proposal, slots, everyoneFree, memberCount, quorum });
 });

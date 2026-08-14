@@ -77,6 +77,13 @@ Subscribe to `postgres_changes` on `events`, `proposals`, `proposal_slots`, and 
 
 Finds the times a group is free that match a plain-language-derived constraint, and (by default) saves them as a proposal to vote on.
 
+**A date the whole group can make always wins.** The scheduler scans the window in
+time order and returns the earliest slots where *everyone* is free, however far
+out they are. Only when the window contains no such date does it fall back to the
+best turnout it found (at least `quorum` members), so the group gets an option
+rather than nothing. `everyoneFree` in the response says which happened — show it,
+because "4 of 6 can make it" is a different answer than "here's a date".
+
 ### Request body
 ```jsonc
 {
@@ -86,14 +93,16 @@ Finds the times a group is free that match a plain-language-derived constraint, 
   "persist": true,               // false = preview without saving
   "constraints": {
     "windowStart": 1786838400000, // epoch ms, earliest a slot may start
-    "windowEnd":   1787443200000, // epoch ms, latest a slot may end
+    "windowEnd":   1787443200000, // epoch ms, how far ahead to look (the iOS
+                                  // app defaults to 6 months; You → Date finder)
     "allowedWeekdays": [0, 6],     // 0=Sun … 6=Sat, evaluated in `timezone`
     "dayStartMinutes": 720,        // 12:00 (minutes from local midnight)
     "dayEndMinutes":   1020,       // 17:00
     "durationMinutes": 180,        // slot length
     "stepMinutes": 30,             // candidate granularity
     "timezone": "America/Los_Angeles",
-    "quorum": 5                    // min members free; omit = everyone
+    "quorum": 5                    // fallback floor only — min members free when
+                                   // no all-free date exists; omit = a majority
   }
 }
 ```
@@ -111,10 +120,15 @@ Finds the times a group is free that match a plain-language-derived constraint, 
       "score": 6,
       "availableUserIds": ["…", "…"]   // aggregate only — never event detail
     }
-  ]
+  ],
+  "everyoneFree": true,  // every slot works for the whole group
+  "memberCount": 6,      // the denominator behind each score
+  "quorum": 6            // availability floor the returned slots met
 }
 ```
-Slots are ranked by `score` (members free) desc, then earliest start.
+When `everyoneFree` is true the slots are the **earliest** dates that work for
+everyone. Otherwise they're the fallback: ranked by `score` (members free) desc,
+then earliest start.
 
 ### Errors
 `400 invalid_json | missing_fields` · `401 unauthorized` · `403 forbidden` (not a group member) · `500 *_failed` (with `detail`).
@@ -134,6 +148,7 @@ struct ProposalSlot: Codable {
   let availableUserIds: [String]
 }
 ```
+Implemented in `ios/Plannit/Services/SlotFinder.swift`.
 
 ---
 

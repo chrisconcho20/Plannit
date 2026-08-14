@@ -78,6 +78,9 @@ struct ProposalRefDTO: Decodable { let id: String }
 struct FindSlotsResponse: Decodable {
     let proposal: ProposalRefDTO?   // omitted when persist:false
     let slots: [FoundSlotDTO]
+    let everyoneFree: Bool          // false = best-turnout fallback
+    let memberCount: Int
+    let quorum: Int
 }
 
 // MARK: - Client

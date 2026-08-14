@@ -1,0 +1,26 @@
+name: Edge Functions
+
+# Runs the Deno tests for the scheduler (the wedge) and type-checks the Edge
+# Functions, so backend logic is validated on every push like the iOS app is.
+on:
+  push:
+    paths: ["supabase/functions/**", ".github/workflows/functions-test.yml"]
+  pull_request:
+    paths: ["supabase/functions/**"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Test the scheduler
+        run: deno test supabase/functions/_shared/
+
+      - name: Type-check the functions
+        run: deno check supabase/functions/find-slots/index.ts supabase/functions/send-push/index.ts

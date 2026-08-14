@@ -161,6 +161,7 @@ struct YouScreen: View {
     @State private var shareAvailability = true
     @State private var pushDateFound = true
     @State private var pushInvites = true
+    @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
 
     var body: some View {
         VStack(spacing: 0) {
@@ -182,6 +183,26 @@ struct YouScreen: View {
                     Spacer()
                 }
                 .padding(Space.gutter)
+
+                SectionLabel("Date finder")
+                settingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            PIcon("wand-sparkles", size: 20, color: .textMuted).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("How far ahead to look").textStyle(.headline, color: .textStrong)
+                                Text("Plannit holds out for a time the whole group can make — a longer window makes that more likely.")
+                                    .textStyle(.caption, color: .textMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        SegmentedControl(options: SearchWindow.options, selection: $searchMonths) {
+                            SearchWindow.label($0)
+                        }
+                        .padding(.leading, 34)
+                    }
+                    .padding(.vertical, 12)
+                }
 
                 SectionLabel("Calendar")
                 settingsCard {

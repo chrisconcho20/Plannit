@@ -19,22 +19,46 @@ enum TimeOfDay: String {
     }
 }
 
+/// How far ahead the date-finder looks. A date that works for *everyone* always
+/// wins, so the window is really "how far out are you willing to plan" — a
+/// personal call, changed in You → Date finder.
+enum SearchWindow {
+    static let key = "plannit.searchWindowMonths"
+    static let options = [1, 3, 6, 12]
+    static let defaultMonths = 6
+
+    /// The stored preference, or the default when unset/nonsense.
+    static var months: Int {
+        let stored = UserDefaults.standard.integer(forKey: key)   // 0 when unset
+        return options.contains(stored) ? stored : defaultMonths
+    }
+
+    /// "6 mo" · "1 year" — for the picker.
+    static func label(_ months: Int) -> String {
+        months == 12 ? "1 year" : "\(months) mo"
+    }
+
+    /// "the next 6 months" · "the next year" — for a sentence.
+    static func phrase(_ months: Int) -> String {
+        months == 12 ? "the next year" : "the next \(months) month\(months == 1 ? "" : "s")"
+    }
+}
+
 enum SlotFinder {
-    /// How far ahead we look for candidate dates.
-    static let searchWeeks = 4
     /// Slots to show — enough to choose from without burying the best one.
     static let maxResults = 5
     static let stepMinutes = 30
 
     static func constraints(days: Set<Int>, timeOfDay: String, duration: String,
-                            memberCount: Int, now: Date = Date()) -> SlotConstraintsDTO {
+                            months: Int = SearchWindow.months,
+                            now: Date = Date()) -> SlotConstraintsDTO {
         let tz = TimeZone.current
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         // Start at the next whole hour so candidates land on :00/:30, not :47.
         let start = cal.nextDate(after: now, matching: DateComponents(minute: 0, second: 0),
                                  matchingPolicy: .nextTime) ?? now
-        let end = cal.date(byAdding: .day, value: searchWeeks * 7, to: start) ?? start
+        let end = cal.date(byAdding: .month, value: months, to: start) ?? start
         let window = (TimeOfDay(rawValue: timeOfDay) ?? .afternoon).window
 
         return SlotConstraintsDTO(
@@ -46,15 +70,9 @@ enum SlotFinder {
             durationMinutes: minutes(from: duration),
             stepMinutes: stepMinutes,
             timezone: tz.identifier,
-            quorum: quorum(memberCount: memberCount))
-    }
-
-    /// Ask for a majority rather than everyone: a group of six rarely has a slot
-    /// where all six are free, and each card still shows "4 of 6 free" so the
-    /// trade-off is visible. `nil` means the scheduler's default (everyone).
-    static func quorum(memberCount: Int) -> Int? {
-        guard memberCount > 1 else { return nil }
-        return max(1, Int((Double(memberCount) / 2).rounded(.up)))
+            // No quorum: the scheduler holds out for a date the whole group can
+            // make and only drops to the best turnout if the window has none.
+            quorum: nil)
     }
 
     /// "2h" → 120.

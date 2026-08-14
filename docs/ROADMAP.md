@@ -46,13 +46,16 @@ account. See §6 for URLs/creds.
 ### Phase 1 — Finish the core live loop (the product's reason to exist)
 1. ~~**Live date-finder (`find-slots`)**~~ ✅ **done (2026-08-14).** `Services/SlotFinder.swift`
    builds the `SlotConstraintsDTO` (days → `allowedWeekdays`, time-of-day →
-   `dayStart/EndMinutes`, duration, a 4-week window from the next whole hour,
-   device timezone, majority quorum) and maps `FoundSlotDTO` → `PSlot`.
-   `NewPlanSheet` previews with `persist:false` and only persists the proposal on
-   **Send to group to vote**, with loading / error / no-results states.
-   _Follow-ups:_ slot avatars still show the first N group members rather than the
-   real `availableUserIds` (needs member ids on `PGroup`); the quorum is a
-   hard-coded majority with no UI.
+   `dayStart/EndMinutes`, duration, device timezone) and maps `FoundSlotDTO` →
+   `PSlot`. `NewPlanSheet` previews with `persist:false` and only persists the
+   proposal on **Send to group to vote**, with loading / error / no-results states.
+   **A date the whole group can make always wins:** the scheduler
+   (`findBestSlots`) returns the earliest all-free slots anywhere in the window
+   and only falls back to the best turnout when there are none — the results
+   header says which. The window is a personal preference (You → Date finder,
+   1/3/6/12 months, default 6) stored under `SearchWindow.key`.
+   _Follow-up:_ slot avatars still show the first N group members rather than the
+   real `availableUserIds` (needs member ids on `PGroup`).
 2. **Live proposals + voting** — `SupabaseRepository.fetchProposals` (embed
    `proposal_slots`, group, `votes`), render in `PlansScreen`/`PlanDetailView`;
    wire vote insert and **Lock in** → set `proposals.finalized_slot_id` + status,
@@ -96,8 +99,10 @@ account. See §6 for URLs/creds.
 12. **Empty-state copy** — friendly "nothing yet / here's what to do" states.
 13. **Wire or hide placeholder buttons** — Settings, Search, Bell, Inbox, ⋯/More,
     Add-people all have empty actions today (see [[plannit-live-feedback]]).
-14. **Tests** — only Deno scheduler tests + CI compile exist. Add XCTest (unit +
-    a few UI smoke tests). Consider an Appetize-based smoke check in CI.
+14. **Tests** — the Deno scheduler tests now run in CI (`functions-test.yml`)
+    alongside the iOS compile. Add XCTest (unit + a few UI smoke tests) —
+    `SlotFinder`'s constraint math is the obvious first target. Consider an
+    Appetize-based smoke check in CI.
 15. **Accessibility & Dynamic Type**, and decide on **dark mode** (design system is
     light-only today).
 
@@ -146,7 +151,8 @@ ios/             SwiftUI app
   Plannit/Features    screens: Onboarding, Calendar, Groups, Plans, You
   Plannit/Services    SupabaseClient, AppleSignIn, CalendarService, DataRepository, Config
   Plannit/Models      UI models + sample data
-.github/workflows/  ios-build (compile), ios-appetize (demo), ios-appetize-live
+.github/workflows/  ios-build (compile), ios-appetize (demo), ios-appetize-live,
+                    functions-test (Deno scheduler tests + type-check)
 codemagic.yaml      Codemagic → TestFlight (needs Apple Developer account)
 ```
 

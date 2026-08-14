@@ -20,7 +20,9 @@ struct NewPlanSheet: View {
     @State private var finding = false
     @State private var sending = false
     @State private var slots: [PSlot] = []
+    @State private var everyoneFree = true
     @State private var errorText: String?
+    @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
 
     private let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -133,10 +135,14 @@ struct NewPlanSheet: View {
                 }
             }
 
-            // Plain-language echo of the constraint.
-            HStack(spacing: 8) {
+            // Plain-language echo of the constraint, and the promise behind it.
+            HStack(alignment: .top, spacing: 8) {
                 PIcon("wand-sparkles", size: 16, color: Palette.teal600)
-                Text(constraintSummary).textStyle(.footnote, color: Palette.teal700)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(constraintSummary).textStyle(.footnote, color: Palette.teal700)
+                    Text("Searching \(SearchWindow.phrase(searchMonths)) for a time everyone can make.")
+                        .textStyle(.caption, color: Palette.teal600)
+                }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,15 +173,19 @@ struct NewPlanSheet: View {
                     .frame(maxWidth: .infinity)
             } else if slots.isEmpty {
                 EmptyState(icon: "calendar-x", title: "No times work",
-                           message: "Nobody’s free for \(duration) \(timeOfDay.lowercased()) in the next \(SlotFinder.searchWeeks) weeks. Try more days or a shorter plan.",
+                           message: "Not enough of the group is free for \(duration) \(timeOfDay.lowercased()) in \(SearchWindow.phrase(searchMonths)). Try more days, a shorter plan, or a longer window in You → Date finder.",
                            actionTitle: "Change the plan") {
                     withAnimation(Motion.base) { step = 1 }
                 }
                 .frame(maxWidth: .infinity)
             } else {
                 HStack(spacing: 8) {
-                    PIcon("circle-check", size: 18, color: .statusFree)
-                    Text(constraintSummary).textStyle(.footnote, color: .textMuted)
+                    PIcon(everyoneFree ? "circle-check" : "circle-alert", size: 18,
+                          color: everyoneFree ? .statusFree : .statusWarning)
+                    Text(everyoneFree
+                         ? constraintSummary
+                         : "No time works for all \(total) in \(SearchWindow.phrase(searchMonths)) — here’s the best turnout.")
+                        .textStyle(.footnote, color: .textMuted)
                 }
                 ForEach(slots) { slot in
                     SlotCard(day: slot.day, date: slot.date, time: slot.time,
@@ -231,6 +241,7 @@ struct NewPlanSheet: View {
         guard isLive, let selected = group else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                 slots = sampleSlots
+                everyoneFree = true
                 withAnimation(Motion.base) { finding = false }
             }
             return
@@ -239,6 +250,7 @@ struct NewPlanSheet: View {
         Task {
             do {
                 let res = try await invokeFindSlots(group: selected, persist: false)
+                everyoneFree = res.everyoneFree
                 slots = res.slots.enumerated().map { i, dto in
                     SlotFinder.slot(from: dto, best: i == 0)
                 }
@@ -278,8 +290,7 @@ struct NewPlanSheet: View {
             groupId: group.id,
             title: planTitle,
             constraints: SlotFinder.constraints(days: days, timeOfDay: timeOfDay,
-                                                duration: duration,
-                                                memberCount: group.members.count),
+                                                duration: duration, months: searchMonths),
             maxResults: SlotFinder.maxResults,
             persist: persist)
         return try await SupabaseClient.shared.invokeFunction("find-slots", body: body)
