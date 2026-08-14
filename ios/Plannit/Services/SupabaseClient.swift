@@ -11,7 +11,17 @@ struct SupabaseSession: Decodable {
     let refresh_token: String
     let user: SupabaseUser
 }
-struct SupabaseUser: Decodable { let id: String }
+struct SupabaseUser: Decodable {
+    let id: String
+    let email: String?
+}
+
+struct ProfileDTO: Decodable {
+    let id: String
+    let display_name: String
+    let timezone: String?
+}
+struct DisplayNameUpdate: Encodable { let display_name: String }
 
 struct GroupDTO: Decodable, Identifiable {
     let id: String
@@ -21,9 +31,11 @@ struct GroupDTO: Decodable, Identifiable {
     let group_memberships: [MembershipEmbedDTO]?   // PostgREST embedded resource
 }
 struct MembershipEmbedDTO: Decodable {
+    let user_id: String?
     let profiles: ProfileEmbedDTO?
 }
 struct ProfileEmbedDTO: Decodable {
+    let id: String?
     let display_name: String?
 }
 
@@ -41,6 +53,16 @@ struct EventDTO: Decodable, Identifiable {
     let end_at: String
     let all_day: Bool
     let source: String
+}
+
+struct EventInsert: Encodable {
+    let owner_id: String
+    let title: String
+    let location: String?
+    let start_at: String   // ISO-8601
+    let end_at: String
+    let timezone: String
+    let source: String     // "plannit" | "device"
 }
 
 struct BusyBlockInsert: Encodable {
@@ -96,6 +118,7 @@ final class SupabaseClient {
 
     private(set) var accessToken: String?
     private(set) var userId: String?
+    private(set) var userEmail: String?
 
     nonisolated init() {}
 
@@ -120,6 +143,7 @@ final class SupabaseClient {
         let s: SupabaseSession = try await send(req)
         accessToken = s.access_token
         userId = s.user.id
+        userEmail = s.user.email
         return s.user.id
     }
 
@@ -139,23 +163,44 @@ final class SupabaseClient {
         let s: SupabaseSession = try await send(req)
         accessToken = s.access_token
         userId = s.user.id
+        userEmail = s.user.email
         return s.user.id
     }
 
     var isSignedIn: Bool { accessToken != nil }
 
-    func signOut() { accessToken = nil; userId = nil }
+    func signOut() { accessToken = nil; userId = nil; userEmail = nil }
 
     // MARK: PostgREST
-    func select<T: Decodable>(_ table: String, columns: String = "*") async throws -> T {
+    /// `query` takes raw PostgREST filters, e.g. `["deleted_at": "is.null",
+    /// "order": "start_at.asc"]`.
+    func select<T: Decodable>(_ table: String, columns: String = "*",
+                              query: [String: String] = [:]) async throws -> T {
         guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
         var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
                                   resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "select", value: columns)]
+            + query.map { URLQueryItem(name: $0.key, value: $0.value) }
         var req = URLRequest(url: comps.url!)
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         return try await send(req)
+    }
+
+    /// PATCH the rows matching `match` (raw PostgREST filters, as above).
+    func update<T: Encodable>(_ table: String, values: T, match: [String: String]) async throws {
+        guard let baseURL, let token = accessToken else { throw SupabaseError.notConfigured }
+        var comps = URLComponents(url: baseURL.appendingPathComponent("rest/v1/\(table)"),
+                                  resolvingAgainstBaseURL: false)!
+        comps.queryItems = match.map { URLQueryItem(name: $0.key, value: $0.value) }
+        var req = URLRequest(url: comps.url!)
+        req.httpMethod = "PATCH"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.httpBody = try JSONEncoder().encode(values)
+        _ = try await sendRaw(req)
     }
 
     func insert<T: Encodable>(_ table: String, values: T) async throws {

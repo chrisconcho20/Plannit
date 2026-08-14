@@ -8,6 +8,8 @@ import SwiftUI
 final class AppModel: ObservableObject {
     @Published var signedIn = false
     @Published var userId: String?
+    @Published var userEmail: String?
+    @Published var displayName: String = Sample.me
     @Published var calendarConnected = false
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
@@ -40,6 +42,79 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Profile
+
+    /// Read your own profile row. A blank `display_name` (the default for a user
+    /// created straight in the dashboard) is filled in from the email, so you
+    /// don't show up nameless to everyone else in your groups.
+    func loadProfile() async {
+        guard Config.isLiveBackend, let uid = userId else { return }
+        userEmail = SupabaseClient.shared.userEmail
+        let fallback = (userEmail?.split(separator: "@").first).map(String.init) ?? "You"
+        do {
+            let rows: [ProfileDTO] = try await SupabaseClient.shared.select(
+                "profiles", columns: "id,display_name,timezone", query: ["id": "eq.\(uid)"])
+            let name = rows.first?.display_name ?? ""
+            if name.isEmpty {
+                await updateDisplayName(fallback.capitalized)
+            } else {
+                displayName = name
+            }
+        } catch {
+            displayName = fallback.capitalized
+        }
+    }
+
+    /// Rename yourself everywhere — group members see this name.
+    @discardableResult
+    func updateDisplayName(_ name: String) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard Config.isLiveBackend, let uid = userId else {
+            displayName = trimmed          // demo mode: local only
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.update(
+                "profiles", values: DisplayNameUpdate(display_name: trimmed),
+                match: ["id": "eq.\(uid)"])
+            displayName = trimmed
+            await loadData()               // group member lists carry the name
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    // MARK: Events
+
+    /// Create an event on your own calendar. Private until it's shared.
+    @discardableResult
+    func createEvent(title: String, start: Date, minutes: Int, location: String) async -> Bool {
+        let place = location.isEmpty ? nil : location
+        let end = start.addingTimeInterval(TimeInterval(minutes * 60))
+
+        guard Config.isLiveBackend, let uid = userId else {
+            let tf = DateFormatter(); tf.dateFormat = "h:mm a"
+            events.append(PEvent(id: UUID().uuidString, start: start, title: title,
+                                 time: tf.string(from: start), location: place,
+                                 hue: GroupHue.forName(title), icon: "calendar"))
+            return true
+        }
+
+        let iso = ISO8601DateFormatter()
+        do {
+            try await SupabaseClient.shared.insert("events", values: EventInsert(
+                owner_id: uid, title: title, location: place,
+                start_at: iso.string(from: start), end_at: iso.string(from: end),
+                timezone: TimeZone.current.identifier, source: "plannit"))
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     // MARK: Auth
     /// Real Sign in with Apple → Supabase session. Returns false on cancel/failure.
     func signInWithApple() async -> Bool {
@@ -50,6 +125,8 @@ final class AppModel: ObservableObject {
             let uid = try await SupabaseClient.shared.signInWithApple(idToken: result.idToken, nonce: result.nonce)
             userId = uid
             signedIn = true
+            await loadProfile()
+            await loadData()
             return true
         } catch {
             return false
@@ -62,6 +139,7 @@ final class AppModel: ObservableObject {
             let uid = try await SupabaseClient.shared.signInWithEmail(email, password: password)
             userId = uid
             signedIn = true
+            await loadProfile()
             await loadData()
             return true
         } catch {

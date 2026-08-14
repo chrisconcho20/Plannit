@@ -8,7 +8,11 @@ struct CalendarScreen: View {
 
     @EnvironmentObject private var model: AppModel
     @State private var mode: Mode = .month
-    @State private var selectedDay: Int? = 16
+    @State private var visibleMonth = Date()          // any day inside the shown month
+    @State private var selectedDay: Int? = Calendar.current.component(.day, from: Date())
+    @State private var showNewEvent = false
+
+    private let cal = Calendar.current
 
     private static let deviceTimeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "EEE d · h:mm a"; return f
@@ -17,16 +21,64 @@ struct CalendarScreen: View {
         d.isAllDay ? "All day" : deviceTimeFormatter.string(from: d.start)
     }
 
-    private var events: [PEvent] {
-        if mode == .month, let day = selectedDay {
-            return model.events.filter { $0.day == day }
+    private var year: Int { cal.component(.year, from: visibleMonth) }
+    private var month: Int { cal.component(.month, from: visibleMonth) }
+
+    /// The day-of-month to ring as "today", but only while that month is shown.
+    private var todayInMonth: Int? {
+        cal.isDate(visibleMonth, equalTo: Date(), toGranularity: .month)
+            ? cal.component(.day, from: Date()) : nil
+    }
+
+    private var selectedDate: Date? {
+        guard let selectedDay else { return nil }
+        return cal.date(from: DateComponents(year: year, month: month, day: selectedDay))
+    }
+
+    /// Events in the shown month, grouped by day — the source of the grid's dots.
+    /// Derived from real events, so a day only gets a mark if something is on it.
+    private var marks: [Int: [Color]] {
+        var out: [Int: [Color]] = [:]
+        for event in model.events
+        where cal.isDate(event.start, equalTo: visibleMonth, toGranularity: .month) {
+            out[event.day, default: []].append(event.hue.color)
         }
-        return model.events.sorted { $0.day < $1.day }
+        for device in model.deviceEvents
+        where cal.isDate(device.start, equalTo: visibleMonth, toGranularity: .month) {
+            out[cal.component(.day, from: device.start), default: []].append(GroupHue.coral.color)
+        }
+        return out
+    }
+
+    private var events: [PEvent] {
+        if mode == .month, let selectedDate {
+            return model.events.filter { $0.isOn(selectedDate) }.sorted { $0.start < $1.start }
+        }
+        let now = cal.startOfDay(for: Date())
+        return model.events.filter { $0.start >= now }.sorted { $0.start < $1.start }
     }
 
     private var sectionTitle: String {
-        if mode == .month, let day = selectedDay { return "August \(day)" }
+        if mode == .month, let selectedDate {
+            let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
+            return f.string(from: selectedDate)
+        }
         return "Upcoming"
+    }
+
+    private var monthTitle: String {
+        let f = DateFormatter(); f.dateFormat = "MMMM yyyy"
+        return f.string(from: visibleMonth)
+    }
+
+    private func stepMonth(_ delta: Int) {
+        guard let next = cal.date(byAdding: .month, value: delta, to: visibleMonth) else { return }
+        withAnimation(Motion.fast) {
+            visibleMonth = next
+            // Keep "today" selected when we land back on the current month.
+            selectedDay = cal.isDate(next, equalTo: Date(), toGranularity: .month)
+                ? cal.component(.day, from: Date()) : nil
+        }
     }
 
     var body: some View {
@@ -36,7 +88,11 @@ struct CalendarScreen: View {
                 VStack(spacing: 0) {
                     if mode == .month {
                         PlannitCard(elevation: 1) {
-                            MonthGrid(year: 2026, month: 8, marks: Sample.marks, today: 13, selected: $selectedDay)
+                            VStack(spacing: 8) {
+                                monthBar
+                                MonthGrid(year: year, month: month, marks: marks,
+                                          today: todayInMonth, selected: $selectedDay)
+                            }
                         }
                         .padding(.horizontal, Space.gutter)
                         .padding(.top, 4)
@@ -58,7 +114,10 @@ struct CalendarScreen: View {
 
                     if events.isEmpty && model.deviceEvents.isEmpty {
                         EmptyState(icon: "calendar", title: "Nothing here",
-                                   message: "No events on this day. Tap ＋ to find a time with a group.")
+                                   message: mode == .month
+                                            ? "No events on this day."
+                                            : "Nothing coming up.",
+                                   actionTitle: "New event") { showNewEvent = true }
                     }
 
                     if !model.deviceEvents.isEmpty {
@@ -83,6 +142,9 @@ struct CalendarScreen: View {
         .navigationBarHidden(true)
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
         .onAppear { model.refreshCalendar() }
+        .sheet(isPresented: $showNewEvent) {
+            NewEventSheet(date: selectedDate ?? Date()).environmentObject(model)
+        }
     }
 
     private var header: some View {
@@ -90,11 +152,25 @@ struct CalendarScreen: View {
             Text("Calendar").textStyle(.title1, color: .textStrong)
             Spacer()
             SegmentedControl(options: Mode.allCases, selection: $mode) { $0.rawValue }
-                .frame(width: 190)
+                .frame(width: 170)
+            IconButton(icon: "calendar-plus", variant: .secondary, size: 40, iconSize: 18,
+                       accessibilityLabel: "New event") { showNewEvent = true }
         }
         .padding(.horizontal, Space.gutter)
         .padding(.top, 6)
         .padding(.bottom, 6)
+    }
+
+    private var monthBar: some View {
+        HStack {
+            IconButton(icon: "chevron-left", variant: .ghost, size: 32, iconSize: 16,
+                       accessibilityLabel: "Previous month") { stepMonth(-1) }
+            Spacer()
+            Text(monthTitle).textStyle(.headline, color: .textStrong)
+            Spacer()
+            IconButton(icon: "chevron-right", variant: .ghost, size: 32, iconSize: 16,
+                       accessibilityLabel: "Next month") { stepMonth(1) }
+        }
     }
 }
 

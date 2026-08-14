@@ -157,6 +157,8 @@ struct PlanDetailView: View {
 }
 
 struct YouScreen: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var showRename = false
     @State private var twoWaySync = true
     @State private var shareAvailability = true
     @State private var pushDateFound = true
@@ -175,14 +177,19 @@ struct YouScreen: View {
 
             ScrollView {
                 HStack(spacing: 14) {
-                    Avatar(name: Sample.me, size: 60)
+                    Avatar(name: model.displayName, size: 60)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(Sample.me).textStyle(.title3, color: .textStrong)
-                        Text("chrisconcho20@gmail.com").textStyle(.footnote, color: .textMuted)
+                        Text(model.displayName).textStyle(.title3, color: .textStrong)
+                        Text(model.userEmail ?? (model.isLiveBackend ? "Signed in" : "Demo mode"))
+                            .textStyle(.footnote, color: .textMuted)
                     }
                     Spacer()
+                    PlannitButton(title: "Edit", variant: .secondary, size: .sm) { showRename = true }
                 }
                 .padding(Space.gutter)
+
+                SectionLabel("Profile")
+                settingsCard { nameRow() }
 
                 SectionLabel("Date finder")
                 settingsCard {
@@ -225,6 +232,9 @@ struct YouScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
+        .sheet(isPresented: $showRename) {
+            DisplayNameSheet(current: model.displayName).environmentObject(model)
+        }
     }
 
     private var divider: some View { Rectangle().fill(Color.hairline).frame(height: 1).padding(.leading, 46) }
@@ -238,6 +248,25 @@ struct YouScreen: View {
             .padding(.horizontal, Space.gutter)
     }
 
+    private func nameRow() -> some View {
+        Button { showRename = true } label: {
+            HStack(spacing: 12) {
+                PIcon("user", size: 20, color: .textMuted).frame(width: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Display name").textStyle(.headline, color: .textStrong)
+                    Text("Everyone in your groups sees this")
+                        .textStyle(.caption, color: .textMuted)
+                }
+                Spacer()
+                Text(model.displayName).textStyle(.subhead, color: .textMuted)
+                PIcon("chevron-right", size: 16, color: .textFaint)
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func toggleRow(_ icon: String, _ title: String, _ subtitle: String, _ binding: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
             PIcon(icon, size: 20, color: .textMuted).frame(width: 22)
@@ -249,5 +278,56 @@ struct YouScreen: View {
             Toggle("", isOn: binding).labelsHidden().tint(.statusFree)
         }
         .padding(.vertical, 12)
+    }
+}
+
+// Rename yourself. The name is written to `profiles.display_name`, which is what
+// everyone in your groups sees — including the avatars on a found slot.
+struct DisplayNameSheet: View {
+    let current: String
+
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var saving = false
+    @State private var errorText: String?
+
+    init(current: String) {
+        self.current = current
+        _name = State(initialValue: current)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SheetHeader(title: "Display name") { dismiss() }
+            VStack(alignment: .leading, spacing: 14) {
+                PTextField(placeholder: "Your name", text: $name, icon: "user")
+                Text("This is how you appear to everyone in your groups.")
+                    .textStyle(.footnote, color: .textMuted)
+                if let errorText {
+                    Text(errorText).textStyle(.footnote, color: .statusDanger)
+                }
+                PlannitButton(title: saving ? "Saving…" : "Save", variant: .primary,
+                              size: .lg, fullWidth: true) { save() }
+                    .disabled(saving || trimmed.isEmpty || trimmed == current)
+                    .opacity(saving || trimmed.isEmpty || trimmed == current ? 0.5 : 1)
+            }
+            .padding(Space.gutter)
+            Spacer(minLength: 0)
+        }
+        .background(Color.appBg)
+        .presentationDetents([.height(280)])
+    }
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private func save() {
+        saving = true
+        errorText = nil
+        Task {
+            let ok = await model.updateDisplayName(trimmed)
+            saving = false
+            if ok { dismiss() } else { errorText = "Couldn’t save that name. Try again." }
+        }
     }
 }

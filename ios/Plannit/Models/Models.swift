@@ -15,7 +15,9 @@ struct PGroup: Identifiable, Hashable {
 
 struct PEvent: Identifiable, Hashable {
     let id: String
-    let day: Int
+    /// The real instant the event starts — the calendar keys off this, not a
+    /// bare day-of-month, so events land on the right day of the right month.
+    let start: Date
     let title: String
     let time: String
     var location: String? = nil
@@ -26,6 +28,9 @@ struct PEvent: Identifiable, Hashable {
     var badge: String? = nil
     var badgeTone: BadgeTone = .neutral
     var source: EventSource = .plannit
+
+    var day: Int { Calendar.current.component(.day, from: start) }
+    func isOn(_ date: Date) -> Bool { Calendar.current.isDate(start, inSameDayAs: date) }
 }
 
 struct PSlot: Identifiable, Hashable {
