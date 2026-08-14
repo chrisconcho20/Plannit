@@ -31,3 +31,20 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"   # iPhone
         ENABLE_PREVIEWS: "YES"
         GENERATE_INFOPLIST_FILE: "NO"
+    scheme:
+      testTargets:
+        - PlannitTests
+
+  # Unit tests for the pure logic — constraint building, slot/date mapping and
+  # the model rules. `xcodebuild test` runs these in CI (see ios-build.yml).
+  PlannitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PlannitTests
+    dependencies:
+      - target: Plannit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.plannit.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"

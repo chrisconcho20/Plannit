@@ -36,3 +36,22 @@ jobs:
             -scheme Plannit \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
+
+      # Unit tests need a concrete simulator, and the runner's device list
+      # changes with the image — pick whatever iPhone it actually has.
+      - name: Pick a simulator
+        id: sim
+        run: |
+          NAME=$(xcrun simctl list devices available \
+                 | grep -oE 'iPhone [0-9]+[A-Za-z ]*' | tail -1 | xargs)
+          echo "Using $NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        working-directory: ios
+        run: |
+          xcodebuild test \
+            -project Plannit.xcodeproj \
+            -scheme Plannit \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            CODE_SIGNING_ALLOWED=NO

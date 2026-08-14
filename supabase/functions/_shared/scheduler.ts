@@ -155,6 +155,13 @@ export function findSlots(members: Member[], c: Constraints, maxResults = 10): S
 export function findBestSlots(members: Member[], c: Constraints, maxResults = 10): SlotSearch {
   const memberCount = members.length;
   const floor = Math.max(1, Math.min(c.quorum ?? majorityOf(memberCount), memberCount));
+
+  // Asking for nothing gets nothing. Without this the all-free branch below
+  // pushes one candidate before noticing it has already hit the limit.
+  if (maxResults <= 0) {
+    return { slots: [], everyoneFree: false, memberCount, quorum: floor };
+  }
+
   const everyone: Slot[] = [];
   const partial: Slot[] = [];
 
@@ -170,7 +177,12 @@ export function findBestSlots(members: Member[], c: Constraints, maxResults = 10
   });
 
   if (everyone.length) {
-    return { slots: everyone, everyoneFree: true, memberCount, quorum: memberCount };
+    return {
+      slots: everyone.slice(0, maxResults),
+      everyoneFree: true,
+      memberCount,
+      quorum: memberCount,
+    };
   }
   partial.sort((a, b) => b.score - a.score || a.start - b.start);
   return {
