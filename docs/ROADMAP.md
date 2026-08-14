@@ -66,8 +66,14 @@ account. See §6 for URLs/creds.
    the faces of whoever is actually free.
    _Next here:_ no realtime — votes appear on reload, not as they land; no
    "unvote"; a locked-in plan can't be reopened or cancelled.
-3. **Event sharing to groups (live)** — `ShareSheet` currently demo; insert
-   `event_shares` rows. Files: `Features/Calendar/CalendarScreen.swift`.
+3. ~~**Event sharing to groups (live)**~~ ✅ **done (2026-08-14).** `ShareSheet`
+   lists your real groups pre-ticked with the event's current shares and diffs
+   the selection on save (insert added / delete removed `event_shares`).
+   `fetchEvents` embeds the shares, so an event knows who can see it, takes its
+   group's colour, and appears in that group's "Shared events" (matched by id).
+   Owner-only, matching RLS.
+   _Next here:_ share-to-a-single-person (`shared_user_id`) is unused, and there's
+   no "who can see this" list of names on the event.
 
 ### Phase 2 — Real calendar, real dates
 4. ~~**Move off the fixed Aug-2026 sample month**~~ ✅ **done (2026-08-14).**
@@ -133,6 +139,9 @@ account. See §6 for URLs/creds.
 ---
 
 ## 3. Known issues / tech debt
+- **No realtime** — votes, shares and new plans appear on the next load, not as
+  they happen. `postgres_changes` subscriptions are specced in the API contract
+  but unused. This is the next structural gap now that phase 1 is complete.
 - **Session not persisted** (in-memory token) — relaunch logs you out. (Phase 5.9)
 - **Group hue not persisted** — no `hue` column; derived from name, so the hue
   picker in "New group" is cosmetic. Add a column or accept derived.
