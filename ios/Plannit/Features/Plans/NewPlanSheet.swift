@@ -250,7 +250,7 @@ struct NewPlanSheet: View {
         Task {
             do {
                 let res = try await invokeFindSlots(group: selected, persist: false)
-                everyoneFree = res.everyoneFree
+                everyoneFree = res.everyoneFree ?? true
                 slots = res.slots.enumerated().map { i, dto in
                     SlotFinder.slot(from: dto, best: i == 0)
                 }
