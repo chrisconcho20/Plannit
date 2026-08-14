@@ -40,6 +40,8 @@ jobs:
         run: |
           APP=$(find build/Build/Products -name "Plannit.app" -type d | head -1)
           echo "Found app at: $APP"
+          echo "--- built Info.plist key check ---"
+          plutil -p "$APP/Info.plist" | grep -E "CFBundleExecutable|CFBundleIdentifier|CFBundlePackageType" || true
           ( cd "$(dirname "$APP")" && zip -r -y "$GITHUB_WORKSPACE/Plannit-sim.zip" "Plannit.app" >/dev/null )
           ls -la "$GITHUB_WORKSPACE/Plannit-sim.zip"
 
