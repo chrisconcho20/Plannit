@@ -254,6 +254,85 @@ final class AppModel: ObservableObject {
 
     // MARK: Events
 
+    /// Change an event you own.
+    @discardableResult
+    func updateEvent(_ event: PEvent, title: String, start: Date, minutes: Int,
+                     location: String) async -> Bool {
+        let place = location.isEmpty ? nil : location
+        let end = start.addingTimeInterval(TimeInterval(minutes * 60))
+
+        guard Config.isLiveBackend else {
+            if let i = events.firstIndex(where: { $0.id == event.id }) {
+                let tf = DateFormatter(); tf.dateFormat = "h:mm a"
+                var e = events[i]
+                e = PEvent(id: e.id, start: start, end: end, title: title,
+                           time: tf.string(from: start), location: place, group: e.group,
+                           hue: e.hue, icon: e.icon, people: e.people, badge: e.badge,
+                           badgeTone: e.badgeTone, source: e.source, ownerId: e.ownerId,
+                           sharedGroupIds: e.sharedGroupIds)
+                events[i] = e
+            }
+            return true
+        }
+
+        let iso = ISO8601DateFormatter()
+        do {
+            try await SupabaseClient.shared.update("events", values: EventUpdate(
+                title: title, location: place,
+                start_at: iso.string(from: start), end_at: iso.string(from: end)),
+                match: ["id": "eq.\(event.id)"])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Delete an event you own. Soft-deleted server-side so the tombstone can
+    /// propagate to other devices (sync-contract §Deltas); the mirror drops it
+    /// from the device calendar on the next pass.
+    @discardableResult
+    func deleteEvent(_ event: PEvent) async -> Bool {
+        guard Config.isLiveBackend else {
+            events.removeAll { $0.id == event.id }
+            return true
+        }
+        do {
+            let iso = ISO8601DateFormatter()
+            try await SupabaseClient.shared.update(
+                "events", values: EventTombstone(deleted_at: iso.string(from: Date())),
+                match: ["id": "eq.\(event.id)"])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Rename a group (owner only, per RLS) and remember its colour.
+    @discardableResult
+    func renameGroup(_ group: PGroup, to name: String, hue: GroupHue? = nil) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if let hue { GroupHue.pick(hue, for: group.id) }
+
+        guard Config.isLiveBackend else {
+            replaceGroup(group.id) {
+                PGroup(id: $0.id, name: trimmed, hue: hue ?? $0.hue, members: $0.members,
+                       note: $0.note, ownerId: $0.ownerId)
+            }
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.update("groups", values: GroupRename(name: trimmed),
+                                                   match: ["id": "eq.\(group.id)"])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Set exactly which groups can see an event: adds the shares you ticked,
     /// removes the ones you unticked. Sharing is the *only* way an event leaves
     /// your own calendar, so this is the whole per-group visibility pillar.
@@ -368,13 +447,15 @@ final class AppModel: ObservableObject {
     /// Create a group with its starting members. Persists to Supabase in live
     /// mode; appends locally in demo.
     @discardableResult
-    func createGroup(name: String, members: [PMember] = []) async -> Bool {
+    func createGroup(name: String, members: [PMember] = [], hue: GroupHue? = nil) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
 
         guard Config.isLiveBackend, let uid = userId else {
-            groups.append(PGroup(id: UUID().uuidString, name: trimmed,
-                                 hue: GroupHue.forName(trimmed), members: members, note: ""))
+            let id = UUID().uuidString
+            if let hue { GroupHue.pick(hue, for: id) }
+            groups.append(PGroup(id: id, name: trimmed,
+                                 hue: hue ?? GroupHue.forName(trimmed), members: members, note: ""))
             return true
         }
 
@@ -382,6 +463,7 @@ final class AppModel: ObservableObject {
             // Read the row back for its generated id — the memberships need it.
             let created: [GroupRefDTO] = try await SupabaseClient.shared.insertReturning(
                 "groups", values: NewGroupInsert(name: trimmed, owner_id: uid))
+            if let group = created.first, let hue { GroupHue.pick(hue, for: group.id) }
             if let group = created.first, !members.isEmpty {
                 try await SupabaseClient.shared.insert("group_memberships", values: members.map {
                     MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")

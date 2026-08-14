@@ -108,4 +108,28 @@ enum GroupHue: String, CaseIterable, Codable {
         let sum = name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
         return allCases[sum % allCases.count]
     }
+
+    // MARK: Chosen hues
+    //
+    // `groups` has no hue column, so a picked colour is remembered on this
+    // device and falls back to the name-derived one. That keeps the picker
+    // honest without a migration; add the column and this store goes away.
+
+    private static let pickedKey = "plannit.groupHues"
+
+    static func picked(for groupId: String) -> GroupHue? {
+        let map = UserDefaults.standard.dictionary(forKey: pickedKey) as? [String: String] ?? [:]
+        return map[groupId].flatMap(GroupHue.init(rawValue:))
+    }
+
+    static func pick(_ hue: GroupHue, for groupId: String) {
+        var map = UserDefaults.standard.dictionary(forKey: pickedKey) as? [String: String] ?? [:]
+        map[groupId] = hue.rawValue
+        UserDefaults.standard.set(map, forKey: pickedKey)
+    }
+
+    /// The hue to draw a group in: your choice, else derived from the name.
+    static func forGroup(id: String, name: String) -> GroupHue {
+        picked(for: id) ?? forName(name)
+    }
 }

@@ -36,7 +36,8 @@ struct SupabaseRepository: DataRepository {
                 let name = membership.profiles?.display_name ?? ""
                 return PMember(id: id, name: name.isEmpty ? "Member" : name)
             }
-            return PGroup(id: dto.id, name: dto.name, hue: GroupHue.forName(dto.name),
+            return PGroup(id: dto.id, name: dto.name,
+                          hue: GroupHue.forGroup(id: dto.id, name: dto.name),
                           members: members, note: "", ownerId: dto.owner_id)
         }
     }
@@ -132,7 +133,8 @@ struct SupabaseRepository: DataRepository {
             let name = m.profiles?.display_name ?? ""
             return PMember(id: id, name: name.isEmpty ? "Member" : name)
         }
-        return PGroup(id: dto.id, name: dto.name, hue: GroupHue.forName(dto.name),
+        return PGroup(id: dto.id, name: dto.name,
+                      hue: GroupHue.forGroup(id: dto.id, name: dto.name),
                       members: members, note: "", ownerId: dto.owner_id)
     }
 

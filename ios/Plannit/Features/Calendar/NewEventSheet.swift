@@ -1,15 +1,18 @@
 import SwiftUI
 
-// NewEventSheet — put something on your own calendar. In live mode this writes
-// a row to `events` (owner_id = you, source = plannit); in demo mode it just
-// appends locally. Sharing it with a group is a separate, deliberate step —
-// events are private until you say otherwise.
+// NewEventSheet — put something on your own calendar, or change something
+// that's already there. In live mode this writes a row to `events`
+// (owner_id = you, source = plannit); in demo mode it just appends locally.
+// Sharing it with a group is a separate, deliberate step — events are private
+// until you say otherwise.
 
 struct NewEventSheet: View {
     var date: Date = Date()
     /// Set when the sheet is opened from inside a group: the event is shared
     /// with it on save unless you untick.
     var group: PGroup? = nil
+    /// Set to edit an existing event instead of creating one.
+    var editing: PEvent? = nil
 
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -24,9 +27,21 @@ struct NewEventSheet: View {
 
     private let durations = ["30m", "1h", "2h", "3h"]
 
-    init(date: Date = Date(), group: PGroup? = nil) {
+    init(date: Date = Date(), group: PGroup? = nil, editing: PEvent? = nil) {
         self.date = date
         self.group = group
+        self.editing = editing
+
+        if let editing {
+            _title = State(initialValue: editing.title)
+            _location = State(initialValue: editing.location ?? "")
+            _start = State(initialValue: editing.start)
+            let minutes = Int((editing.end ?? editing.start.addingTimeInterval(3600))
+                                .timeIntervalSince(editing.start) / 60)
+            _duration = State(initialValue: Self.label(forMinutes: minutes))
+            _shareWithGroup = State(initialValue: false)   // sharing is its own sheet
+            return
+        }
         // Open on the chosen day at the next whole hour, or 9am for a future day.
         let cal = Calendar.current
         let base: Date
@@ -41,7 +56,7 @@ struct NewEventSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SheetHeader(title: "New event") { dismiss() }
+            SheetHeader(title: editing == nil ? "New event" : "Edit event") { dismiss() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     fieldLabel("What")
@@ -80,7 +95,7 @@ struct NewEventSheet: View {
                         }
                     }
 
-                    if let group {
+                    if let group, editing == nil {
                         Button { withAnimation(Motion.fast) { shareWithGroup.toggle() } } label: {
                             HStack(spacing: 12) {
                                 RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
@@ -110,8 +125,9 @@ struct NewEventSheet: View {
 
             VStack(spacing: 0) {
                 Divider().overlay(Color.hairline)
-                PlannitButton(title: saving ? "Saving…" : "Add to calendar",
-                              variant: .primary, size: .lg, icon: "calendar-plus", fullWidth: true) {
+                PlannitButton(title: saving ? "Saving…" : (editing == nil ? "Add to calendar" : "Save changes"),
+                              variant: .primary, size: .lg,
+                              icon: editing == nil ? "calendar-plus" : "check", fullWidth: true) {
                     save()
                 }
                 .disabled(saving || title.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -127,16 +143,28 @@ struct NewEventSheet: View {
     private func save() {
         saving = true
         errorText = nil
+        let name = title.trimmingCharacters(in: .whitespaces)
+        let place = location.trimmingCharacters(in: .whitespaces)
         Task {
-            let ok = await model.createEvent(
-                title: title.trimmingCharacters(in: .whitespaces),
-                start: start,
-                minutes: Self.minutes(duration),
-                location: location.trimmingCharacters(in: .whitespaces),
-                shareWith: shareWithGroup ? group : nil)
+            let ok: Bool
+            if let editing {
+                ok = await model.updateEvent(editing, title: name, start: start,
+                                             minutes: Self.minutes(duration), location: place)
+            } else {
+                ok = await model.createEvent(title: name, start: start,
+                                             minutes: Self.minutes(duration), location: place,
+                                             shareWith: shareWithGroup ? group : nil)
+            }
             saving = false
             if ok { dismiss() } else { errorText = "Couldn’t save that. Check your connection and try again." }
         }
+    }
+
+    /// Nearest chip to a real duration, so editing a 90-minute event doesn't
+    /// silently round it away without showing you.
+    static func label(forMinutes minutes: Int) -> String {
+        let options = ["30m": 30, "1h": 60, "2h": 120, "3h": 180]
+        return options.min { abs($0.value - minutes) < abs($1.value - minutes) }?.key ?? "1h"
     }
 
     /// "30m" → 30 · "2h" → 120.

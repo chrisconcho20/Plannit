@@ -146,6 +146,15 @@ struct ProposalFinalizeUpdate: Encodable {
     let finalized_slot_id: String
     let status: String     // "finalized"
 }
+struct EventUpdate: Encodable {
+    let title: String
+    let location: String?
+    let start_at: String
+    let end_at: String
+}
+/// Soft delete — the sync contract wants a tombstone, not a vanished row.
+struct EventTombstone: Encodable { let deleted_at: String }
+struct GroupRename: Encodable { let name: String }
 struct EventShareInsert: Encodable {
     let event_id: String
     let group_id: String

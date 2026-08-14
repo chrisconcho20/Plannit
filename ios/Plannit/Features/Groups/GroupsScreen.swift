@@ -86,6 +86,7 @@ struct GroupDetailView: View {
     @State private var showAddPeople = false
     @State private var pendingMember: PMember?
     @State private var confirmDeleteGroup = false
+    @State private var showRename = false
 
     /// Re-read from the model so the screen updates after add/remove.
     private var live: PGroup { model.groups.first { $0.id == group.id } ?? group }
@@ -163,6 +164,11 @@ struct GroupDetailView: View {
                                   icon: "user-plus", fullWidth: true) { showAddPeople = true }
                         .padding(.horizontal, Space.gutter)
                         .padding(.top, 12)
+
+                    PlannitButton(title: "Rename or recolour", variant: .ghost, size: .md,
+                                  icon: "pencil", fullWidth: true) { showRename = true }
+                        .padding(.horizontal, Space.gutter)
+                        .padding(.top, 4)
                 }
 
                 PlannitButton(title: isOwner ? "Delete group" : "Leave group",
@@ -198,6 +204,9 @@ struct GroupDetailView: View {
         }
         .sheet(isPresented: $showAddPeople) {
             AddPeopleSheet(group: live).environmentObject(model)
+        }
+        .sheet(isPresented: $showRename) {
+            RenameGroupSheet(group: live).environmentObject(model)
         }
         .confirmationDialog("Remove \(pendingMember?.name ?? "")?",
                             isPresented: Binding(get: { pendingMember != nil },
@@ -270,7 +279,7 @@ struct NewGroupSheet: View {
         errorText = nil
         Task {
             let members = model.people.filter { selected.contains($0.id) }
-            let ok = await model.createGroup(name: name, members: members)
+            let ok = await model.createGroup(name: name, members: members, hue: hue)
             busy = false
             if ok { dismiss() } else { errorText = "Couldn’t create that group. Try again." }
         }
@@ -372,6 +381,68 @@ struct PeoplePicker: View {
     private func toggle(_ id: String) {
         withAnimation(Motion.fast) {
             if selected.contains(id) { _ = selected.remove(id) } else { _ = selected.insert(id) }
+        }
+    }
+}
+
+
+// Rename a group and pick its colour. The name is stored server-side; the hue
+// is remembered on this device until `groups` grows a column for it.
+struct RenameGroupSheet: View {
+    let group: PGroup
+
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var hue: GroupHue
+    @State private var saving = false
+    @State private var errorText: String?
+
+    init(group: PGroup) {
+        self.group = group
+        _name = State(initialValue: group.name)
+        _hue = State(initialValue: group.hue)
+    }
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var unchanged: Bool { trimmed == group.name && hue == group.hue }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SheetHeader(title: "Edit group") { dismiss() }
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("NAME").textStyle(.overline, color: .textFaint)
+                    PTextField(placeholder: "Group name", text: $name, icon: "users")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("COLOUR").textStyle(.overline, color: .textFaint)
+                    HuePicker(selection: $hue)
+                    Text("The colour is saved on this device for now.")
+                        .textStyle(.caption, color: .textMuted)
+                }
+                if let errorText {
+                    Text(errorText).textStyle(.footnote, color: .statusDanger)
+                }
+                PlannitButton(title: saving ? "Saving…" : "Save", variant: .primary,
+                              size: .lg, fullWidth: true) { save() }
+                    .disabled(saving || trimmed.isEmpty || unchanged)
+                    .opacity(saving || trimmed.isEmpty || unchanged ? 0.5 : 1)
+            }
+            .padding(Space.gutter)
+            Spacer(minLength: 0)
+        }
+        .background(Color.appBg)
+        .presentationDetents([.height(380)])
+    }
+
+    private func save() {
+        saving = true
+        errorText = nil
+        Task {
+            let ok = await model.renameGroup(group, to: trimmed, hue: hue)
+            saving = false
+            if ok { dismiss() } else { errorText = "Couldn't save that. Only the owner can rename a group." }
         }
     }
 }

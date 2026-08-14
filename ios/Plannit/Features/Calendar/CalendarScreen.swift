@@ -183,6 +183,8 @@ struct EventDetailView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var showShare = false
+    @State private var showEdit = false
+    @State private var confirmDelete = false
 
     /// Re-read so the visibility row updates as soon as sharing changes.
     private var live: PEvent { model.events.first { $0.id == event.id } ?? event }
@@ -268,14 +270,44 @@ struct EventDetailView: View {
                 IconButton(icon: "chevron-left", variant: .secondary, size: 40, iconSize: 18,
                            accessibilityLabel: "Back") { dismiss() }
                 Spacer()
-                IconButton(icon: "ellipsis", variant: .secondary, size: 40, iconSize: 18,
-                           accessibilityLabel: "More") {}
+                if isOwner {
+                    Menu {
+                        Button { showEdit = true } label: { Label("Edit event", systemImage: "pencil") }
+                        Button { showShare = true } label: { Label("Share to a group", systemImage: "person.2.fill") }
+                        Button(role: .destructive) { confirmDelete = true } label: {
+                            Label("Delete event", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.textBody)
+                            .frame(width: 40, height: 40)
+                            .background(Color.surface)
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("More")
+                }
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
         }
         .sheet(isPresented: $showShare) { ShareSheet(event: live).environmentObject(model) }
+        .sheet(isPresented: $showEdit) {
+            NewEventSheet(date: live.start, editing: live).environmentObject(model)
+        }
+        .confirmationDialog("Delete “\(live.title)”?", isPresented: $confirmDelete,
+                            titleVisibility: .visible) {
+            Button("Delete event", role: .destructive) {
+                Task { await model.deleteEvent(live) }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(live.isPrivate
+                 ? "This removes it from your calendar."
+                 : "This removes it for everyone it's shared with.")
+        }
     }
 
     private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {
