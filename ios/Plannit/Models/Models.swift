@@ -73,6 +73,14 @@ struct PSlot: Identifiable, Hashable {
     var best: Bool = false
     /// Profile ids of the members free then — lets the card show real faces.
     var availableIds: [String] = []
+    /// The real instants, when we have them: `day`/`time` are display strings.
+    var startsAt: Date? = nil
+    var endsAt: Date? = nil
+
+    var isToday: Bool {
+        guard let startsAt else { return false }
+        return Calendar.current.isDateInToday(startsAt)
+    }
 }
 
 struct PAvailability: Identifiable, Hashable {
@@ -100,6 +108,18 @@ struct PProposal: Identifiable, Hashable {
 
     var total: Int { group.members.count }
     var isFinalized: Bool { finalizedSlotId != nil }
+    var finalizedSlot: PSlot? { slots.first { $0.id == finalizedSlotId } }
+
+    /// Why this plan wants your attention — nil when it doesn't.
+    /// Drives the Plans tab badge, so it counts real reasons only.
+    enum Nudge { case needsYourVote, happeningToday }
+    func nudge(for userId: String?) -> Nudge? {
+        if isFinalized {
+            return finalizedSlot?.isToday == true ? .happeningToday : nil
+        }
+        // Someone put a plan in front of you and you haven't answered it.
+        return myVoteSlotId == nil ? .needsYourVote : nil
+    }
     func canFinalize(_ userId: String?) -> Bool {
         guard let userId else { return true }              // demo
         return createdBy == nil || createdBy == userId || group.ownerId == userId

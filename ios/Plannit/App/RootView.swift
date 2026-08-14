@@ -9,7 +9,9 @@ struct RootView: View {
     @StateObject private var model = AppModel()
     @State private var flow: Flow = .welcome
     @State private var tab: Tab = .calendar
+    @State private var showCreate = false
     @State private var showNewPlan = false
+    @State private var showNewEvent = false
     @State private var showNewGroup = false
     @State private var toast: String?
 
@@ -36,14 +38,33 @@ struct RootView: View {
             }
         }
         .environmentObject(model)
+        // The ＋ asks what you're making rather than guessing from the tab.
+        .sheet(isPresented: $showCreate) {
+            CreateSheet(group: model.openGroup,
+                        offerNewGroup: tab == .groups && model.openGroup == nil) { choice in
+                showCreate = false
+                // Let the sheet finish dismissing before presenting the next one.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    switch choice {
+                    case .findADate: showNewPlan = true
+                    case .addEvent:  showNewEvent = true
+                    case .newGroup:  showNewGroup = true
+                    }
+                }
+            }
+            .environmentObject(model)
+        }
         .sheet(isPresented: $showNewPlan) {
-            NewPlanSheet(groups: model.groups) { name, group in
+            NewPlanSheet(groups: model.groups, preselected: model.openGroup) { name, group in
                 showNewPlan = false
                 tab = .plans
                 showToast(model.isLiveBackend
                           ? "\(name) sent to \(group) — we’ll ping you as votes come in"
                           : "\(name) sent to \(group) — 4 have voted already")
             }
+        }
+        .sheet(isPresented: $showNewEvent) {
+            NewEventSheet(date: Date(), group: model.openGroup).environmentObject(model)
         }
         .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }
         .animation(Motion.base, value: flow)
@@ -53,17 +74,14 @@ struct RootView: View {
         ZStack(alignment: .bottomTrailing) {
             tabContent
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    PlannitTabBar(selection: $tab)
+                    PlannitTabBar(selection: $tab, plansBadge: model.plansBadge)
                 }
 
             if tab != .you {
                 IconButton(icon: "plus", variant: .primary, size: 58, iconSize: 26,
-                           accessibilityLabel: "New plan") {
-                    showNewPlan = tab != .groups
-                    showNewGroup = tab == .groups
-                }
-                .padding(.trailing, Space.gutter)
-                .padding(.bottom, Space.tabBarH + 30)
+                           accessibilityLabel: "New") { showCreate = true }
+                    .padding(.trailing, Space.gutter)
+                    .padding(.bottom, Space.tabBarH + 30)
             }
 
             if let toast {
@@ -97,14 +115,17 @@ struct RootView: View {
 
 struct PlannitTabBar: View {
     @Binding var selection: Tab
+    /// Plans waiting on you — nil hides the dot. Never a constant: an always-lit
+    /// badge is worse than none.
+    var plansBadge: Int? = nil
 
     private struct Item { let tab: Tab; let label: String; let icon: String; let badge: Int? }
-    private let items: [Item] = [
-        .init(tab: .calendar, label: "Calendar", icon: "calendar-days", badge: nil),
-        .init(tab: .groups, label: "Groups", icon: "users", badge: nil),
-        .init(tab: .plans, label: "Plans", icon: "sparkles", badge: 2),
-        .init(tab: .you, label: "You", icon: "user", badge: nil),
-    ]
+    private var items: [Item] {
+        [.init(tab: .calendar, label: "Calendar", icon: "calendar-days", badge: nil),
+         .init(tab: .groups, label: "Groups", icon: "users", badge: nil),
+         .init(tab: .plans, label: "Plans", icon: "sparkles", badge: plansBadge),
+         .init(tab: .you, label: "You", icon: "user", badge: nil)]
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {

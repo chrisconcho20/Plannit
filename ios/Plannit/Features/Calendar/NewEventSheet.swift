@@ -7,6 +7,9 @@ import SwiftUI
 
 struct NewEventSheet: View {
     var date: Date = Date()
+    /// Set when the sheet is opened from inside a group: the event is shared
+    /// with it on save unless you untick.
+    var group: PGroup? = nil
 
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -15,13 +18,15 @@ struct NewEventSheet: View {
     @State private var location = ""
     @State private var start = Date()
     @State private var duration = "1h"
+    @State private var shareWithGroup = true
     @State private var saving = false
     @State private var errorText: String?
 
     private let durations = ["30m", "1h", "2h", "3h"]
 
-    init(date: Date = Date()) {
+    init(date: Date = Date(), group: PGroup? = nil) {
         self.date = date
+        self.group = group
         // Open on the chosen day at the next whole hour, or 9am for a future day.
         let cal = Calendar.current
         let base: Date
@@ -75,9 +80,27 @@ struct NewEventSheet: View {
                         }
                     }
 
+                    if let group {
+                        Button { withAnimation(Motion.fast) { shareWithGroup.toggle() } } label: {
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                                    .fill(group.hue.color).frame(width: 30, height: 30)
+                                    .overlay(PIcon("users", size: 15, color: .white))
+                                Text("Share with \(group.name)").textStyle(.body, color: .textStrong)
+                                Spacer()
+                                PIcon(shareWithGroup ? "circle-check" : "circle", size: 22,
+                                      color: shareWithGroup ? .actionPrimary : .textFaint)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     HStack(spacing: 8) {
                         PIcon("lock", size: 16, color: .textFaint)
-                        Text("Only you can see this until you share it with a group.")
+                        Text(group != nil && shareWithGroup
+                             ? "Everyone in \(group!.name) will see this event."
+                             : "Only you can see this until you share it with a group.")
                             .textStyle(.caption, color: .textMuted)
                     }
                 }
@@ -109,7 +132,8 @@ struct NewEventSheet: View {
                 title: title.trimmingCharacters(in: .whitespaces),
                 start: start,
                 minutes: Self.minutes(duration),
-                location: location.trimmingCharacters(in: .whitespaces))
+                location: location.trimmingCharacters(in: .whitespaces),
+                shareWith: shareWithGroup ? group : nil)
             saving = false
             if ok { dismiss() } else { errorText = "Couldn’t save that. Check your connection and try again." }
         }

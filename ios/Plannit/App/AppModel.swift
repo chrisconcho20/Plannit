@@ -21,6 +21,9 @@ final class AppModel: ObservableObject {
     /// People you can add to a group. Until friend requests land this is
     /// everyone RLS lets you see: your groups' co-members.
     @Published var people: [PMember] = Sample.people
+    /// The group you're currently looking at, so the ＋ can act in its context
+    /// instead of guessing from the tab.
+    @Published var openGroup: PGroup?
 
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
@@ -99,6 +102,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// What the Plans tab badge counts: plans waiting on your vote, plus ones
+    /// locked in for today. Nil when there's nothing to answer — a badge that's
+    /// always lit teaches people to ignore it.
+    var plansBadge: Int? {
+        let count = proposals.filter { $0.nudge(for: userId) != nil }.count
+        return count > 0 ? count : nil
+    }
+
     // MARK: Voting
 
     /// Vote for one slot. A vote is a choice, not a tally, so this replaces any
@@ -149,12 +160,12 @@ final class AppModel: ObservableObject {
 
             // The event belongs to whoever locked it in, and is shared with the
             // group so everyone can see it (events are private by default).
-            if let times = try await slotTimes(slot.id, proposalId: proposal.id) {
+            if let start = slot.startsAt, let end = slot.endsAt {
                 let iso = ISO8601DateFormatter()
                 let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
                     "events", values: EventInsert(
                         owner_id: uid, title: proposal.title, location: nil,
-                        start_at: iso.string(from: times.start), end_at: iso.string(from: times.end),
+                        start_at: iso.string(from: start), end_at: iso.string(from: end),
                         timezone: TimeZone.current.identifier, source: "plannit"))
                 if let event = created.first {
                     try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
@@ -166,17 +177,6 @@ final class AppModel: ObservableObject {
         } catch {
             return false
         }
-    }
-
-    /// Read the slot's real start/end back — `PSlot` only carries display strings.
-    private func slotTimes(_ slotId: String, proposalId: String) async throws -> (start: Date, end: Date)? {
-        let rows: [ProposalSlotDTO] = try await SupabaseClient.shared.select(
-            "proposal_slots", columns: "id,start_at,end_at,score,available_user_ids",
-            query: ["id": "eq.\(slotId)"])
-        guard let row = rows.first,
-              let start = SupabaseRepository.parseISO(row.start_at),
-              let end = SupabaseRepository.parseISO(row.end_at) else { return nil }
-        return (start, end)
     }
 
     private func replaceProposal(_ id: String, _ transform: (PProposal) -> PProposal) {
@@ -227,9 +227,11 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Create an event on your own calendar. Private until it's shared.
+    /// Create an event on your own calendar. Private unless `shareWith` is set,
+    /// which is how an event made from inside a group reaches that group.
     @discardableResult
-    func createEvent(title: String, start: Date, minutes: Int, location: String) async -> Bool {
+    func createEvent(title: String, start: Date, minutes: Int, location: String,
+                     shareWith group: PGroup? = nil) async -> Bool {
         let place = location.isEmpty ? nil : location
         let end = start.addingTimeInterval(TimeInterval(minutes * 60))
 
@@ -237,16 +239,25 @@ final class AppModel: ObservableObject {
             let tf = DateFormatter(); tf.dateFormat = "h:mm a"
             events.append(PEvent(id: UUID().uuidString, start: start, title: title,
                                  time: tf.string(from: start), location: place,
-                                 hue: GroupHue.forName(title), icon: "calendar"))
+                                 group: group?.name,
+                                 hue: group?.hue ?? GroupHue.forName(title), icon: "calendar",
+                                 badge: group == nil ? "Private" : nil,
+                                 sharedGroupIds: group.map { [$0.id] } ?? []))
             return true
         }
 
         let iso = ISO8601DateFormatter()
         do {
-            try await SupabaseClient.shared.insert("events", values: EventInsert(
-                owner_id: uid, title: title, location: place,
-                start_at: iso.string(from: start), end_at: iso.string(from: end),
-                timezone: TimeZone.current.identifier, source: "plannit"))
+            // Read the row back so the share can name it.
+            let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
+                "events", values: EventInsert(
+                    owner_id: uid, title: title, location: place,
+                    start_at: iso.string(from: start), end_at: iso.string(from: end),
+                    timezone: TimeZone.current.identifier, source: "plannit"))
+            if let group, let event = created.first {
+                try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
+                    event_id: event.id, group_id: group.id))
+            }
             await loadData()
             return true
         } catch {

@@ -186,6 +186,9 @@ struct GroupDetailView: View {
             .padding(.vertical, 6)
             .background(.ultraThinMaterial)
         }
+        // Tell the shell which group is open, so the ＋ acts in this context.
+        .onAppear { model.openGroup = live }
+        .onDisappear { if model.openGroup?.id == group.id { model.openGroup = nil } }
         .sheet(isPresented: $showNewPlan) {
             NewPlanSheet(groups: model.groups, preselected: group) { _, _ in showNewPlan = false }
         }

@@ -146,7 +146,9 @@ struct SupabaseRepository: DataRepository {
                      time: timeLabel(start, end),
                      free: dto.score,
                      best: best,
-                     availableIds: dto.available_user_ids ?? [])
+                     availableIds: dto.available_user_ids ?? [],
+                     startsAt: start,
+                     endsAt: end)
     }
 
     /// "Sat, Sun · afternoon · 2h" from the constraints the scheduler stored.
