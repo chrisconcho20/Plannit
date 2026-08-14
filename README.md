@@ -33,6 +33,8 @@ Frontend/iOS is being built on a separate track against the published
 
 ## Documentation
 
+- [`AGENTS.md`](AGENTS.md) — **start here if resuming**: how to build/test without a Mac (CI + Appetize)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — remaining features, finalization plan, known issues
 - [`docs/market-research.md`](docs/market-research.md) — competitive landscape, what to borrow, what to avoid
 - [`docs/technical-proposal.md`](docs/technical-proposal.md) — architecture, sync engine, data model, scheduler, phasing
 - [`docs/cost-analysis.md`](docs/cost-analysis.md) — infra cost model, prototype & beta totals
