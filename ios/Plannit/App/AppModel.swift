@@ -30,6 +30,9 @@ final class AppModel: ObservableObject {
     /// The group you're currently looking at, so the ＋ can act in its context
     /// instead of guessing from the tab.
     @Published var openGroup: PGroup?
+    /// Accepted friends, and requests in both directions.
+    @Published var friends: [PMember] = Config.isLiveBackend ? [] : Sample.people
+    @Published var friendRequests: [PFriendRequest] = []
 
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
@@ -65,10 +68,14 @@ final class AppModel: ObservableObject {
             let e = try await repo.fetchEvents(groups: g)
             let p = try await repo.fetchProposals()
             let who = try await repo.fetchPeople()
+            let mates = try await repo.fetchFriends()
+            let requests = try await repo.fetchFriendRequests()
             groups = g
             events = e
             proposals = p
             people = who
+            friends = mates
+            friendRequests = requests
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
         } catch {
@@ -115,6 +122,8 @@ final class AppModel: ObservableObject {
         events = Config.isLiveBackend ? [] : Sample.events
         proposals = Config.isLiveBackend ? [] : Sample.proposals
         people = Config.isLiveBackend ? [] : Sample.people
+        friends = Config.isLiveBackend ? [] : Sample.people
+        friendRequests = []
         loadError = nil
     }
 
@@ -176,6 +185,96 @@ final class AppModel: ObservableObject {
     var plansBadge: Int? {
         let count = proposals.filter { $0.nudge(for: userId) != nil }.count
         return count > 0 ? count : nil
+    }
+
+    // MARK: Friends
+
+    var incomingRequests: [PFriendRequest] { friendRequests.filter(\.incoming) }
+
+    /// Who you can put in a group: your friends first, then anyone else RLS
+    /// already shows you (a co-member you haven't befriended). Friends are the
+    /// real answer; the co-member fallback stops a group you're already in from
+    /// becoming un-editable if auto-friending is switched off later.
+    var addablePeople: [PMember] {
+        var seen = Set(friends.map(\.id))
+        return friends + people.filter { seen.insert($0.id).inserted }
+    }
+
+    /// Find someone by their exact email, so you can send them a request.
+    /// Returns nil when there's no such account — deliberately indistinguishable
+    /// from "exists but hidden", because the lookup can't be used to fish.
+    func findPerson(email: String) async -> PMember? {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard Config.isLiveBackend else {
+            return Sample.people.first { $0.name.lowercased().hasPrefix(trimmed.lowercased().prefix(3)) }
+        }
+        return try? await SupabaseRepository().findPerson(email: trimmed)
+    }
+
+    @discardableResult
+    func sendFriendRequest(to person: PMember) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            friendRequests.append(PFriendRequest(id: UUID().uuidString, person: person,
+                                                 incoming: false))
+            return true
+        }
+        do {
+            try await SupabaseClient.shared.insert("friendships", values: FriendshipInsert(
+                requester_id: uid, addressee_id: person.id, status: "pending"))
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Accept: the addressee flips the row to accepted (RLS lets either party
+    /// update, and only the addressee is ever shown the button).
+    @discardableResult
+    func respond(to request: PFriendRequest, accept: Bool) async -> Bool {
+        guard Config.isLiveBackend else {
+            friendRequests.removeAll { $0.id == request.id }
+            if accept { friends.append(request.person) }
+            return true
+        }
+        do {
+            if accept {
+                try await SupabaseClient.shared.update(
+                    "friendships", values: FriendshipStatusUpdate(status: "accepted"),
+                    match: ["id": "eq.\(request.id)"])
+            } else {
+                try await SupabaseClient.shared.delete("friendships",
+                                                       match: ["id": "eq.\(request.id)"])
+            }
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Unfriend. The row is deleted rather than blocked — blocking is a
+    /// different thing we haven't designed.
+    @discardableResult
+    func removeFriend(_ person: PMember) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            friends.removeAll { $0.id == person.id }
+            return true
+        }
+        do {
+            // The pair can be stored in either direction.
+            try await SupabaseClient.shared.delete("friendships", match: [
+                "requester_id": "eq.\(uid)", "addressee_id": "eq.\(person.id)",
+            ])
+            try await SupabaseClient.shared.delete("friendships", match: [
+                "requester_id": "eq.\(person.id)", "addressee_id": "eq.\(uid)",
+            ])
+            await loadData()
+            return true
+        } catch {
+            return false
+        }
     }
 
     // MARK: Voting

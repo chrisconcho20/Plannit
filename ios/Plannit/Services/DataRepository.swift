@@ -11,6 +11,8 @@ protocol DataRepository {
     func fetchEvents(groups: [PGroup]) async throws -> [PEvent]
     func fetchProposals() async throws -> [PProposal]
     func fetchPeople() async throws -> [PMember]
+    func fetchFriends() async throws -> [PMember]
+    func fetchFriendRequests() async throws -> [PFriendRequest]
 }
 
 struct SampleRepository: DataRepository {
@@ -18,6 +20,12 @@ struct SampleRepository: DataRepository {
     func fetchEvents(groups: [PGroup]) async -> [PEvent] { Sample.events }
     func fetchProposals() async -> [PProposal] { Sample.proposals }
     func fetchPeople() async -> [PMember] { Sample.people }
+    func fetchFriends() async -> [PMember] { Sample.people }
+    func fetchFriendRequests() async -> [PFriendRequest] {
+        // One pretend request so the demo shows the accept/decline UI.
+        [PFriendRequest(id: "req-1", person: PMember(id: "kit", name: "Kit Halloran"),
+                        incoming: true)]
+    }
 }
 
 @MainActor
@@ -42,9 +50,37 @@ struct SupabaseRepository: DataRepository {
         }
     }
 
-    /// Everyone you're allowed to see: RLS returns your own profile, your
-    /// friends', and anyone you already share a group with. Until friend
-    /// requests exist (roadmap phase 3) that co-member set *is* the directory.
+    /// Your accepted friends, via `my_friends()` — `friendships` has two foreign
+    /// keys to `profiles`, so an embed would be ambiguous.
+    func fetchFriends() async throws -> [PMember] {
+        let rows: [FriendDTO] = try await client.rpc("my_friends", args: EmptyArgs())
+        return rows.map { PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name) }
+    }
+
+    /// Requests in both directions. Also a function: someone who has only
+    /// requested you isn't a friend yet, so RLS hides their name from a join.
+    func fetchFriendRequests() async throws -> [PFriendRequest] {
+        let rows: [FriendRequestDTO] = try await client.rpc("my_friend_requests", args: EmptyArgs())
+        return rows.map {
+            PFriendRequest(id: $0.id,
+                           person: PMember(id: $0.other_id,
+                                           name: $0.display_name.isEmpty ? "Member" : $0.display_name),
+                           incoming: $0.incoming)
+        }
+    }
+
+    /// Look someone up to befriend them. Exact email only — the function
+    /// deliberately won't do prefix search, so the directory isn't enumerable.
+    func findPerson(email: String) async throws -> PMember? {
+        let rows: [FriendDTO] = try await client.rpc("find_profile_by_email",
+                                                     args: EmailLookup(p_email: email))
+        return rows.first.map {
+            PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name)
+        }
+    }
+
+    /// Everyone you can put in a group: your friends, plus anyone you already
+    /// share a group with (RLS shows you those profiles anyway).
     func fetchPeople() async throws -> [PMember] {
         let rows: [ProfileDTO] = try await client.select(
             "profiles", columns: "id,display_name,timezone",

@@ -15,6 +15,13 @@ struct PMember: Identifiable, Hashable {
     static func named(_ names: [String]) -> [PMember] { names.map { PMember(id: $0, name: $0) } }
 }
 
+/// A friend request you've sent or received.
+struct PFriendRequest: Identifiable, Hashable {
+    let id: String            // the friendships row
+    let person: PMember
+    let incoming: Bool        // true = they asked you
+}
+
 struct PGroup: Identifiable, Hashable {
     let id: String
     let name: String

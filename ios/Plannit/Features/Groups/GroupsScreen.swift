@@ -284,7 +284,7 @@ struct NewGroupSheet: View {
                     field("Name") { PTextField(placeholder: "e.g. Soccer", text: $name, icon: "users") }
                     field("Colour") { HuePicker(selection: $hue) }
                     field("People") {
-                        PeoplePicker(people: model.people, selected: $selected)
+                        PeoplePicker(people: model.addablePeople, selected: $selected)
                     }
                     if let errorText {
                         Text(errorText).textStyle(.footnote, color: .statusDanger)
@@ -335,7 +335,7 @@ struct AddPeopleSheet: View {
     /// Everyone you know who isn't in this group yet.
     private var candidates: [PMember] {
         let existing = Set(group.members.map(\.id))
-        return model.people.filter { !existing.contains($0.id) }
+        return model.addablePeople.filter { !existing.contains($0.id) }
     }
 
     var body: some View {

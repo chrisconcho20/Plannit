@@ -161,6 +161,27 @@ struct EventShareInsert: Encodable {
 }
 struct EventRefDTO: Decodable { let id: String }
 
+// MARK: Friends
+struct FriendDTO: Decodable {
+    let id: String
+    let display_name: String
+}
+struct FriendRequestDTO: Decodable {
+    let id: String
+    let other_id: String
+    let display_name: String
+    let incoming: Bool
+}
+struct FriendshipInsert: Encodable {
+    let requester_id: String
+    let addressee_id: String
+    let status: String     // "pending" | "accepted" | "blocked"
+}
+struct FriendshipStatusUpdate: Encodable { let status: String }
+struct EmailLookup: Encodable { let p_email: String }
+struct ConfigRowDTO: Decodable { let key: String; let value: Bool }
+struct EmptyArgs: Encodable {}
+
 // Mirrors the Edge Function Constraints (supabase/functions/_shared/scheduler.ts).
 struct SlotConstraintsDTO: Encodable {
     let windowStart: Int64
@@ -408,6 +429,20 @@ final class SupabaseClient {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         _ = try await sendRaw(req)
+    }
+
+    /// Call a Postgres function. Some things RLS deliberately hides — a
+    /// stranger's profile, a pending requester's name — are reachable only
+    /// through a SECURITY DEFINER function that scopes the answer to you.
+    func rpc<Args: Encodable, Res: Decodable>(_ name: String, args: Args) async throws -> Res {
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("rest/v1/rpc/\(name)"))
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(args)
+        return try await send(req)
     }
 
     // MARK: Edge Functions

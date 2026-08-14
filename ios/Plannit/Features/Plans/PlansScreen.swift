@@ -315,6 +315,9 @@ struct PlanDetailView: View {
     }
 }
 
+/// The only place the You tab navigates to, for now.
+enum YouRoute: Hashable { case friends }
+
 struct YouScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var showRename = false
@@ -347,7 +350,30 @@ struct YouScreen: View {
                 .padding(Space.gutter)
 
                 SectionLabel("Profile")
-                settingsCard { nameRow() }
+                settingsCard {
+                    nameRow()
+                    divider
+                    NavigationLink(value: YouRoute.friends) {
+                        HStack(spacing: 12) {
+                            PIcon("users", size: 20, color: .textMuted).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Friends").textStyle(.headline, color: .textStrong)
+                                Text("Who you can add to groups and plans")
+                                    .textStyle(.caption, color: .textMuted)
+                            }
+                            Spacer()
+                            if !model.incomingRequests.isEmpty {
+                                Badge(text: "\(model.incomingRequests.count) new", tone: .primary)
+                            } else {
+                                Text("\(model.friends.count)").textStyle(.subhead, color: .textMuted)
+                            }
+                            PIcon("chevron-right", size: 16, color: .textFaint)
+                        }
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 SectionLabel("Date finder")
                 settingsCard {
@@ -397,6 +423,7 @@ struct YouScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
+        .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .sheet(isPresented: $showRename) {
             DisplayNameSheet(current: model.displayName).environmentObject(model)
         }
