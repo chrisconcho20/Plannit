@@ -64,8 +64,10 @@ account. See §6 for URLs/creds.
    matching RLS) sets `finalized_slot_id` + status, creates the winning `event`
    and shares it to the group. Slots carry `available_user_ids`, so cards show
    the faces of whoever is actually free.
-   _Next here:_ no realtime — votes appear on reload, not as they land; no
-   "unvote"; a locked-in plan can't be reopened or cancelled.
+   ✅ **Also done (2026-08-14):** you can take your vote back, and the organiser
+   can cancel a plan.
+   _Next here:_ no realtime — votes appear on reload, not as they land; a
+   locked-in plan can't be reopened (cancel and re-run is the workaround).
 3. ~~**Event sharing to groups (live)**~~ ✅ **done (2026-08-14).** `ShareSheet`
    lists your real groups pre-ticked with the event's current shares and diffs
    the selection on save (insert added / delete removed `event_shares`).
@@ -82,8 +84,9 @@ account. See §6 for URLs/creds.
    the loaded events — no more dots on days with nothing behind them.
    **New event** (`Features/Calendar/NewEventSheet.swift`) writes to `events` in
    live mode and appends locally in demo.
-   _Next here:_ events are still create-only — no edit or delete, and the Week
-   view is unbuilt (Month/List work).
+   ✅ **Also done (2026-08-14):** events can be edited and deleted (soft delete,
+   so the tombstone propagates), and **Week** is a real week strip instead of a
+   copy of the List.
 5. **Full two-way sync** per [`backend/sync-contract.md`](backend/sync-contract.md).
    **Done (2026-08-14):** availability is now trustworthy — uncapped, merged
    (`Services/Availability.swift`, 11 tests), replace-not-append uploads, and it
@@ -106,10 +109,10 @@ account. See §6 for URLs/creds.
    lets you see" = your groups' co-members. You cannot reach someone you don't
    already share a group with, and removing the last shared group makes them
    invisible again. Friend requests are what break that circularity.
-7. **Group management** — ~~add members~~ ✅, ~~remove members / delete / leave~~ ✅
-   (2026-08-14, `Features/Groups/GroupsScreen.swift`). Still to do: **rename a
-   group**, and **hue persistence** (needs a `hue` column or mapping table —
-   currently derived from name; see known issues).
+7. ~~**Group management**~~ ✅ **done (2026-08-14).** Add / remove members,
+   delete, leave, and rename + recolour. The hue is stored **on-device** per
+   group (no `hue` column yet) and falls back to the name-derived colour —
+   a migration would make it shared.
 
 ### Phase 4 — Notifications
 8. **APNs client** — request permission, register the device token into
@@ -119,16 +122,21 @@ account. See §6 for URLs/creds.
    Apple Developer account + APNs key.
 
 ### Phase 5 — Robustness & finalization
-9. **Session persistence** — `SupabaseClient` holds the token in memory only; add
-   **Keychain** storage + refresh-token handling (auto-refresh on 401). Decision
-   context: sessions currently lost on relaunch.
+9. ~~**Session persistence**~~ ✅ **done (2026-08-14).** Keychain-backed session
+   (access + refresh token + expiry), refreshed before it expires and retried
+   once on a 401. Sign out is wired and clears everything. Unsigned simulator
+   builds (CI, Appetize) fall back to UserDefaults, since the Keychain refuses
+   an app with no entitlements.
 10. **Offline cache** — decision **D-02 chose GRDB**; none yet. Add an offline-first
     local store so the app works without network and syncs deltas.
-11. **Error & loading states** — user-facing errors (toasts) on network failures,
-    spinners on live loads, retry. Currently failures fall back silently to sample.
+11. **Error & loading states** — ✅ live mode no longer starts on sample data, a
+    failed load shows a banner with Retry, and every list pulls to refresh.
+    _Still to do:_ skeletons while first loading, and per-action toasts for the
+    writes that currently fail quietly (add/remove member, share).
 12. **Empty-state copy** — friendly "nothing yet / here's what to do" states.
-13. **Wire or hide placeholder buttons** — Add-people ✅ and the ＋ ✅ are wired;
-    Settings, Search, Bell, Inbox and ⋯/More still do nothing.
+13. ~~**Wire or hide placeholder buttons**~~ ✅ **done (2026-08-14).** Search
+    filters groups by name or member; ⋯ on an event is Edit/Share/Delete; the
+    dead Inbox and Settings buttons are gone; Sign out works.
 14. **Tests** — ✅ two suites run on every push: **XCTest** (`ios/PlannitTests`,
     22 tests — constraint maths, date/slot mapping, ownership and badge rules)
     via `xcodebuild test` in `ios-build.yml`, and **Deno** (19 tests including
@@ -154,9 +162,8 @@ account. See §6 for URLs/creds.
 - **No realtime** — votes, shares and new plans appear on the next load, not as
   they happen. `postgres_changes` subscriptions are specced in the API contract
   but unused. This is the next structural gap now that phase 1 is complete.
-- **Session not persisted** (in-memory token) — relaunch logs you out. (Phase 5.9)
-- **Group hue not persisted** — no `hue` column; derived from name, so the hue
-  picker in "New group" is cosmetic. Add a column or accept derived.
+- **Group hue is device-local** — the picker works, but the colour lives in
+  UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
 - **You can only add people you already share a group with** — there's no friend
   system, so the people picker is fed by whatever `profiles` RLS returns. For
   testing, `supabase/seed-test-users.sql` drops five real people into every group
