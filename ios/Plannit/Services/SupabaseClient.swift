@@ -66,6 +66,8 @@ final class SupabaseClient {
     private(set) var accessToken: String?
     private(set) var userId: String?
 
+    nonisolated init() {}
+
     var isConfigured: Bool { Config.isLiveBackend }
     private var baseURL: URL? { URL(string: Config.supabaseURL) }
     private var anonKey: String { Config.supabaseAnonKey }

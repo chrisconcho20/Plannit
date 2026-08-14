@@ -15,6 +15,8 @@ final class AppModel: ObservableObject {
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
 
+    nonisolated init() {}
+
     var isLiveBackend: Bool { Config.isLiveBackend }
 
     // MARK: Auth

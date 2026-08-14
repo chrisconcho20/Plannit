@@ -13,7 +13,6 @@ struct DeviceEvent: Identifiable, Hashable {
     let isAllDay: Bool
 }
 
-@MainActor
 final class CalendarService {
     let store = EKEventStore()
 
