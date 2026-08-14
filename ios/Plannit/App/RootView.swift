@@ -7,6 +7,7 @@ struct RootView: View {
     enum Flow { case welcome, connect, app }
 
     @StateObject private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var flow: Flow = .welcome
     @State private var tab: Tab = .calendar
     @State private var showCreate = false
@@ -92,7 +93,19 @@ struct RootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .task { await model.loadData() }
+        .task {
+            await model.resumeCalendarIfAuthorized()
+            await model.loadData()
+        }
+        // A full reconcile every time we come back: EventKit can't tell us about
+        // edits made while we were away (sync-contract §Background refresh).
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await model.syncCalendar()
+                await model.loadData()
+            }
+        }
     }
 
     @ViewBuilder

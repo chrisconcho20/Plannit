@@ -36,6 +36,8 @@ struct PEvent: Identifiable, Hashable {
     /// The real instant the event starts — the calendar keys off this, not a
     /// bare day-of-month, so events land on the right day of the right month.
     let start: Date
+    /// Known for anything that came from the backend; nil for sample rows.
+    var end: Date? = nil
     let title: String
     let time: String
     var location: String? = nil

@@ -27,8 +27,23 @@ final class AppModel: ObservableObject {
 
     private let calendar = CalendarService()
     private var appleCoordinator: AppleSignInCoordinator?
+    private var calendarObserver: NSObjectProtocol?
 
     nonisolated init() {}
+
+    /// EKEventStoreChanged only fires while we're running — the foreground
+    /// reconcile in RootView covers everything we miss (sync-contract §Background).
+    func startObservingCalendar() {
+        guard calendarObserver == nil else { return }
+        calendarObserver = NotificationCenter.default.addObserver(
+            forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.syncCalendar() }
+        }
+    }
+
+    deinit {
+        if let calendarObserver { NotificationCenter.default.removeObserver(calendarObserver) }
+    }
 
     var isLiveBackend: Bool { Config.isLiveBackend }
 
@@ -45,6 +60,7 @@ final class AppModel: ObservableObject {
             events = e
             proposals = p
             people = who
+            mirrorToDeviceCalendar()   // keep the device copy in step
         } catch {
             // Keep whatever we have (sample seed) on failure.
         }
@@ -404,9 +420,18 @@ final class AppModel: ObservableObject {
         calendarConnected = granted
         calendarDenied = !granted
         if granted {
-            deviceEvents = calendar.fetchDeviceEvents()
-            await uploadBusyBlocksIfLive()
+            startObservingCalendar()
+            await syncCalendar()
         }
+    }
+
+    /// Pick the connection back up on launch when access was already granted,
+    /// so returning users don't have to reconnect to stay in sync.
+    func resumeCalendarIfAuthorized() async {
+        guard !calendarConnected, calendar.hasAccess else { return }
+        calendarConnected = true
+        startObservingCalendar()
+        await syncCalendar()
     }
 
     func refreshCalendar() {
@@ -414,17 +439,47 @@ final class AppModel: ObservableObject {
         deviceEvents = calendar.fetchDeviceEvents()
     }
 
-    /// Upload merged busy intervals (no titles) so group availability can be computed.
+    /// Re-read the device calendar and push availability again. Called when the
+    /// app comes back to the foreground and when EventKit reports a change —
+    /// availability that's only uploaded once is stale by the next morning.
+    func syncCalendar() async {
+        guard calendarConnected else { return }
+        deviceEvents = calendar.fetchDeviceEvents()
+        await uploadBusyBlocksIfLive()
+        mirrorToDeviceCalendar()
+    }
+
+    /// Write Plannit-origin events into the dedicated "Plannit" calendar, so a
+    /// locked-in plan really does land on your calendar. Best-effort: no access,
+    /// no mirror, no complaints.
+    func mirrorToDeviceCalendar() {
+        guard calendarConnected else { return }
+        calendar.mirror(events)
+    }
+
+    /// Upload merged busy intervals (no titles) so group availability can be
+    /// computed. Replaces the window rather than appending to it — a plain
+    /// insert stacked a fresh copy of your calendar every time you connected.
     private func uploadBusyBlocksIfLive() async {
         guard SupabaseClient.shared.isConfigured, SupabaseClient.shared.isSignedIn,
               let uid = userId else { return }
         let iso = ISO8601DateFormatter()
+        let now = Date()
         let blocks = calendar.busyIntervals().map {
             BusyBlockInsert(user_id: uid,
                             start_at: iso.string(from: $0.start),
                             end_at: iso.string(from: $0.end))
         }
-        guard !blocks.isEmpty else { return }
-        try? await SupabaseClient.shared.insert("busy_blocks", values: blocks)
+        do {
+            // Clear what we said last time about the future, then state it again.
+            // Past blocks are left alone: the scheduler never looks backwards.
+            try await SupabaseClient.shared.delete("busy_blocks", match: [
+                "user_id": "eq.\(uid)", "end_at": "gte.\(iso.string(from: now))",
+            ])
+            guard !blocks.isEmpty else { return }
+            try await SupabaseClient.shared.insert("busy_blocks", values: blocks)
+        } catch {
+            // Availability is best-effort; the next sync tries again.
+        }
     }
 }
