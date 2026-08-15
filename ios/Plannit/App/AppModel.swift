@@ -307,6 +307,60 @@ final class AppModel: ObservableObject {
         return count > 0 ? count : nil
     }
 
+    // MARK: Invites
+
+    /// A link that puts someone in this group — and makes you two friends,
+    /// since sending an invite is about as clear a signal as it gets.
+    /// Returns nil if we couldn't make one.
+    func inviteLink(for group: PGroup) async -> URL? {
+        guard Config.isLiveBackend else {
+            return URL(string: "https://plannit.app/i/demo")   // nothing real to share in demo
+        }
+        do {
+            let rows: [InviteDTO] = try await SupabaseClient.shared.rpc(
+                "create_group_invite", args: CreateInviteArgs(p_group: group.id))
+            guard let token = rows.first?.token else { return nil }
+            return Self.inviteURL(token: token)
+        } catch {
+            say("Couldn't make an invite link.")
+            return nil
+        }
+    }
+
+    /// The public landing page. An https link so it previews in a message and
+    /// works for someone who hasn't installed the app; that page deep-links
+    /// back into plannit://invite/<token>.
+    static func inviteURL(token: String) -> URL? {
+        URL(string: Config.supabaseURL)?
+            .appendingPathComponent("functions/v1/invite")
+            .appending(queryItems: [URLQueryItem(name: "t", value: token)])
+    }
+
+    /// Handle plannit://invite/<token>, however we were opened.
+    func redeemInvite(token: String) async {
+        guard Config.isLiveBackend else { return }
+        guard signedIn else {
+            say("Sign in first, then open the invite again.")
+            return
+        }
+        do {
+            let rows: [RedeemedInviteDTO] = try await SupabaseClient.shared.rpc(
+                "redeem_invite", args: RedeemInviteArgs(p_token: token))
+            await loadData()
+            guard let row = rows.first else {
+                say("That invite has expired.")
+                return
+            }
+            if let name = row.group_name {
+                say(row.already_member == true ? "You're already in \(name)." : "You're in \(name).")
+            } else {
+                say("You're now friends.")
+            }
+        } catch {
+            say("That invite has expired or been used up.")
+        }
+    }
+
     // MARK: Friends
 
     var incomingRequests: [PFriendRequest] { friendRequests.filter(\.incoming) }
@@ -503,7 +557,8 @@ final class AppModel: ObservableObject {
                         owner_id: uid, title: proposal.title, location: nil,
                         start_at: iso.string(from: start), end_at: iso.string(from: end),
                         all_day: false,
-                        timezone: TimeZone.current.identifier, source: "plannit"))
+                        timezone: TimeZone.current.identifier, source: "plannit",
+                        recurrence_rule: nil))
                 if let event = created.first {
                     try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
                         event_id: event.id, group_id: proposal.group.id))
@@ -537,12 +592,13 @@ final class AppModel: ObservableObject {
     /// Change an event you own.
     @discardableResult
     func updateEvent(_ event: PEvent, title: String, start: Date, minutes: Int,
-                     location: String, allDay: Bool = false) async -> Bool {
+                     location: String, allDay: Bool = false,
+                     repeats: RepeatRule = .never) async -> Bool {
         let place = location.isEmpty ? nil : location
         let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
 
         guard Config.isLiveBackend else {
-            if let i = events.firstIndex(where: { $0.id == event.id }) {
+            if let i = events.firstIndex(where: { $0.id == event.rowId }) {
                 let tf = DateFormatter(); tf.dateFormat = "h:mm a"
                 var e = events[i]
                 e = PEvent(id: e.id, start: start, end: end, title: title,
@@ -550,6 +606,7 @@ final class AppModel: ObservableObject {
                            location: place, group: e.group,
                            hue: e.hue, icon: e.icon, people: e.people, badge: e.badge,
                            badgeTone: e.badgeTone, source: e.source, isAllDay: allDay,
+                           recurrence: repeats,
                            ownerId: e.ownerId, sharedGroupIds: e.sharedGroupIds)
                 events[i] = e
             }
@@ -561,8 +618,8 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.update("events", values: EventUpdate(
                 title: title, location: place,
                 start_at: iso.string(from: start), end_at: iso.string(from: end),
-                all_day: allDay),
-                match: ["id": "eq.\(event.id)"])
+                all_day: allDay, recurrence_rule: Recurrence.rrule(for: repeats)),
+                match: ["id": "eq.\(event.rowId)"])
             await refreshEvents()
             return true
         } catch {
@@ -576,14 +633,14 @@ final class AppModel: ObservableObject {
     @discardableResult
     func deleteEvent(_ event: PEvent) async -> Bool {
         guard Config.isLiveBackend else {
-            events.removeAll { $0.id == event.id }
+            events.removeAll { $0.id == event.rowId }
             return true
         }
         do {
             let iso = ISO8601DateFormatter()
             try await SupabaseClient.shared.update(
                 "events", values: EventTombstone(deleted_at: iso.string(from: Date())),
-                match: ["id": "eq.\(event.id)"])
+                match: ["id": "eq.\(event.rowId)"])
             await refreshEvents()
             return true
         } catch {
@@ -632,7 +689,7 @@ final class AppModel: ObservableObject {
                 || !addedPeople.isEmpty || !removedPeople.isEmpty else { return true }
 
         guard Config.isLiveBackend else {
-            if let i = events.firstIndex(where: { $0.id == event.id }) {
+            if let i = events.firstIndex(where: { $0.id == event.rowId }) {
                 var e = events[i]
                 e.sharedGroupIds = Array(groupIds)
                 e.sharedUserIds = Array(personIds)
@@ -646,24 +703,24 @@ final class AppModel: ObservableObject {
         do {
             if !removedGroups.isEmpty {
                 try await SupabaseClient.shared.delete("event_shares", match: [
-                    "event_id": "eq.\(event.id)",
+                    "event_id": "eq.\(event.rowId)",
                     "group_id": "in.(\(removedGroups.joined(separator: ",")))",
                 ])
             }
             if !removedPeople.isEmpty {
                 try await SupabaseClient.shared.delete("event_shares", match: [
-                    "event_id": "eq.\(event.id)",
+                    "event_id": "eq.\(event.rowId)",
                     "shared_user_id": "in.(\(removedPeople.joined(separator: ",")))",
                 ])
             }
             if !addedGroups.isEmpty {
                 try await SupabaseClient.shared.insert("event_shares", values: addedGroups.map {
-                    EventShareInsert(event_id: event.id, group_id: $0)
+                    EventShareInsert(event_id: event.rowId, group_id: $0)
                 })
             }
             if !addedPeople.isEmpty {
                 try await SupabaseClient.shared.insert("event_shares", values: addedPeople.map {
-                    EventUserShareInsert(event_id: event.id, shared_user_id: $0)
+                    EventUserShareInsert(event_id: event.rowId, shared_user_id: $0)
                 })
             }
             await refreshEvents()
@@ -677,7 +734,8 @@ final class AppModel: ObservableObject {
     /// which is how an event made from inside a group reaches that group.
     @discardableResult
     func createEvent(title: String, start: Date, minutes: Int, location: String,
-                     allDay: Bool = false, shareWith group: PGroup? = nil) async -> Bool {
+                     allDay: Bool = false, repeats: RepeatRule = .never,
+                     shareWith group: PGroup? = nil) async -> Bool {
         let place = location.isEmpty ? nil : location
         let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
 
@@ -690,6 +748,7 @@ final class AppModel: ObservableObject {
                                  hue: group?.hue ?? GroupHue.forName(title), icon: "calendar",
                                  badge: group == nil ? "Private" : nil,
                                  isAllDay: allDay,
+                                 recurrence: repeats,
                                  sharedGroupIds: group.map { [$0.id] } ?? []))
             return true
         }
@@ -702,7 +761,8 @@ final class AppModel: ObservableObject {
                     owner_id: uid, title: title, location: place,
                     start_at: iso.string(from: start), end_at: iso.string(from: end),
                     all_day: allDay,
-                    timezone: TimeZone.current.identifier, source: "plannit"))
+                    timezone: TimeZone.current.identifier, source: "plannit",
+                    recurrence_rule: Recurrence.rrule(for: repeats)))
             if let group, let event = created.first {
                 try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
                     event_id: event.id, group_id: group.id))

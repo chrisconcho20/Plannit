@@ -110,6 +110,14 @@ struct RootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        // plannit://invite/<token> — from the web landing page, or a link
+        // someone taps with the app already installed.
+        .onOpenURL { url in
+            guard url.scheme == "plannit", url.host == "invite" else { return }
+            let token = url.pathComponents.last.map { $0.replacingOccurrences(of: "/", with: "") }
+            guard let token, !token.isEmpty else { return }
+            Task { await model.redeemInvite(token: token) }
+        }
         .animation(Motion.base, value: model.toast)
         .task {
             await model.resumeCalendarIfAuthorized()

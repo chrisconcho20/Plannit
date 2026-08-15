@@ -61,6 +61,12 @@ struct PEvent: Identifiable, Hashable {
     /// nil in demo mode; otherwise the profile that owns the event — only they
     /// may share it (RLS on `event_shares`).
     var ownerId: String? = nil
+    /// How often it repeats. One database row covers the whole series.
+    var recurrence: RepeatRule = .never
+    /// Set on an expanded occurrence: the id of the row it came from. The
+    /// occurrence needs its own `id` to be unique in a list, but every action
+    /// (edit, delete, share) has to act on the underlying series.
+    var seriesId: String? = nil
     /// Groups this event is visible to. Empty = private to the owner.
     var sharedGroupIds: [String] = []
     /// People it's shared with directly, by profile id.
@@ -74,6 +80,33 @@ struct PEvent: Identifiable, Hashable {
 
     var day: Int { Calendar.current.component(.day, from: start) }
     func isOn(_ date: Date) -> Bool { Calendar.current.isDate(start, inSameDayAs: date) }
+
+    /// The row this represents — itself, or the series an occurrence came from.
+    var rowId: String { seriesId ?? id }
+
+    /// Expand a repeating event into the occurrences that fall in `range`.
+    /// A non-repeating event is just itself, so callers don't branch.
+    func occurrences(in range: ClosedRange<Date>) -> [PEvent] {
+        guard recurrence != .never else {
+            return range.contains(start) ? [self] : []
+        }
+        let length = end.map { $0.timeIntervalSince(start) } ?? 3600
+        return Recurrence.occurrences(start: start, rule: recurrence, in: range, limit: 120)
+            .map { occurrenceStart in
+                var copy = self
+                copy = PEvent(
+                    id: "\(id)#\(Int(occurrenceStart.timeIntervalSince1970))",
+                    start: occurrenceStart,
+                    end: occurrenceStart.addingTimeInterval(length),
+                    title: title, time: time, location: location, group: group,
+                    hue: hue, icon: icon, people: people, badge: badge,
+                    badgeTone: badgeTone, source: source, isAllDay: isAllDay,
+                    recurrence: recurrence, seriesId: id,
+                    ownerId: ownerId,
+                    sharedGroupIds: sharedGroupIds, sharedUserIds: sharedUserIds)
+                return copy
+            }
+    }
 }
 
 /// One thing that happened, from `my_activity()`. The *wording* deliberately

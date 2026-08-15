@@ -117,6 +117,8 @@ struct GroupDetailView: View {
     @State private var pendingMember: PMember?
     @State private var confirmDeleteGroup = false
     @State private var showRename = false
+    @State private var inviteURL: URL?
+    @State private var makingInvite = false
 
     /// Re-read from the model so the screen updates after add/remove.
     private var live: PGroup { model.groups.first { $0.id == group.id } ?? group }
@@ -199,6 +201,37 @@ struct GroupDetailView: View {
                                   icon: "pencil", fullWidth: true) { showRename = true }
                         .padding(.horizontal, Space.gutter)
                         .padding(.top, 4)
+                }
+
+                // An invite link beats "what's their email?" — the recipient
+                // doesn't need an account, or the app, to open it.
+                if let inviteURL {
+                    ShareLink(item: inviteURL,
+                              subject: Text("Join \(live.name) on Plannit"),
+                              message: Text("Come plan with us — this link adds you to \(live.name).")) {
+                        HStack(spacing: 8) {
+                            PIcon("link", size: 18, color: .textOnPrimary)
+                            Text("Share invite link").textStyle(.headline, color: .textOnPrimary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(Color.actionPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                    }
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, 8)
+                } else {
+                    PlannitButton(title: makingInvite ? "Making a link…" : "Invite with a link",
+                                  variant: .secondary, size: .md, icon: "link", fullWidth: true) {
+                        makingInvite = true
+                        Task {
+                            inviteURL = await model.inviteLink(for: live)
+                            makingInvite = false
+                        }
+                    }
+                    .disabled(makingInvite)
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, 8)
                 }
 
                 PlannitButton(title: isOwner ? "Delete group" : "Leave group",

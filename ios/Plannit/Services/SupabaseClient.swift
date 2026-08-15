@@ -106,6 +106,7 @@ struct EventDTO: Decodable, Identifiable {
     let end_at: String
     let all_day: Bool
     let source: String
+    let recurrence_rule: String?
     let event_shares: [EventShareEmbedDTO]?   // only one FK to events — safe to embed
 }
 struct EventShareEmbedDTO: Decodable {
@@ -122,6 +123,7 @@ struct EventInsert: Encodable {
     let all_day: Bool
     let timezone: String
     let source: String     // "plannit" | "device"
+    let recurrence_rule: String?
 }
 
 struct BusyBlockInsert: Encodable {
@@ -180,6 +182,7 @@ struct EventUpdate: Encodable {
     let start_at: String
     let end_at: String
     let all_day: Bool
+    let recurrence_rule: String?
 }
 /// Soft delete — the sync contract wants a tombstone, not a vanished row.
 struct EventTombstone: Encodable { let deleted_at: String }
@@ -195,6 +198,19 @@ struct EventUserShareInsert: Encodable {
     let shared_user_id: String
 }
 struct EventRefDTO: Decodable { let id: String }
+
+// MARK: Invites
+struct InviteDTO: Decodable {
+    let token: String
+    let expires_at: String?
+}
+struct RedeemedInviteDTO: Decodable {
+    let group_id: String?
+    let group_name: String?
+    let already_member: Bool?
+}
+struct CreateInviteArgs: Encodable { let p_group: String }
+struct RedeemInviteArgs: Encodable { let p_token: String }
 
 // MARK: Activity
 struct ActivityDTO: Decodable {

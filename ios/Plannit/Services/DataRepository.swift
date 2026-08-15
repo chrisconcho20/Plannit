@@ -269,6 +269,7 @@ struct SupabaseRepository: DataRepository {
             badgeTone: .neutral,
             source: isDevice ? .device : .plannit,
             isAllDay: d.all_day,
+            recurrence: Recurrence.rule(from: d.recurrence_rule),
             ownerId: d.owner_id,
             sharedGroupIds: sharedIds,
             sharedUserIds: sharedPeople

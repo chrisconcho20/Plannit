@@ -35,12 +35,24 @@ struct CalendarScreen: View {
         return cal.date(from: DateComponents(year: year, month: month, day: selectedDay))
     }
 
+    /// The month on screen, as a range — repeating events are expanded into it.
+    private var monthRange: ClosedRange<Date>? {
+        guard let interval = cal.dateInterval(of: .month, for: visibleMonth) else { return nil }
+        return interval.start...interval.end
+    }
+
+    /// Every occurrence in the shown month: a weekly five-a-side is four dots,
+    /// not one.
+    private var monthOccurrences: [PEvent] {
+        guard let monthRange else { return [] }
+        return model.events.flatMap { $0.occurrences(in: monthRange) }
+    }
+
     /// Events in the shown month, grouped by day — the source of the grid's dots.
     /// Derived from real events, so a day only gets a mark if something is on it.
     private var marks: [Int: [Color]] {
         var out: [Int: [Color]] = [:]
-        for event in model.events
-        where cal.isDate(event.start, equalTo: visibleMonth, toGranularity: .month) {
+        for event in monthOccurrences {
             out[event.day, default: []].append(event.hue.color)
         }
         for device in model.deviceEvents
@@ -52,10 +64,18 @@ struct CalendarScreen: View {
 
     private var events: [PEvent] {
         if mode != .list, let selectedDate {
-            return model.events.filter { $0.isOn(selectedDate) }.sorted { $0.start < $1.start }
+            let day = cal.startOfDay(for: selectedDate)
+            let end = cal.date(byAdding: .day, value: 1, to: day) ?? day
+            return model.events.flatMap { $0.occurrences(in: day...end) }
+                .filter { $0.isOn(selectedDate) }
+                .sorted { $0.start < $1.start }
         }
+        // Upcoming: a repeating event should appear on each of its next dates,
+        // not once forever at its original start.
         let now = cal.startOfDay(for: Date())
-        return model.events.filter { $0.start >= now }.sorted { $0.start < $1.start }
+        let horizon = cal.date(byAdding: .month, value: 3, to: now) ?? now
+        return model.events.flatMap { $0.occurrences(in: now...horizon) }
+            .sorted { $0.start < $1.start }
     }
 
     /// Your own calendar's events, scoped exactly like the Plannit ones above:
@@ -285,7 +305,11 @@ struct EventDetailView: View {
     @State private var confirmDelete = false
 
     /// Re-read so the visibility row updates as soon as sharing changes.
-    private var live: PEvent { model.events.first { $0.id == event.id } ?? event }
+    /// An expanded occurrence has a synthetic id, so resolve through the row it
+    /// came from — otherwise editing next week's instance would find nothing.
+    private var live: PEvent {
+        (model.events.first { $0.id == event.rowId } ?? event)
+    }
     private var isOwner: Bool { live.isOwned(by: model.userId) }
 
     /// "Private" · "Shared with Soccer" · "Shared with Soccer and Maya + 2 more".
@@ -325,6 +349,10 @@ struct EventDetailView: View {
                 VStack(spacing: 0) {
                     detailRow("clock", "Time", event.time)
                     if let location = event.location { detailRow("map-pin", "Place", location) }
+                    if live.recurrence != .never {
+                        detailRow("repeat", "Repeats", live.recurrence.label.lowercased()
+                                    .replacingOccurrences(of: "every", with: "Every"))
+                    }
                     detailRow(live.isPrivate ? "lock" : "users", "Visibility", visibility)
                 }
                 .padding(.horizontal, Space.gutter)

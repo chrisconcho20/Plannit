@@ -22,6 +22,7 @@ struct NewEventSheet: View {
     @State private var start = Date()
     @State private var duration = "1h"
     @State private var allDay = false
+    @State private var repeats: RepeatRule = .never
     @State private var shareWithGroup = true
     @State private var saving = false
     @State private var errorText: String?
@@ -41,6 +42,7 @@ struct NewEventSheet: View {
                                 .timeIntervalSince(editing.start) / 60)
             _duration = State(initialValue: Self.label(forMinutes: minutes))
             _allDay = State(initialValue: editing.isAllDay)
+            _repeats = State(initialValue: editing.recurrence)
             _shareWithGroup = State(initialValue: false)   // sharing is its own sheet
             return
         }
@@ -97,6 +99,26 @@ struct NewEventSheet: View {
                                 }
                             }
                         }
+                    }
+
+                    fieldLabel("Repeats")
+                    Menu {
+                        ForEach(RepeatRule.allCases) { rule in
+                            Button(rule.label) { repeats = rule }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            PIcon("repeat", size: 18, color: .textFaint)
+                            Text(repeats.label).textStyle(.body, color: .textStrong)
+                            Spacer()
+                            PIcon("chevron-down", size: 16, color: .textFaint)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 48)
+                        .background(Color.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                            .strokeBorder(Color.lineStrong, lineWidth: 1))
                     }
 
                     fieldLabel("Where (optional)")
@@ -164,11 +186,11 @@ struct NewEventSheet: View {
             if let editing {
                 ok = await model.updateEvent(editing, title: name, start: start,
                                              minutes: Self.minutes(duration), location: place,
-                                             allDay: allDay)
+                                             allDay: allDay, repeats: repeats)
             } else {
                 ok = await model.createEvent(title: name, start: start,
                                              minutes: Self.minutes(duration), location: place,
-                                             allDay: allDay,
+                                             allDay: allDay, repeats: repeats,
                                              shareWith: shareWithGroup ? group : nil)
             }
             saving = false

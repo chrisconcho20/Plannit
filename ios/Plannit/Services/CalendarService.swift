@@ -153,7 +153,9 @@ final class CalendarService {
         var map = Self.mirrorMap
         var written = 0
 
-        let wanted = events.filter { $0.source == .plannit }
+        // Series only: mirroring expanded occurrences would write hundreds of
+        // one-off events where EventKit can hold a single repeating one.
+        let wanted = events.filter { $0.source == .plannit && $0.seriesId == nil }
         for event in wanted {
             let start = event.start
             // Sample rows have no end; an hour is a sane mirror default.
@@ -163,10 +165,12 @@ final class CalendarService {
 
             // Skip the save when nothing actually changed — writing on every
             // load would churn the user's calendar database.
+            let sameRule = (existing?.recurrenceRules?.first?.frequency)
+                == Recurrence.ekRule(for: event.recurrence)?.frequency
             if let existing, existing.title == event.title,
                existing.startDate == start, existing.endDate == end,
                existing.isAllDay == event.isAllDay,
-               existing.location == event.location {
+               existing.location == event.location, sameRule {
                 continue
             }
 
@@ -176,6 +180,8 @@ final class CalendarService {
             ekEvent.endDate = end
             ekEvent.isAllDay = event.isAllDay
             ekEvent.location = event.location
+            // One repeating EKEvent, not 400 copies.
+            ekEvent.recurrenceRules = Recurrence.ekRule(for: event.recurrence).map { [$0] }
             ekEvent.notes = "Planned with Plannit"
             do {
                 try store.save(ekEvent, span: .thisEvent, commit: false)

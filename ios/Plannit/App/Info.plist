@@ -22,6 +22,17 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.plannit.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>plannit</string>
+            </array>
+        </dict>
+    </array>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.plannit.app.refresh</string>
