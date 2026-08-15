@@ -119,8 +119,11 @@ begin
   -- their refresh token keeps working until it expires. Dropping the sessions is
   -- what actually revokes access, so re-running this file is a real "change the
   -- locks" and not just a new password on an open door.
-  delete from auth.refresh_tokens where user_id = any(
-    select u.id::text from auth.users u where u.id = any(test_ids));
+  -- test_ids already holds the uuids, so don't join auth.users here: `u` is the
+  -- loop's record variable above, and aliasing the table `u` makes `u.id`
+  -- ambiguous between the two.
+  delete from auth.refresh_tokens
+   where user_id = any(array(select t::text from unnest(test_ids) as t));
   delete from auth.sessions where user_id = any(test_ids);
 
   -- --------------------------------------------------------------- groups ---
