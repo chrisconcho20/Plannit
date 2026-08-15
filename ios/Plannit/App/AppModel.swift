@@ -612,8 +612,8 @@ final class AppModel: ObservableObject {
                            location: place, group: e.group,
                            hue: e.hue, icon: e.icon, people: e.people, badge: e.badge,
                            badgeTone: e.badgeTone, source: e.source, isAllDay: allDay,
-                           recurrence: repeats,
-                           ownerId: e.ownerId, sharedGroupIds: e.sharedGroupIds)
+                           ownerId: e.ownerId, recurrence: repeats,
+                           sharedGroupIds: e.sharedGroupIds, sharedUserIds: e.sharedUserIds)
                 events[i] = e
             }
             return true
