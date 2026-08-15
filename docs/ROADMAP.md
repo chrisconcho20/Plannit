@@ -181,6 +181,10 @@ account. See §6 for URLs/creds.
   UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
 - **Reaching a stranger needs their exact email** — by design (the directory
   isn't enumerable), but it means invite links matter more than they look.
+- **No password reset** — the recovery email's link needs a real web page to
+  land on, which we don't have yet. A forgotten password means a dashboard fix.
+- **Email confirmation must be off** for sign-up to work end to end, for the
+  same reason (see `manual-test-plan.md` §0).
 - **Placeholder buttons** do nothing (see Phase 5.13).
 - **No offline support / no retry** — network failure silently keeps sample data
   (the date-finder is the exception: it now surfaces a real error + retry).

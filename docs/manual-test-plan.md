@@ -24,6 +24,22 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 
 ---
 
+## 0. Making an account
+
+Sign-up needs the project's **Auth → Providers → Email → Confirm email** setting
+considered. With it **on** (the Supabase default) a new account has to click a
+link, and that link points at your Site URL — which isn't a real page yet, so
+the account can't be confirmed. **For the beta, turn Confirm email off.**
+
+| # | Do this | Expect |
+|---|---|---|
+| 0.1 | Create account → name, email, 6+ char password | Straight into the app, already named |
+| 0.2 | You → Friends | Everyone else is already there (beta auto-friend) |
+| 0.3 | Someone else's group → they see you | Your real name, not "Member" |
+| 0.4 | Create an account with the same email again | "That email already has an account — sign in instead." |
+| 0.5 | Try a 3-character password | "Use at least 6 characters" — before any network call |
+| 0.6 | With Confirm email ON | "Check <email> for a confirmation link", and it flips back to Sign in |
+
 ## 1. Identity and groups
 
 | # | Do this | Expect |
