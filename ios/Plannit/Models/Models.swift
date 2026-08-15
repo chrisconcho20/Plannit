@@ -101,8 +101,8 @@ struct PEvent: Identifiable, Hashable {
                     title: title, time: time, location: location, group: group,
                     hue: hue, icon: icon, people: people, badge: badge,
                     badgeTone: badgeTone, source: source, isAllDay: isAllDay,
-                    recurrence: recurrence, seriesId: id,
                     ownerId: ownerId,
+                    recurrence: recurrence, seriesId: id,
                     sharedGroupIds: sharedGroupIds, sharedUserIds: sharedUserIds)
                 return copy
             }
