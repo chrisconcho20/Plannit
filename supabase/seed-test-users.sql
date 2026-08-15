@@ -31,7 +31,7 @@ declare
   owner_email   text := 'johnnysilverhands@gmail.com';
   -- CHANGE THIS. It's a shared password for accounts on a live database, and
   -- this file is in the repo — anything left here is effectively published.
-  test_password text := 'change-me-before-sharing';
+  test_password text := 'tp20';
   owner_tz      text := 'America/Los_Angeles';
   owner_uid    uuid;
   test_ids     uuid[];

@@ -30,6 +30,23 @@ additional_redirect_urls = ["plannit://auth-callback"]
 jwt_expiry = 3600
 enable_signup = true
 
+# Beta: no email confirmation. The confirmation link points at `site_url`, which
+# is a deep link into the app rather than a web page — so a new account can't
+# actually be confirmed, and sign-up would dead-end.
+#
+# NOTE: this governs `supabase start` locally. The hosted project reads its auth
+# settings from the dashboard, so it has to be turned off there too:
+# Authentication → Sign In / Providers → Email → Confirm email.
+#
+# Do NOT use `supabase config push` to sync it: that pushes this whole file,
+# including [auth.external.apple], whose client_id/secret come from env vars
+# that aren't set on this machine — it would reconfigure the live Apple
+# provider as a side effect of a one-line change.
+#
+# Turn confirmations back on before anyone who isn't a tester can sign up.
+[auth.email]
+enable_confirmations = false
+
 # Sign in with Apple — the primary auth method for Plannit (see docs/decisions.md D-03).
 # Secrets are provided via env, never committed.
 [auth.external.apple]

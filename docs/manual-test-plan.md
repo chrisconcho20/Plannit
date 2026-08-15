@@ -26,10 +26,18 @@ and **Sunday afternoons** never have one (Jo is busy every Sunday for six months
 
 ## 0. Making an account
 
-Sign-up needs the project's **Auth → Providers → Email → Confirm email** setting
-considered. With it **on** (the Supabase default) a new account has to click a
-link, and that link points at your Site URL — which isn't a real page yet, so
-the account can't be confirmed. **For the beta, turn Confirm email off.**
+**Turn email confirmation off first** — Dashboard → Authentication → Sign In /
+Providers → Email → **Confirm email: off**. With it on (the Supabase default) a
+new account must click a link, and that link points at `site_url`, which is a
+deep link into the app rather than a web page, so the account can never be
+confirmed and sign-up dead-ends. `config.toml` records the same setting for
+local dev, but the hosted project only reads the dashboard.
+
+⚠️ With confirmations off and sign-up open, anyone who can reach the app can
+make a working account — and the live Appetize preview URL is public. During the
+beta, either keep that URL to yourself or turn `auto_friend_everyone` off so a
+stranger's account can't see everyone's names. When your testers are all signed
+up, flipping **Allow new users to sign up** off closes the door behind them.
 
 | # | Do this | Expect |
 |---|---|---|
