@@ -133,6 +133,21 @@ If nothing arrives live but everything appears within ~20 seconds, the socket
 isn't connecting and the polling fallback is carrying it — check that 0006 is
 applied and that the channel is private.
 
+## 6d. On a real device only
+
+These can't be checked on Appetize at all — they're the reason for the Mac.
+
+| # | Do this | Expect |
+|---|---|---|
+| 6d.1 | Grant calendar access with a real, full calendar | The date-finder's answers match reality — no "free" slot you know is booked |
+| 6d.2 | Lock a plan in, open Apple Calendar | A **Plannit** calendar exists with the event in it |
+| 6d.3 | Back in Plannit, look at the day | The plan appears **once**, not twice (it's in your device calendar now too) |
+| 6d.4 | Add an all-day event in Apple Calendar | It shows in Plannit and does **not** block that day in the date-finder |
+| 6d.5 | Edit an event in Apple Calendar with Plannit open | Plannit re-syncs within a moment |
+| 6d.6 | Delete a locked-in plan in Plannit | It disappears from Apple Calendar too |
+| 6d.7 | Settings → Display & Text Size → Larger Text | Every screen scales; nothing clips or overlaps |
+| 6d.8 | Turn on VoiceOver, sweep a screen | **Known gap:** cards read as raw text runs; buttons are labelled |
+
 ## 7. Try to break it
 
 | # | Do this | Expect |

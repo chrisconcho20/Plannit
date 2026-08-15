@@ -95,12 +95,16 @@ account. See §6 for URLs/creds.
    works: a dedicated **"Plannit" `EKCalendar`** that Plannit-origin events are
    mirrored into (create/update/remove, keyed by an `events.id → eventIdentifier`
    map), so a locked-in plan really lands on the device.
-   **Still to do:** the import half — device events as `events` rows keyed by
-   `calendarItemExternalIdentifier` (now carried on `DeviceEvent`), a
-   `last_synced_at` high-water mark, tombstones, and `BGAppRefreshTask`.
-   ⚠️ Verification: EventKit round-trips can't be confirmed on Appetize (fresh
-   empty simulator each session). The import half really wants TestFlight on a
-   real device — see phase 6.
+   ~~**Still to do:** the import half~~ — **resolved by D-17 (2026-08-14), mostly
+   by deciding not to do it.** The sync contract said to upload device events as
+   `events` rows; the permission prompt promises "event details stay on your
+   device". The promise wins, so the import is a local merge and the
+   device→server deltas/tombstones/high-water mark are moot. What did land:
+   device reads now exclude our own "Plannit" calendar (mirrored plans were
+   about to show twice on a real phone), and a **`BGAppRefreshTask`** refreshes
+   busy blocks while the app is shut.
+   ⚠️ Verification: none of the EventKit work can be confirmed on Appetize
+   (fresh empty simulator each session) — it's the point of the Mac session.
 
 ### Phase 3 — Social graph
 6. ~~**Friends**~~ ✅ **structure done (2026-08-14).** `0005_friends_beta.sql`
@@ -149,8 +153,11 @@ account. See §6 for URLs/creds.
     `functions-test.yml`. Manual pass: [`manual-test-plan.md`](manual-test-plan.md).
     _Still missing:_ UI tests, and nothing exercises the Supabase client against
     a real (or faked) backend — repository mapping is only covered by eye.
-15. **Accessibility & Dynamic Type**, and decide on **dark mode** (design system is
-    light-only today).
+15. **Accessibility & Dynamic Type** — ✅ type scales with the reader's setting
+    (capped at 1.6x) and no tap target is under 44pt. _Still to do:_ VoiceOver
+    labels on cards and rows (only icon buttons have them), and a decision on
+    **dark mode** (the design system is light-only, which is stark on a phone at
+    night).
 
 ### Phase 6 — Ship
 16. **Apple Developer Program** ($99/yr) → real Sign in with Apple (configure the
