@@ -164,6 +164,26 @@ These can't be checked on Appetize at all — they're the reason for the Mac.
 | 6d.7 | Settings → Display & Text Size → Larger Text | Every screen scales; nothing clips or overlaps |
 | 6d.8 | Turn on VoiceOver, sweep a screen | **Known gap:** cards read as raw text runs; buttons are labelled |
 
+## 6e. Invites, sharing, repeats, activity (needs `db push` for 0007/0008
+and `functions deploy invite`)
+
+| # | Do this | Expect |
+|---|---|---|
+| 6e.1 | Group → Invite with a link → Share | A share sheet with an https link |
+| 6e.2 | Open that link in a browser | A page naming the inviter and group, with an "Open in Plannit" button |
+| 6e.3 | Tap it with the app installed | Plannit opens, "You're in <group>", and you're friends with the inviter |
+| 6e.4 | Tap the same link again | "You're already in <group>" — and no use is burned |
+| 6e.5 | Owner removes the inviter, then someone opens the link | Refused — a removed member's link stops working |
+| 6e.6 | Open `?t=deadbeef` in a browser | "Expired or used up" — never "no such invite" |
+| 6e.7 | Event → Share → tick a person (not a group) | They see it on their calendar; yours says "Shared with <name>" |
+| 6e.8 | As them, open it | "Shared with you", no share button |
+| 6e.9 | New event → Repeats → Every week | It appears on the grid every week, at the same clock time |
+| 6e.10 | Make a monthly event on the 31st | It skips February — it does not land on the 1st or the 28th |
+| 6e.11 | Edit next month's occurrence | You're editing the series (one row), and every occurrence moves |
+| 6e.12 | Check Apple Calendar | **One** repeating event in the Plannit calendar, not dozens |
+| 6e.13 | Plans → bell | Votes, plans, shares and requests, newest first; the dot clears on open |
+| 6e.14 | Have Maya vote, wait | It appears in your activity (live via broadcast, or within 30s) |
+
 ## 7. Try to break it
 
 | # | Do this | Expect |
