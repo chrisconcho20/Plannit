@@ -26,7 +26,10 @@ struct RootView: View {
                 ProgressView().tint(.actionPrimary)
             case .welcome:
                 if Config.isLiveBackend {
-                    LiveSignInView { flow = .app }
+                    // Straight to .app would skip the calendar ask entirely —
+                    // and without it there are no busy blocks, so the
+                    // date-finder has nothing to work with.
+                    LiveSignInView { flow = model.calendarAuthorized ? .app : .connect }
                 } else {
                     WelcomeView(
                         onStart: { flow = .connect },

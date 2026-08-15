@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Plans tab — proposals awaiting votes, the plan detail (slots + who's-free),
 // the New Plan (date-finder) flow, and the You screen.
@@ -346,7 +347,7 @@ struct YouScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var showRename = false
     @State private var confirmSignOut = false
-    @State private var twoWaySync = true
+    @State private var connecting = false
     @State private var shareAvailability = true
     @State private var pushDateFound = true
     @State private var pushInvites = true
@@ -421,7 +422,7 @@ struct YouScreen: View {
 
                 SectionLabel("Calendar")
                 settingsCard {
-                    toggleRow("calendar-check", "Two-way sync", "Keep Plannit and your calendar in step", $twoWaySync)
+                    calendarRow
                     divider
                     toggleRow("eye-off", "Share availability", "Only free/busy — never event details", $shareAvailability)
                 }
@@ -468,6 +469,51 @@ struct YouScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).strokeBorder(Color.hairline, lineWidth: 1))
             .padding(.horizontal, Space.gutter)
+    }
+
+    /// The calendar connection, stated honestly and actionable in every state.
+    /// This used to be a Toggle bound to a @State bool — it looked like a
+    /// setting and controlled nothing, while the only route to the permission
+    /// prompt was a demo-mode screen a live user never sees.
+    @ViewBuilder
+    private var calendarRow: some View {
+        HStack(spacing: 12) {
+            PIcon(model.calendarConnected ? "calendar-check" : "calendar",
+                  size: 20, color: model.calendarConnected ? .statusFree : .textMuted)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Your calendar").textStyle(.headline, color: .textStrong)
+                Text(calendarStatus).textStyle(.caption, color: .textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if model.calendarConnected {
+                Badge(text: "On", tone: .free)
+            } else if model.calendarNeedsSettings {
+                PlannitButton(title: "Settings", variant: .secondary, size: .sm) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            } else {
+                PlannitButton(title: connecting ? "…" : "Connect", variant: .primary, size: .sm) {
+                    connecting = true
+                    Task { await model.connectCalendar(); connecting = false }
+                }
+                .disabled(connecting)
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var calendarStatus: String {
+        if model.calendarConnected {
+            return "\(model.deviceEvents.count) events read. Only free/busy is shared."
+        }
+        if model.calendarNeedsSettings {
+            return "You said no earlier — iOS only asks once, so turn it on in Settings."
+        }
+        return "Plannit needs it to find times your groups are free."
     }
 
     private func nameRow() -> some View {

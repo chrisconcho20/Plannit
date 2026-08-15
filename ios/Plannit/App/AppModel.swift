@@ -971,6 +971,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Has the system already granted calendar access? Distinct from
+    /// `calendarConnected`, which is our session state.
+    var calendarAuthorized: Bool { calendar.hasAccess }
+
+    /// Send someone to Settings — iOS only ever prompts once, so a denial can
+    /// only be undone there.
+    var calendarNeedsSettings: Bool { calendarDenied && !calendar.hasAccess }
+
     /// Pick the connection back up on launch when access was already granted,
     /// so returning users don't have to reconnect to stay in sync.
     func resumeCalendarIfAuthorized() async {

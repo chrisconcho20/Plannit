@@ -88,6 +88,9 @@ struct ConnectCalendarView: View {
                 .disabled(connecting)
                 PlannitButton(title: "Not now", variant: .ghost, size: .md,
                               fullWidth: true, action: onSkip)
+                Text("You can turn this on later in You → Your calendar.")
+                    .textStyle(.caption, color: .textFaint)
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, Space.gutter)
             .padding(.bottom, 8)
