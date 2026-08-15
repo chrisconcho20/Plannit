@@ -188,6 +188,12 @@ struct EventShareInsert: Encodable {
     let event_id: String
     let group_id: String
 }
+/// A share aimed at one person. Separate struct because the table's check
+/// constraint allows exactly one target — a group or a user, never both.
+struct EventUserShareInsert: Encodable {
+    let event_id: String
+    let shared_user_id: String
+}
 struct EventRefDTO: Decodable { let id: String }
 
 // MARK: Friends

@@ -63,8 +63,10 @@ struct PEvent: Identifiable, Hashable {
     var ownerId: String? = nil
     /// Groups this event is visible to. Empty = private to the owner.
     var sharedGroupIds: [String] = []
+    /// People it's shared with directly, by profile id.
+    var sharedUserIds: [String] = []
 
-    var isPrivate: Bool { sharedGroupIds.isEmpty }
+    var isPrivate: Bool { sharedGroupIds.isEmpty && sharedUserIds.isEmpty }
     func isOwned(by userId: String?) -> Bool {
         guard let ownerId, let userId else { return true }   // demo: everything is yours
         return ownerId == userId

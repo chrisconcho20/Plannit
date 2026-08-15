@@ -288,12 +288,17 @@ struct EventDetailView: View {
     private var live: PEvent { model.events.first { $0.id == event.id } ?? event }
     private var isOwner: Bool { live.isOwned(by: model.userId) }
 
-    /// "Private" · "Shared with Soccer" · "Shared with Soccer + 2 more".
+    /// "Private" · "Shared with Soccer" · "Shared with Soccer and Maya + 2 more".
     private var visibility: String {
-        let names = live.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id }?.name }
+        let groupNames = live.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id }?.name }
+        let peopleNames = live.sharedUserIds.compactMap { id in
+            model.addablePeople.first { $0.id == id }?.name
+        }
+        let names = groupNames + peopleNames
         switch names.count {
         case 0:  return live.source == .device ? "Private (from your calendar)" : "Private — only you"
         case 1:  return "Shared with \(names[0])"
+        case 2:  return "Shared with \(names[0]) and \(names[1])"
         default: return "Shared with \(names[0]) + \(names.count - 1) more"
         }
     }
@@ -428,15 +433,19 @@ struct ShareSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var shared: Set<String>
+    @State private var sharedPeople: Set<String>
     @State private var saving = false
     @State private var errorText: String?
 
     init(event: PEvent) {
         self.event = event
         _shared = State(initialValue: Set(event.sharedGroupIds))
+        _sharedPeople = State(initialValue: Set(event.sharedUserIds))
     }
 
-    private var changed: Bool { shared != Set(event.sharedGroupIds) }
+    private var changed: Bool {
+        shared != Set(event.sharedGroupIds) || sharedPeople != Set(event.sharedUserIds)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -450,9 +459,9 @@ struct ShareSheet: View {
             .padding(.horizontal, Space.gutter)
             .padding(.bottom, 8)
 
-            Text(shared.isEmpty
-                 ? "Only you can see this. Pick the groups that should see it too."
-                 : "Everyone in a ticked group can see this event. Untick to take it back.")
+            Text(shared.isEmpty && sharedPeople.isEmpty
+                 ? "Only you can see this. Pick who should see it too."
+                 : "Everyone ticked can see this event. Untick to take it back.")
                 .textStyle(.footnote, color: .textMuted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Space.gutter)
@@ -488,6 +497,25 @@ struct ShareSheet: View {
                         }
                         .buttonStyle(CardPressStyle())
                     }
+                    if !model.friends.isEmpty {
+                        SectionLabel("Or one person")
+                        ForEach(model.friends) { friend in
+                            Button { togglePerson(friend.id) } label: {
+                                HStack(spacing: 12) {
+                                    Avatar(name: friend.name, size: 34)
+                                    Text(friend.name).textStyle(.headline, color: .textStrong)
+                                    Spacer()
+                                    PIcon(sharedPeople.contains(friend.id) ? "circle-check" : "circle",
+                                          size: 22,
+                                          color: sharedPeople.contains(friend.id) ? .actionPrimary : .textFaint)
+                                }
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
                     if let errorText {
                         Text(errorText).textStyle(.footnote, color: .statusDanger)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -513,7 +541,7 @@ struct ShareSheet: View {
         saving = true
         errorText = nil
         Task {
-            let ok = await model.shareEvent(event, with: shared)
+            let ok = await model.shareEvent(event, with: shared, people: sharedPeople)
             saving = false
             if ok { dismiss() } else { errorText = "Couldn’t update sharing. Only the event's owner can." }
         }
@@ -522,6 +550,13 @@ struct ShareSheet: View {
     private func toggle(_ id: String) {
         withAnimation(Motion.fast) {
             if shared.contains(id) { _ = shared.remove(id) } else { _ = shared.insert(id) }
+        }
+    }
+
+    private func togglePerson(_ id: String) {
+        withAnimation(Motion.fast) {
+            if sharedPeople.contains(id) { _ = sharedPeople.remove(id) }
+            else { _ = sharedPeople.insert(id) }
         }
     }
 }

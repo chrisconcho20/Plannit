@@ -106,7 +106,8 @@ struct SupabaseRepository: DataRepository {
             "events", columns: "*,event_shares(group_id,shared_user_id)",
             query: ["deleted_at": "is.null", "order": "start_at.asc"])
         let names = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
-        return dtos.map { Self.map($0, groups: names) }
+        let me = client.userId
+        return dtos.map { Self.map($0, groups: names, me: me) }
     }
 
     /// The Plans tab in two queries: proposals (with their group's members, so
@@ -215,11 +216,19 @@ struct SupabaseRepository: DataRepository {
         return parts.joined(separator: " · ")
     }
 
-    private static func map(_ d: EventDTO, groups: [String: PGroup]) -> PEvent {
+    /// "Private" is only true of your own unshared events. Something shared
+    /// *with* you isn't private — labelling it that way was misleading.
+    private static func badge(shares: Int, isMine: Bool) -> String? {
+        if !isMine { return "Shared with you" }
+        return shares == 0 ? "Private" : nil
+    }
+
+    private static func map(_ d: EventDTO, groups: [String: PGroup], me: String?) -> PEvent {
         let start = parseDate(d.start_at) ?? Date()
         let end = parseDate(d.end_at)
         let isDevice = d.source == "device"
         let sharedIds = (d.event_shares ?? []).compactMap(\.group_id)
+        let sharedPeople = (d.event_shares ?? []).compactMap(\.shared_user_id)
         let firstGroup = sharedIds.compactMap { groups[$0] }.first
 
         return PEvent(
@@ -231,12 +240,14 @@ struct SupabaseRepository: DataRepository {
             // glance; private ones keep a stable hue derived from the title.
             hue: firstGroup?.hue ?? (isDevice ? .coral : GroupHue.forName(d.title)),
             icon: "calendar",
-            badge: sharedIds.isEmpty ? "Private" : nil,
+            badge: Self.badge(shares: sharedIds.count + sharedPeople.count,
+                              isMine: d.owner_id == me),
             badgeTone: .neutral,
             source: isDevice ? .device : .plannit,
             isAllDay: d.all_day,
             ownerId: d.owner_id,
-            sharedGroupIds: sharedIds
+            sharedGroupIds: sharedIds,
+            sharedUserIds: sharedPeople
         )
     }
 

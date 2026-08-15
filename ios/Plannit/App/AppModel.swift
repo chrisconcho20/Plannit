@@ -594,33 +594,50 @@ final class AppModel: ObservableObject {
     /// your own calendar, so this is the whole per-group visibility pillar.
     /// RLS: only the event's owner may write shares.
     @discardableResult
-    func shareEvent(_ event: PEvent, with groupIds: Set<String>) async -> Bool {
-        let current = Set(event.sharedGroupIds)
-        let added = groupIds.subtracting(current)
-        let removed = current.subtracting(groupIds)
-        guard !added.isEmpty || !removed.isEmpty else { return true }
+    func shareEvent(_ event: PEvent, with groupIds: Set<String>,
+                    people personIds: Set<String> = []) async -> Bool {
+        let currentGroups = Set(event.sharedGroupIds)
+        let currentPeople = Set(event.sharedUserIds)
+        let addedGroups = groupIds.subtracting(currentGroups)
+        let removedGroups = currentGroups.subtracting(groupIds)
+        let addedPeople = personIds.subtracting(currentPeople)
+        let removedPeople = currentPeople.subtracting(personIds)
+        guard !addedGroups.isEmpty || !removedGroups.isEmpty
+                || !addedPeople.isEmpty || !removedPeople.isEmpty else { return true }
 
         guard Config.isLiveBackend else {
             if let i = events.firstIndex(where: { $0.id == event.id }) {
                 var e = events[i]
                 e.sharedGroupIds = Array(groupIds)
+                e.sharedUserIds = Array(personIds)
                 e.group = groups.first { groupIds.contains($0.id) }?.name
-                e.badge = groupIds.isEmpty ? "Private" : nil
+                e.badge = e.isPrivate ? "Private" : nil
                 events[i] = e
             }
             return true
         }
 
         do {
-            if !removed.isEmpty {
+            if !removedGroups.isEmpty {
                 try await SupabaseClient.shared.delete("event_shares", match: [
                     "event_id": "eq.\(event.id)",
-                    "group_id": "in.(\(removed.joined(separator: ",")))",
+                    "group_id": "in.(\(removedGroups.joined(separator: ",")))",
                 ])
             }
-            if !added.isEmpty {
-                try await SupabaseClient.shared.insert("event_shares", values: added.map {
+            if !removedPeople.isEmpty {
+                try await SupabaseClient.shared.delete("event_shares", match: [
+                    "event_id": "eq.\(event.id)",
+                    "shared_user_id": "in.(\(removedPeople.joined(separator: ",")))",
+                ])
+            }
+            if !addedGroups.isEmpty {
+                try await SupabaseClient.shared.insert("event_shares", values: addedGroups.map {
                     EventShareInsert(event_id: event.id, group_id: $0)
+                })
+            }
+            if !addedPeople.isEmpty {
+                try await SupabaseClient.shared.insert("event_shares", values: addedPeople.map {
+                    EventUserShareInsert(event_id: event.id, shared_user_id: $0)
                 })
             }
             await refreshEvents()
