@@ -55,6 +55,17 @@ enum Sample {
                hue: .coral, icon: "clock", badge: "Private", badgeTone: .neutral, source: .device),
     ]
 
+    static let activity: [PActivity] = [
+        PActivity(id: "a1", kind: .vote, happenedAt: Date().addingTimeInterval(-900),
+                  actor: "Maya Ellis", title: "Five-a-side", subtitle: "Soccer"),
+        PActivity(id: "a2", kind: .planCreated, happenedAt: Date().addingTimeInterval(-7200),
+                  actor: "Theo Sand", title: "Someone's 30th", subtitle: "Family"),
+        PActivity(id: "a3", kind: .eventShared, happenedAt: Date().addingTimeInterval(-90000),
+                  actor: "Ada Kim", title: "Film night", subtitle: "Flatmates"),
+        PActivity(id: "a4", kind: .friendRequest, happenedAt: Date().addingTimeInterval(-200000),
+                  actor: "Kit Halloran", title: "", subtitle: nil),
+    ]
+
     static let proposals: [PProposal] = [
         PProposal(id: "p1", title: "Five-a-side", group: groups[0],
                   constraint: "Sat, Sun · afternoon · 2 hours", status: "voting", votes: 4,

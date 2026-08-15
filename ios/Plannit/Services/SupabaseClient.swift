@@ -196,6 +196,18 @@ struct EventUserShareInsert: Encodable {
 }
 struct EventRefDTO: Decodable { let id: String }
 
+// MARK: Activity
+struct ActivityDTO: Decodable {
+    let kind: String
+    let happened_at: String
+    let actor_name: String?
+    let title: String?
+    let subtitle: String?
+    let group_id: String?
+    let proposal_id: String?
+}
+struct ActivityArgs: Encodable { let p_limit: Int }
+
 // MARK: Friends
 struct FriendDTO: Decodable {
     let id: String

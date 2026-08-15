@@ -76,6 +76,69 @@ struct PEvent: Identifiable, Hashable {
     func isOn(_ date: Date) -> Bool { Calendar.current.isDate(start, inSameDayAs: date) }
 }
 
+/// One thing that happened, from `my_activity()`. The *wording* deliberately
+/// lives here rather than in SQL — copy changes shouldn't need a migration.
+struct PActivity: Identifiable, Hashable {
+    enum Kind: String {
+        case planCreated = "plan_created"
+        case vote
+        case planLocked = "plan_locked"
+        case eventShared = "event_shared"
+        case friendRequest = "friend_request"
+        case joinedGroup = "joined_group"
+    }
+
+    let id: String
+    let kind: Kind
+    let happenedAt: Date
+    let actor: String
+    let title: String
+    let subtitle: String?
+
+    var icon: String {
+        switch kind {
+        case .planCreated:   return "wand-sparkles"
+        case .vote:          return "thumbs-up"
+        case .planLocked:    return "calendar-check"
+        case .eventShared:   return "share-2"
+        case .friendRequest: return "user-plus"
+        case .joinedGroup:   return "users"
+        }
+    }
+
+    var hue: GroupHue {
+        switch kind {
+        case .planCreated, .planLocked: return .teal
+        case .vote:                     return .indigo
+        case .eventShared:              return .coral
+        case .friendRequest:            return .rose
+        case .joinedGroup:              return .sky
+        }
+    }
+
+    var sentence: String {
+        switch kind {
+        case .planCreated:   return "\(actor) started \(title)"
+        case .vote:          return "\(actor) voted on \(title)"
+        case .planLocked:    return "\(title) is locked in"
+        case .eventShared:   return "\(actor) shared \(title)"
+        case .friendRequest: return "\(actor) wants to be friends"
+        case .joinedGroup:   return "\(actor) joined \(title)"
+        }
+    }
+
+    /// "just now" · "2h ago" · "3 Sept"
+    var when: String {
+        let seconds = Date().timeIntervalSince(happenedAt)
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(Int(seconds / 60))m ago" }
+        if seconds < 86_400 { return "\(Int(seconds / 3600))h ago" }
+        if seconds < 604_800 { return "\(Int(seconds / 86_400))d ago" }
+        let f = DateFormatter(); f.dateFormat = "d MMM"
+        return f.string(from: happenedAt)
+    }
+}
+
 struct PSlot: Identifiable, Hashable {
     /// The `proposal_slots` row id once a proposal exists; a throwaway uuid
     /// while the slot is still just a search result.

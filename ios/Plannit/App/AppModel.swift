@@ -58,6 +58,29 @@ final class AppModel: ObservableObject {
     /// already your friend. Read from the server so the copy stops being true
     /// the moment it's switched off.
     @Published var autoFriendEveryone = false
+    /// What's happened lately, and how much of it you haven't seen.
+    @Published var activity: [PActivity] = Config.isLiveBackend ? [] : Sample.activity
+
+    private static let seenKey = "plannit.activitySeenAt"
+
+    var unreadActivity: Int {
+        let seen = UserDefaults.standard.double(forKey: Self.seenKey)
+        guard seen > 0 else { return activity.count }
+        let cutoff = Date(timeIntervalSince1970: seen)
+        return activity.filter { $0.happenedAt > cutoff }.count
+    }
+
+    func markActivitySeen() {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.seenKey)
+        objectWillChange.send()
+    }
+
+    func refreshActivity() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        if let fresh = try? await SupabaseRepository().fetchActivity(limit: 50) {
+            activity = fresh
+        }
+    }
 
     private let calendar = CalendarService()
     private let realtime = RealtimeService()
@@ -97,6 +120,7 @@ final class AppModel: ObservableObject {
             let mates = try await repo.fetchFriends()
             let requests = try await repo.fetchFriendRequests()
             let beta = await repo.fetchAutoFriendFlag()
+            let recent = (try? await repo.fetchActivity(limit: 50)) ?? []
             groups = g
             events = e
             proposals = p
@@ -104,6 +128,7 @@ final class AppModel: ObservableObject {
             friends = mates
             friendRequests = requests
             autoFriendEveryone = beta
+            activity = recent
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
             await realtime.sync(groupIds: g.map(\.id))
@@ -218,6 +243,7 @@ final class AppModel: ObservableObject {
         people = Config.isLiveBackend ? [] : Sample.people
         friends = Config.isLiveBackend ? [] : Sample.people
         friendRequests = []
+        activity = Config.isLiveBackend ? [] : Sample.activity
         loadError = nil
     }
 

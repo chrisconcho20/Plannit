@@ -4,6 +4,9 @@ import SwiftUI
 // the New Plan (date-finder) flow, and the You screen.
 // Mirrors ui_kits/plannit-ios/PlansScreen.jsx.
 
+/// The Plans tab's one destination beyond a plan itself.
+enum PlansRoute: Hashable { case activity }
+
 struct PlansScreen: View {
     @EnvironmentObject private var model: AppModel
 
@@ -15,6 +18,22 @@ struct PlansScreen: View {
             HStack {
                 Text("Plans").textStyle(.title1, color: .textStrong)
                 Spacer()
+                NavigationLink(value: PlansRoute.activity) {
+                    ZStack(alignment: .topTrailing) {
+                        PIcon("bell", size: 18, color: .textBody)
+                            .frame(width: 40, height: 40)
+                            .background(Color.surface)
+                            .clipShape(Circle())
+                        if model.unreadActivity > 0 {
+                            Circle().fill(Color.actionPrimary)
+                                .frame(width: 10, height: 10)
+                                .offset(x: 1, y: -1)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(model.unreadActivity > 0
+                                    ? "Activity, \(model.unreadActivity) new" : "Activity")
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
@@ -59,6 +78,7 @@ struct PlansScreen: View {
         .navigationBarHidden(true)
         .liveRefresh(every: 20) { await model.refreshProposals() }
         .navigationDestination(for: PProposal.self) { PlanDetailView(proposal: $0) }
+        .navigationDestination(for: PlansRoute.self) { _ in ActivityScreen() }
     }
 }
 

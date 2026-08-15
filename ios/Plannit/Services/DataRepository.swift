@@ -13,6 +13,7 @@ protocol DataRepository {
     func fetchPeople() async throws -> [PMember]
     func fetchFriends() async throws -> [PMember]
     func fetchFriendRequests() async throws -> [PFriendRequest]
+    func fetchActivity(limit: Int) async throws -> [PActivity]
 }
 
 struct SampleRepository: DataRepository {
@@ -26,6 +27,7 @@ struct SampleRepository: DataRepository {
         [PFriendRequest(id: "req-1", person: PMember(id: "kit", name: "Kit Halloran"),
                         incoming: true)]
     }
+    func fetchActivity(limit: Int) async -> [PActivity] { Sample.activity }
 }
 
 @MainActor
@@ -56,6 +58,26 @@ struct SupabaseRepository: DataRepository {
         let rows: [ConfigRowDTO]? = try? await client.select(
             "app_config", columns: "key,value", query: ["key": "eq.auto_friend_everyone"])
         return rows?.first?.value ?? false
+    }
+
+    /// Everything that happened in your groups and friendships, newest first.
+    /// One definer function rather than six queries: RLS on `profiles` would
+    /// hide some actors' names, and six round trips would disagree with each
+    /// other about "now".
+    func fetchActivity(limit: Int = 50) async throws -> [PActivity] {
+        let rows: [ActivityDTO] = try await client.rpc("my_activity",
+                                                       args: ActivityArgs(p_limit: limit))
+        return rows.compactMap { row in
+            guard let kind = PActivity.Kind(rawValue: row.kind),
+                  let when = parseISO(row.happened_at) else { return nil }
+            return PActivity(
+                id: "\(row.kind)-\(row.happened_at)-\(row.title ?? "")-\(row.actor_name ?? "")",
+                kind: kind,
+                happenedAt: when,
+                actor: (row.actor_name?.isEmpty == false ? row.actor_name! : "Someone"),
+                title: row.title ?? "a plan",
+                subtitle: row.subtitle)
+        }
     }
 
     /// Your accepted friends, via `my_friends()` — `friendships` has two foreign
@@ -161,6 +183,8 @@ struct SupabaseRepository: DataRepository {
                 createdBy: row.created_by)
         }
     }
+
+    private func parseISO(_ s: String) -> Date? { Self.parseISO(s) }
 
     private func fetchSlots(for proposalIds: [String]) async throws -> [String: [ProposalSlotDTO]] {
         let rows: [ProposalSlotDTO] = try await client.select(
