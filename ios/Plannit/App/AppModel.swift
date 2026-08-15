@@ -851,28 +851,8 @@ final class AppModel: ObservableObject {
     }
 
     /// Upload merged busy intervals (no titles) so group availability can be
-    /// computed. Replaces the window rather than appending to it — a plain
-    /// insert stacked a fresh copy of your calendar every time you connected.
+    /// computed. Shared with the background task — see AvailabilityUploader.
     private func uploadBusyBlocksIfLive() async {
-        guard SupabaseClient.shared.isConfigured, SupabaseClient.shared.isSignedIn,
-              let uid = userId else { return }
-        let iso = ISO8601DateFormatter()
-        let now = Date()
-        let blocks = calendar.busyIntervals().map {
-            BusyBlockInsert(user_id: uid,
-                            start_at: iso.string(from: $0.start),
-                            end_at: iso.string(from: $0.end))
-        }
-        do {
-            // Clear what we said last time about the future, then state it again.
-            // Past blocks are left alone: the scheduler never looks backwards.
-            try await SupabaseClient.shared.delete("busy_blocks", match: [
-                "user_id": "eq.\(uid)", "end_at": "gte.\(iso.string(from: now))",
-            ])
-            guard !blocks.isEmpty else { return }
-            try await SupabaseClient.shared.insert("busy_blocks", values: blocks)
-        } catch {
-            // Availability is best-effort; the next sync tries again.
-        }
+        await AvailabilityUploader.upload(calendar: calendar)
     }
 }
