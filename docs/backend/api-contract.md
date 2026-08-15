@@ -207,6 +207,33 @@ update public.app_config set value = 'false' where key = 'auto_friend_everyone';
 Existing friendships survive; only new accounts stop being auto-added. The app
 reads the flag and drops the "everyone is your friend" line when it's off.
 
+## Invite links
+
+`GET /functions/v1/invite?t=<token>` is a public HTML landing page (no JWT — see
+`config.toml`). It calls `peek_invite` and deep-links to `plannit://invite/<token>`.
+
+| Function | Who | Returns |
+|---|---|---|
+| `create_group_invite(p_group)` | authenticated members | `(token, expires_at)` — the token is generated server-side, never chosen by the client |
+| `redeem_invite(p_token)` | authenticated | `(group_id, group_name, already_member)`; also makes the two people friends |
+| `peek_invite(p_token)` | **anon** + authenticated | `(group_name, inviter_name, valid)` — the one anon-callable thing in the schema |
+
+All four RPCs `RETURNS TABLE`, so PostgREST answers with a JSON **array** even
+for a single row. Invites expire after 14 days or 25 uses; a use is only burned
+when a membership is actually created, and the author must still be in the group.
+
+## Activity
+
+`my_activity(p_limit)` returns a merged feed — `plan_created`, `vote`,
+`plan_locked`, `event_shared`, `friend_request`, `joined_group` — scoped to your
+groups and friendships. Definer, because RLS on `profiles` would hide some
+actors' names, and six client queries would disagree about "now". Your own
+actions are excluded, except `plan_locked` (the organiser is exactly who wants
+to know), and `joined_group` only reports joins after your own.
+
+_Not yet: pagination (no cursor, just a limit) or server-side read state — the
+client tracks "seen" locally._
+
 ## Push notifications
 Register the device's APNs token into `device_tokens` after sign-in (RLS lets a
 user write only their own). Sending is server-side only. Full details:

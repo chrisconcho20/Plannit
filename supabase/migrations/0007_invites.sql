@@ -14,11 +14,13 @@
 --   redeem_invite       — writes into a group the caller is provably not yet in
 --   peek_invite         — must answer an anonymous browser, which RLS shows nothing
 
--- pgcrypto lives in the `extensions` schema on Supabase, so the bare
--- `create extension` in 0001 is a no-op there and gen_random_bytes() is not on
--- the search_path of a function pinned to `public`. Qualify it explicitly.
-create schema if not exists extensions;
-create extension if not exists pgcrypto with schema extensions;
+-- Token entropy comes from gen_random_uuid(), which is core Postgres (13+) and
+-- therefore always on the search_path. pgcrypto's gen_random_bytes would be
+-- better-looking but it lives in `extensions` on hosted Supabase and in
+-- `public` wherever 0001's bare `create extension` actually created it — and a
+-- column DEFAULT can't set its own search_path, so a qualified call would break
+-- on exactly one of those two setups. Two v4 UUIDs, hyphens stripped, is 64 hex
+-- characters and ~244 bits of CSPRNG output.
 
 -- ---------------------------------------------------------------------------
 -- invites
@@ -30,7 +32,8 @@ create table public.invites (
   -- would let someone walk the space and land in strangers' groups, so this
   -- must be unguessable rather than merely unique.
   token      text not null unique
-             default encode(extensions.gen_random_bytes(16), 'hex'),
+             default replace(gen_random_uuid()::text, '-', '')
+                  || replace(gen_random_uuid()::text, '-', ''),
   -- Null group = a friend-only invite ("add me on Plannit"), which creates the
   -- friendship and nothing else.
   group_id   uuid references public.groups(id) on delete cascade,
@@ -59,8 +62,11 @@ create policy invites_insert on public.invites for insert to authenticated
   with check ( created_by = auth.uid()
            and (group_id is null or public.is_group_member(group_id, auth.uid())) );
 
+-- The owner can revoke too, not just the author: kicking someone out is
+-- meaningless if the link they made keeps letting strangers in for a fortnight.
 create policy invites_delete on public.invites for delete to authenticated
-  using ( created_by = auth.uid() );
+  using ( created_by = auth.uid()
+       or (group_id is not null and public.is_group_owner(group_id, auth.uid())) );
 
 -- No UPDATE policy and no UPDATE grant, on purpose. `uses` is the only mutable
 -- column and the whole point of the cap is that the holder of a link can't
@@ -132,14 +138,27 @@ begin
     raise exception 'This invite link has been used up';
   end if;
 
+  -- The author must still be in the group. Otherwise a removed member's link
+  -- keeps admitting strangers until it expires — revocation would depend on
+  -- somebody remembering the link exists.
+  if v_invite.group_id is not null
+     and not public.is_group_member(v_invite.group_id, v_invite.created_by) then
+    raise exception 'This invite link is no longer valid';
+  end if;
+
   -- Someone who hands you a working invite link and someone who accepts it
   -- plainly know each other, so skip the request/accept dance entirely.
   -- uq_friendship_pair is an expression index; a bare ON CONFLICT DO NOTHING
   -- arbitrates against it without naming it.
+  -- Accepting the link answers any request already open between the two of
+  -- them; leaving it pending would nag both of you forever. Deliberately narrow:
+  -- a 'blocked' row must stay blocked, so only 'pending' is promoted.
   if v_invite.created_by <> v_uid then
     insert into public.friendships (requester_id, addressee_id, status)
     values (v_invite.created_by, v_uid, 'accepted')
-    on conflict do nothing;
+    on conflict (least(requester_id, addressee_id), greatest(requester_id, addressee_id))
+    do update set status = 'accepted'
+    where friendships.status = 'pending';
   end if;
 
   -- Friend-only invite: there is no group to join and nothing to count.

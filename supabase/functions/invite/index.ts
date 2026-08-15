@@ -204,7 +204,9 @@ Deno.serve(async (req) => {
     return html(expiredPage(), 405);
   }
 
-  const token = new URL(req.url).searchParams.get("t")?.trim() ?? "";
+  // Lowercased because encode(…, 'hex') emits lowercase and some clients
+  // upper-case URLs they think are opaque.
+  const token = new URL(req.url).searchParams.get("t")?.trim().toLowerCase() ?? "";
 
   // Tokens are 16 random bytes as hex (0007). Anything else can't be one, so
   // answer without troubling the database — this is also what stops the

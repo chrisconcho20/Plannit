@@ -43,3 +43,9 @@ verify_jwt = true
 # Internal-only: protected by INTERNAL_FUNCTION_SECRET, not a user JWT.
 [functions.send-push]
 verify_jwt = false
+
+# A landing page for a texted link: the reader has no account yet, by
+# definition. The 244-bit token in the query string is the only credential, and
+# peek_invite() is written to return nothing useful without a valid one.
+[functions.invite]
+verify_jwt = false

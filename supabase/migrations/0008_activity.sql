@@ -30,7 +30,8 @@ returns table (
 )
 language sql stable security definer set search_path = public as $$
   with mine as (
-    select m.group_id
+    -- joined_at comes along so branches can ask "was I even here yet?".
+    select m.group_id, m.joined_at
       from public.group_memberships m
      where m.user_id = auth.uid()
   )
@@ -79,8 +80,12 @@ language sql stable security definer set search_path = public as $$
     union all
 
     -- A date got locked in. There is no `finalized_by` column, so the actor is
-    -- attributed to whoever created the proposal — usually the same person, and
-    -- the reason this branch also excludes plans you created yourself.
+    -- attributed to whoever created the proposal.
+    --
+    -- This is the one branch that does NOT exclude your own plans. The rule
+    -- elsewhere is "don't tell people what they just did", but the organiser is
+    -- precisely who wants to know a date landed, and the client words this one
+    -- impersonally ("Five-a-side is locked in") rather than naming an actor.
     select 'plan_locked',
            pr.updated_at,
            coalesce(nullif(a.display_name, ''), 'Someone'),
@@ -93,7 +98,6 @@ language sql stable security definer set search_path = public as $$
       join public.groups g on g.id = pr.group_id
       left join public.profiles a on a.id = pr.created_by
      where pr.finalized_slot_id is not null
-       and pr.created_by <> auth.uid()
 
     union all
 
@@ -149,6 +153,9 @@ language sql stable security definer set search_path = public as $$
       join public.groups g on g.id = gm.group_id
       left join public.profiles a on a.id = gm.user_id
      where gm.user_id <> auth.uid()
+       -- Only joins you were around for. Without this, a new member's first
+       -- feed is every historical join in every group they were just added to.
+       and gm.joined_at >= mine.joined_at
   ) feed
   order by feed.happened_at desc
   limit p_limit;
