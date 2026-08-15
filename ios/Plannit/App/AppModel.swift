@@ -63,6 +63,12 @@ final class AppModel: ObservableObject {
 
     private static let seenKey = "plannit.activitySeenAt"
 
+    /// True only when there's nothing on screen yet and we're fetching. A
+    /// refresh over existing content must not blank it out.
+    func firstLoad(of collection: [some Any]) -> Bool {
+        isLoading && collection.isEmpty && loadError == nil
+    }
+
     var unreadActivity: Int {
         let seen = UserDefaults.standard.double(forKey: Self.seenKey)
         guard seen > 0 else { return activity.count }

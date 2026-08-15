@@ -13,6 +13,21 @@ struct EventCard: View {
     var badge: String? = nil
     var badgeTone: BadgeTone = .neutral
 
+    /// VoiceOver reads the card as one sentence. Left alone it announces every
+    /// text run separately — title, clock icon, time, dot, place — which is
+    /// exhausting and puts the badge before the time.
+    private var spoken: String {
+        var parts = [title, time]
+        if let location { parts.append("at \(location)") }
+        if let group { parts.append("shared with \(group)") }
+        if !people.isEmpty {
+            parts.append(people.count == 1 ? "\(people[0]) going"
+                                           : "\(people.count) people going")
+        }
+        if let badge { parts.append(badge) }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         PlannitCard(elevation: 1, padding: 0) {
                 HStack(alignment: .top, spacing: 12) {
@@ -55,5 +70,7 @@ struct EventCard: View {
                 .padding(.leading, 14)
                 .padding(.trailing, 16)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
     }
 }

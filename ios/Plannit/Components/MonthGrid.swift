@@ -64,5 +64,25 @@ struct MonthGrid: View {
         .frame(height: 44)
         .contentShape(Rectangle())
         .onTapGesture { withAnimation(Motion.fast) { selected = (selected == day ? nil : day) } }
+        // Without this a swipe through the month reads "1, 2, 3…" with no dates
+        // and no idea which days have anything on them.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken(day))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func spoken(_ day: Int) -> String {
+        var parts: [String] = []
+        var c = DateComponents(); c.year = year; c.month = month; c.day = day
+        if let date = Calendar.current.date(from: c) {
+            let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
+            parts.append(f.string(from: date))
+        } else {
+            parts.append("\(day)")
+        }
+        if today == day { parts.append("today") }
+        let count = marks[day]?.count ?? 0
+        if count > 0 { parts.append(count == 1 ? "1 event" : "\(count) events") }
+        return parts.joined(separator: ", ")
     }
 }

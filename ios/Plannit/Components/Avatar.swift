@@ -44,6 +44,15 @@ struct AvatarStack: View {
     var size: CGFloat = 32
     var max: Int = 4
 
+    /// "Maya, Theo and 4 others" — VoiceOver would otherwise read initials.
+    private var spoken: String {
+        guard !names.isEmpty else { return "" }
+        let shown = Array(names.prefix(2))
+        let extra = names.count - shown.count
+        if extra <= 0 { return shown.joined(separator: " and ") }
+        return "\(shown.joined(separator: ", ")) and \(extra) other\(extra == 1 ? "" : "s")"
+    }
+
     var body: some View {
         let shown = Array(names.prefix(max))
         let extra = names.count - shown.count
@@ -62,5 +71,7 @@ struct AvatarStack: View {
                     .overlay(Circle().strokeBorder(Color.surface, lineWidth: 2))
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
     }
 }

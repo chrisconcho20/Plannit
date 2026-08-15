@@ -49,9 +49,17 @@ struct GroupsScreen: View {
                 SectionLabel(query.isEmpty ? "Your groups" : "Matches") {
                     Text("\(shown.count)").textStyle(.caption, color: .textFaint)
                 }
+                if model.firstLoad(of: model.groups) {
+                    SkeletonList(count: 3).padding(.horizontal, Space.gutter)
+                }
                 if shown.isEmpty && !query.isEmpty {
-                    EmptyState(icon: "search", title: "No matches",
-                               message: "No group or person matches “\(query)”.")
+                    EmptyState(icon: "search", title: "No one by that name",
+                               message: "Nothing matches “\(query)”. Try a first name, or part of a group's name.")
+                }
+                if model.groups.isEmpty && query.isEmpty && !model.firstLoad(of: model.groups) {
+                    EmptyState(icon: "users", title: "No groups yet",
+                               message: "A group is just the people you make plans with — a five-a-side team, your flat, your family. Make one and Plannit can find dates that work for all of them.",
+                               actionTitle: "Make your first group") { showNewGroup = true }
                 }
                 LazyVStack(spacing: Space.gapList) {
                     ForEach(shown) { group in
@@ -153,8 +161,8 @@ struct GroupDetailView: View {
 
                 SectionLabel("Shared events")
                 if sharedEvents.isEmpty {
-                    EmptyState(icon: "calendar", title: "No shared events yet",
-                               message: "Events shared with \(group.name) show up here.")
+                    EmptyState(icon: "calendar", title: "Nothing shared yet",
+                               message: "Events you share with \(group.name) — and any date the group locks in — collect here.")
                 } else {
                     LazyVStack(spacing: Space.gapList) {
                         ForEach(sharedEvents) { event in
@@ -378,8 +386,8 @@ struct AddPeopleSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if candidates.isEmpty {
-                        EmptyState(icon: "user-plus", title: "Nobody left to add",
-                                   message: "Everyone you know is already in this group. Friend requests are coming — for now you can only add people you already share a group with.")
+                        EmptyState(icon: "user-plus", title: "Everyone's already here",
+                                   message: "Everyone you're friends with is in this group. Send an invite link to bring someone new in.")
                     } else {
                         PeoplePicker(people: candidates, selected: $selected)
                     }

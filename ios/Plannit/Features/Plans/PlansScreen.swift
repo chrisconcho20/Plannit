@@ -66,9 +66,11 @@ struct PlansScreen: View {
                     .padding(.horizontal, Space.gutter)
                 }
 
-                if model.proposals.isEmpty {
-                    EmptyState(icon: "sparkles", title: "No plans yet",
-                               message: "Tap ＋ to pick a group and let Plannit find when everyone’s free.")
+                if model.firstLoad(of: model.proposals) {
+                    SkeletonList(count: 2).padding(.horizontal, Space.gutter)
+                } else if model.proposals.isEmpty {
+                    EmptyState(icon: "sparkles", title: "No plans in the air",
+                               message: "Pick a group, say roughly when — “a weekend afternoon” — and Plannit checks everyone's calendars and comes back with dates that actually work.")
                 }
                 Color.clear.frame(height: 120)
             }

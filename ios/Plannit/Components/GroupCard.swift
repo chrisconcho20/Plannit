@@ -28,5 +28,19 @@ struct GroupCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// "Soccer, 6 people, Tuesday and weekend games" — the avatar stack is
+    /// decoration, so it's summarised as a count rather than six names.
+    private var spoken: String {
+        var parts = [name]
+        if !members.isEmpty {
+            parts.append(members.count == 1 ? "1 person" : "\(members.count) people")
+        }
+        if let note, !note.isEmpty { parts.append(note) }
+        return parts.joined(separator: ", ")
     }
 }

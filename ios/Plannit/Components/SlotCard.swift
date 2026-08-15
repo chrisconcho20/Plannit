@@ -15,6 +15,16 @@ struct SlotCard: View {
 
     private var allFree: Bool { freeCount == total }
 
+    /// "Saturday the 16th, 2:00 to 4:00 PM, everyone free, best option,
+    /// selected" — the point of the card, in the order that matters.
+    private var spoken: String {
+        var parts = ["\(day) \(date)", time]
+        parts.append(allFree ? "everyone free" : "\(freeCount) of \(total) free")
+        if best { parts.append("best option") }
+        if selected { parts.append("selected") }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         PlannitCard(elevation: selected ? 2 : 1, padding: 0) {
             HStack(spacing: 14) {
@@ -52,5 +62,8 @@ struct SlotCard: View {
             RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
                 .strokeBorder(Color.actionPrimary, lineWidth: selected ? 2 : 0)
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }

@@ -15,9 +15,11 @@ struct ActivityScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if model.activity.isEmpty {
-                    EmptyState(icon: "bell", title: "Nothing yet",
-                               message: "When someone votes, shares an event or starts a plan, it shows up here.")
+                if model.firstLoad(of: model.activity) {
+                    SkeletonList(count: 4).padding(.horizontal, Space.gutter)
+                } else if model.activity.isEmpty {
+                    EmptyState(icon: "bell", title: "All quiet",
+                               message: "Votes, new plans and shared events land here as your groups get going.")
                 } else {
                     VStack(spacing: Space.gapInline) {
                         ForEach(model.activity) { item in
@@ -67,5 +69,9 @@ struct ActivityScreen: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([item.sentence, item.subtitle, item.when]
+                                .compactMap { $0 }.filter { !$0.isEmpty }
+                                .joined(separator: ", "))
     }
 }

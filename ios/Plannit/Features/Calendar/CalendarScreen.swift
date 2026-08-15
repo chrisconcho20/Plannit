@@ -151,11 +151,14 @@ struct CalendarScreen: View {
                     }
                     .padding(.horizontal, Space.gutter)
 
-                    if events.isEmpty && deviceEvents.isEmpty {
-                        EmptyState(icon: "calendar", title: "Nothing here",
+                    if model.firstLoad(of: model.events) {
+                        SkeletonList(count: 3).padding(.horizontal, Space.gutter)
+                    } else if events.isEmpty && deviceEvents.isEmpty {
+                        EmptyState(icon: "calendar",
+                                   title: mode != .list ? "Nothing on this day" : "Nothing coming up",
                                    message: mode != .list
-                                            ? "No events on this day."
-                                            : "Nothing coming up.",
+                                            ? "A free day. Add something, or find a time with a group."
+                                            : "Your calendar's clear from here. Enjoy it, or fill it.",
                                    actionTitle: "New event") { showNewEvent = true }
                     }
 
