@@ -689,6 +689,50 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Create an account. Returns nil on success, or a message to show.
+    ///
+    /// The profile is created by the DB trigger from the metadata we send, so a
+    /// new account is named and auto-friended before it ever reaches a screen.
+    func signUp(email: String, password: String, name: String) async -> String? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return "Tell us your name first." }
+        guard password.count >= 6 else { return "Use at least 6 characters for the password." }
+
+        do {
+            let result = try await SupabaseClient.shared.signUp(
+                email: email.trimmingCharacters(in: .whitespaces),
+                password: password, displayName: trimmedName)
+            switch result {
+            case .signedIn:
+                userId = SupabaseClient.shared.userId
+                userEmail = SupabaseClient.shared.userEmail
+                displayName = trimmedName
+                signedIn = true
+                await loadProfile()
+                await loadData()
+                await startRealtime()
+                return nil
+            case .needsEmailConfirmation:
+                return "Check \(email) for a confirmation link, then sign in."
+            }
+        } catch let SupabaseError.http(_, body) {
+            // GoTrue's messages are decent; surface the useful ones plainly.
+            if body.localizedCaseInsensitiveContains("already registered")
+                || body.localizedCaseInsensitiveContains("already been registered") {
+                return "That email already has an account — sign in instead."
+            }
+            if body.localizedCaseInsensitiveContains("invalid email") {
+                return "That doesn't look like an email address."
+            }
+            if body.localizedCaseInsensitiveContains("password") {
+                return "That password is too weak — try a longer one."
+            }
+            return "Couldn't create that account. Try again."
+        } catch {
+            return "Couldn't reach Plannit. Check your connection."
+        }
+    }
+
     /// Dev email/password sign-in (for browser/simulator live testing).
     func signInWithEmail(_ email: String, _ password: String) async -> Bool {
         do {

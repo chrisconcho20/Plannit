@@ -95,15 +95,26 @@ struct ConnectCalendarView: View {
     }
 }
 
-// Dev email/password sign-in — shown only in live mode so the backend can be
-// tested in the browser/simulator without Sign in with Apple.
+// Email sign-in and sign-up. This is the only real way into a live build
+// (Sign in with Apple needs a paid Apple Developer account), so it has to be
+// able to *create* an account — otherwise every tester needs a row made for
+// them by hand in the Supabase dashboard.
+
 struct LiveSignInView: View {
     var onSignedIn: () -> Void
     @EnvironmentObject private var model: AppModel
+
+    @State private var creating = false
+    @State private var name = ""
     @State private var email = ""
     @State private var password = ""
     @State private var busy = false
-    @State private var error: String?
+    @State private var message: String?
+    @State private var messageIsError = true
+
+    private var canSubmit: Bool {
+        !email.isEmpty && !password.isEmpty && (!creating || !name.isEmpty)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,32 +125,62 @@ struct LiveSignInView: View {
                     .overlay(PIcon("calendar-heart", size: 36, color: .white, weight: .bold))
                     .primaryGlow()
                 Text("Plannit").textStyle(.display, color: .textStrong)
-                Text("Dev sign-in · live backend").textStyle(.subhead, color: .textMuted)
+                Text(creating ? "Make plans that actually happen."
+                              : "Welcome back.")
+                    .textStyle(.subhead, color: .textMuted)
             }
             Spacer()
+
             VStack(spacing: 12) {
-                PTextField(placeholder: "Email", text: $email, icon: "user")
+                SegmentedControl(options: [false, true], selection: $creating.animation(Motion.fast)) {
+                    $0 ? "Create account" : "Sign in"
+                }
+                .padding(.bottom, 2)
+
+                if creating {
+                    PTextField(placeholder: "Your name", text: $name, icon: "user")
+                        .textContentType(.name)
+                }
+                PTextField(placeholder: "Email", text: $email, icon: "inbox")
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                 secureField
-                if let error {
-                    Text(error).textStyle(.footnote, color: .statusDanger)
+
+                if let message {
+                    Text(message)
+                        .textStyle(.footnote, color: messageIsError ? .statusDanger : .statusFree)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                PlannitButton(title: busy ? "Signing in…" : "Sign in", variant: .primary, size: .lg,
-                              fullWidth: true) { signIn() }
-                    .disabled(busy || email.isEmpty || password.isEmpty)
-                    .opacity(busy || email.isEmpty || password.isEmpty ? 0.5 : 1)
+
+                PlannitButton(title: buttonTitle, variant: .primary, size: .lg,
+                              fullWidth: true) { submit() }
+                    .disabled(busy || !canSubmit)
+                    .opacity(busy || !canSubmit ? 0.5 : 1)
+
+                if creating {
+                    Text("Your name is what your groups see. You can change it later.")
+                        .textStyle(.caption, color: .textFaint)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding(.horizontal, Space.gutter)
             Spacer()
         }
     }
 
+    private var buttonTitle: String {
+        if busy { return creating ? "Creating…" : "Signing in…" }
+        return creating ? "Create account" : "Sign in"
+    }
+
     private var secureField: some View {
         HStack(spacing: 10) {
             PIcon("lock", size: 18, color: .textFaint)
-            SecureField("Password", text: $password).textStyle(.body, color: .textStrong)
+            SecureField(creating ? "Password (6+ characters)" : "Password", text: $password)
+                .textStyle(.body, color: .textStrong)
+                .textContentType(creating ? .newPassword : .password)
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 48)
@@ -149,13 +190,31 @@ struct LiveSignInView: View {
             .strokeBorder(Color.lineStrong, lineWidth: 1))
     }
 
-    private func signIn() {
+    private func submit() {
         busy = true
-        error = nil
+        message = nil
         Task { @MainActor in
-            let ok = await model.signInWithEmail(email, password)
-            busy = false
-            if ok { onSignedIn() } else { error = "Couldn't sign in. Check the email and password." }
+            if creating {
+                let problem = await model.signUp(email: email, password: password, name: name)
+                busy = false
+                if problem == nil {
+                    onSignedIn()
+                } else {
+                    // "Check your inbox" isn't a failure, so don't paint it red.
+                    messageIsError = !(problem!.hasPrefix("Check "))
+                    message = problem
+                    if !messageIsError { creating = false }
+                }
+            } else {
+                let ok = await model.signInWithEmail(email, password)
+                busy = false
+                if ok {
+                    onSignedIn()
+                } else {
+                    messageIsError = true
+                    message = "Couldn't sign in. Check the email and password."
+                }
+            }
         }
     }
 }

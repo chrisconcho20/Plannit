@@ -13,6 +13,24 @@ struct SupabaseSession: Decodable {
     let user: SupabaseUser
 }
 
+/// GoTrue answers a sign-up one of two ways depending on the project's "confirm
+/// email" setting: with a session (straight in) or with just a user (go check
+/// your inbox). Decode leniently and let the caller tell the difference.
+struct SignUpResponse: Decodable {
+    let access_token: String?
+    let refresh_token: String?
+    let expires_in: Int?
+    let user: SupabaseUser?
+    let id: String?
+    let confirmation_sent_at: String?
+
+    var session: SupabaseSession? {
+        guard let access_token, let refresh_token, let user else { return nil }
+        return SupabaseSession(access_token: access_token, refresh_token: refresh_token,
+                               expires_in: expires_in, user: user)
+    }
+}
+
 /// What we keep in the Keychain between launches.
 struct StoredSession: Codable {
     let accessToken: String
@@ -36,6 +54,15 @@ struct ProfileDTO: Decodable {
     let timezone: String?
 }
 struct DisplayNameUpdate: Encodable { let display_name: String }
+struct SignUpMetadata: Encodable {
+    let display_name: String
+    let timezone: String
+}
+struct SignUpBody: Encodable {
+    let email: String
+    let password: String
+    let data: SignUpMetadata
+}
 struct ProfileInsert: Encodable {
     let id: String
     let display_name: String
@@ -358,6 +385,32 @@ final class SupabaseClient {
         let s: SupabaseSession = try await send(req)
         store(s)
         return s.user.id
+    }
+
+    // MARK: Auth — create an account.
+    //
+    // `data` becomes raw_user_meta_data, which the handle_new_user trigger reads
+    // to fill in the profile — so a new account arrives already named and in the
+    // right timezone, and 0005's auto-friend trigger fires with a real name.
+    enum SignUpResult { case signedIn, needsEmailConfirmation }
+
+    func signUp(email: String, password: String, displayName: String) async throws -> SignUpResult {
+        guard let baseURL else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("auth/v1/signup"))
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(SignUpBody(
+            email: email, password: password,
+            data: SignUpMetadata(display_name: displayName,
+                                 timezone: TimeZone.current.identifier)))
+
+        let response: SignUpResponse = try await send(req)
+        if let session = response.session {
+            store(session)
+            return .signedIn
+        }
+        return .needsEmailConfirmation
     }
 
     var isSignedIn: Bool { accessToken != nil }
