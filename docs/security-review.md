@@ -145,6 +145,13 @@ sits in a plist on a simulator nobody owns", and I took the trade knowingly.
   to ship in clients; RLS is what protects the data. It does mean the preview
   build can reach your live project, which is finding 1's real substance.
 
+## Before opening sign-up to strangers
+
+Every loosened setting is collected in
+[`beta-to-production.md`](beta-to-production.md) — confirmation off,
+auto-friending on, the live test accounts, the public preview URL — with what
+each has to become.
+
 ## If you do one thing
 
 Rotate `test_password`, re-run the seed, and treat the live preview URL as a

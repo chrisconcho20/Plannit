@@ -43,7 +43,8 @@ enable_signup = true
 # that aren't set on this machine — it would reconfigure the live Apple
 # provider as a side effect of a one-line change.
 #
-# Turn confirmations back on before anyone who isn't a tester can sign up.
+# Turn confirmations back on before anyone who isn't a tester can sign up —
+# tracked with the rest of the beta-only settings in docs/beta-to-production.md.
 [auth.email]
 enable_confirmations = false
 

@@ -160,6 +160,11 @@ account. See §6 for URLs/creds.
     night).
 
 ### Phase 6 — Ship
+
+**Before any of this: [`beta-to-production.md`](beta-to-production.md)** — the
+settings deliberately loosened for beta testing (email confirmation off,
+auto-friending on, live test accounts, the public preview URL) and what each has
+to become. Individually sensible, collectively a security incident.
 16. **Apple Developer Program** ($99/yr) → real Sign in with Apple (configure the
     Apple provider in Supabase Auth) + APNs + on-device testing via **Codemagic →
     TestFlight** ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
