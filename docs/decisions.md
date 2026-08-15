@@ -73,6 +73,44 @@ because owning a Phoenix protocol client means owning the JWT-refresh-on-socket
 behaviour that silently disconnects clients when missed. Research and sources:
 [`realtime-research.md`](realtime-research.md).
 
+**D-17 — device events stay on the device.**
+
+| ID | Decision | Options | Choice ★ | Status |
+|---|---|---|---|---|
+| D-17 | What the device→Plannit import writes | Upsert device events as `events` rows (as [`sync-contract.md`](backend/sync-contract.md) §Import specifies) / **keep them local, upload only `busy_blocks`** | **Keep them local** | Accepted 2026-08-14 |
+
+Two of our own contracts disagreed, and the tiebreaker is what we tell the user
+at the permission prompt:
+
+> `NSCalendarsFullAccessUsageDescription`: "Plannit reads your events to find
+> times your groups are free. **Event details stay on your device** — only
+> free/busy is shared."
+
+[`api-contract.md`](backend/api-contract.md) says the same ("raw events never
+leave the phone unless explicitly shared"), while the sync contract's Import
+section says to upsert every device event into `events` with `source='device'`.
+Implementing the latter would make a promise shown at a system permission dialog
+false — so it loses.
+
+Consequences, taken deliberately:
+
+- **`events` only ever holds Plannit-origin rows** plus anything you explicitly
+  share. `source='device'` and `external_cal_id` stay in the schema unused; no
+  migration, no cost, and they're there if D-17 is ever reversed.
+- **Import becomes a local merge**, not a sync: the device calendar is read for
+  display and for deriving `busy_blocks`, and that's all. Deltas, tombstones and
+  a `last_synced_at` high-water mark for the device→server direction are moot —
+  there's nothing to reconcile.
+- **Export is unaffected** — Plannit-origin events still mirror into the
+  dedicated "Plannit" calendar, which is what makes a locked-in plan land on
+  everyone's phone.
+- **We lose** cross-device visibility of your *device* events (each phone reads
+  its own calendar, which is where they live anyway) and any server-side view of
+  them, which we have no feature asking for.
+
+Reopen only alongside a deliberate change to the permission copy and the privacy
+model — i.e. as a product decision, not an implementation one.
+
 **The alternative we did not take, and when to reopen it.** A local-first sync
 engine — realistically **PowerSync** (full local SQLite, Swift SDK, non-invasive
 Supabase integration) — would deliver realtime, offline and optimistic writes as

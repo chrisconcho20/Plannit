@@ -223,7 +223,8 @@ struct SupabaseRepository: DataRepository {
         let firstGroup = sharedIds.compactMap { groups[$0] }.first
 
         return PEvent(
-            id: d.id, start: start, end: end, title: d.title, time: timeLabel(start, end),
+            id: d.id, start: start, end: end, title: d.title,
+            time: d.all_day ? "All day" : timeLabel(start, end),
             location: d.location,
             group: firstGroup?.name,
             // A shared event takes its group's colour so the calendar reads at a
@@ -233,6 +234,7 @@ struct SupabaseRepository: DataRepository {
             badge: sharedIds.isEmpty ? "Private" : nil,
             badgeTone: .neutral,
             source: isDevice ? .device : .plannit,
+            isAllDay: d.all_day,
             ownerId: d.owner_id,
             sharedGroupIds: sharedIds
         )

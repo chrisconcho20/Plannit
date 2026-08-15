@@ -92,6 +92,7 @@ struct EventInsert: Encodable {
     let location: String?
     let start_at: String   // ISO-8601
     let end_at: String
+    let all_day: Bool
     let timezone: String
     let source: String     // "plannit" | "device"
 }
@@ -151,6 +152,7 @@ struct EventUpdate: Encodable {
     let location: String?
     let start_at: String
     let end_at: String
+    let all_day: Bool
 }
 /// Soft delete — the sync contract wants a tombstone, not a vanished row.
 struct EventTombstone: Encodable { let deleted_at: String }

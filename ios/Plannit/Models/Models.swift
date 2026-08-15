@@ -55,6 +55,9 @@ struct PEvent: Identifiable, Hashable {
     var badge: String? = nil
     var badgeTone: BadgeTone = .neutral
     var source: EventSource = .plannit
+    /// An all-day event has no meaningful clock time — real calendars are full
+    /// of them (birthdays, trips) and they don't make you busy.
+    var isAllDay: Bool = false
     /// nil in demo mode; otherwise the profile that owns the event — only they
     /// may share it (RLS on `event_shares`).
     var ownerId: String? = nil

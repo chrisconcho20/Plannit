@@ -21,6 +21,7 @@ struct NewEventSheet: View {
     @State private var location = ""
     @State private var start = Date()
     @State private var duration = "1h"
+    @State private var allDay = false
     @State private var shareWithGroup = true
     @State private var saving = false
     @State private var errorText: String?
@@ -39,6 +40,7 @@ struct NewEventSheet: View {
             let minutes = Int((editing.end ?? editing.start.addingTimeInterval(3600))
                                 .timeIntervalSince(editing.start) / 60)
             _duration = State(initialValue: Self.label(forMinutes: minutes))
+            _allDay = State(initialValue: editing.isAllDay)
             _shareWithGroup = State(initialValue: false)   // sharing is its own sheet
             return
         }
@@ -64,10 +66,20 @@ struct NewEventSheet: View {
 
                     fieldLabel("When")
                     VStack(spacing: 0) {
-                        DatePicker("Starts", selection: $start)
+                        // Real calendars are full of all-day entries; without
+                        // this you can only make timed ones.
+                        Toggle(isOn: $allDay.animation(Motion.fast)) {
+                            Text("All day").textStyle(.body, color: .textStrong)
+                        }
+                        .tint(.actionPrimary)
+                        .padding(.vertical, 10)
+                        Divider().overlay(Color.hairline)
+                        DatePicker(allDay ? "Date" : "Starts", selection: $start,
+                                   displayedComponents: allDay ? [.date] : [.date, .hourAndMinute])
                             .datePickerStyle(.compact)
                             .tint(.actionPrimary)
                             .textStyle(.body, color: .textStrong)
+                            .padding(.vertical, 4)
                     }
                     .padding(.horizontal, 14)
                     .frame(minHeight: 48)
@@ -76,11 +88,13 @@ struct NewEventSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
                         .strokeBorder(Color.lineStrong, lineWidth: 1))
 
-                    fieldLabel("How long")
-                    HStack(spacing: 8) {
-                        ForEach(durations, id: \.self) { d in
-                            SelectableChip(label: d, selected: duration == d) {
-                                withAnimation(Motion.fast) { duration = d }
+                    if !allDay {
+                        fieldLabel("How long")
+                        HStack(spacing: 8) {
+                            ForEach(durations, id: \.self) { d in
+                                SelectableChip(label: d, selected: duration == d) {
+                                    withAnimation(Motion.fast) { duration = d }
+                                }
                             }
                         }
                     }
@@ -149,10 +163,12 @@ struct NewEventSheet: View {
             let ok: Bool
             if let editing {
                 ok = await model.updateEvent(editing, title: name, start: start,
-                                             minutes: Self.minutes(duration), location: place)
+                                             minutes: Self.minutes(duration), location: place,
+                                             allDay: allDay)
             } else {
                 ok = await model.createEvent(title: name, start: start,
                                              minutes: Self.minutes(duration), location: place,
+                                             allDay: allDay,
                                              shareWith: shareWithGroup ? group : nil)
             }
             saving = false

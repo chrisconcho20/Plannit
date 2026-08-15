@@ -27,6 +27,27 @@ final class AppModel: ObservableObject {
     /// of quietly showing nothing.
     @Published var isLoading = false
     @Published var loadError: String?
+    /// A one-line message for the shell to show. Writes used to fail in
+    /// silence — you'd tap "remove member", nothing would happen, and there was
+    /// nowhere for the reason to go.
+    @Published var toast: String?
+
+    func say(_ message: String) {
+        toast = message
+        let shown = message
+        Task {
+            try? await Task.sleep(nanoseconds: 3_200_000_000)
+            if toast == shown { toast = nil }
+        }
+    }
+
+    /// Report a failed write. Returns the value it's given so call sites can
+    /// stay one-liners.
+    @discardableResult
+    private func failed(_ ok: Bool, _ message: String) -> Bool {
+        if !ok { say(message) }
+        return ok
+    }
     /// The group you're currently looking at, so the ＋ can act in its context
     /// instead of guessing from the tab.
     @Published var openGroup: PGroup?
@@ -298,7 +319,7 @@ final class AppModel: ObservableObject {
             await refreshFriends()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't send that request.")
         }
     }
 
@@ -323,7 +344,7 @@ final class AppModel: ObservableObject {
             await refreshFriends()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't answer that request.")
         }
     }
 
@@ -346,7 +367,7 @@ final class AppModel: ObservableObject {
             await refreshFriends()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't remove that friend.")
         }
     }
 
@@ -425,7 +446,7 @@ final class AppModel: ObservableObject {
             await refreshProposals()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't cancel that plan.")
         }
     }
 
@@ -455,6 +476,7 @@ final class AppModel: ObservableObject {
                     "events", values: EventInsert(
                         owner_id: uid, title: proposal.title, location: nil,
                         start_at: iso.string(from: start), end_at: iso.string(from: end),
+                        all_day: false,
                         timezone: TimeZone.current.identifier, source: "plannit"))
                 if let event = created.first {
                     try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
@@ -465,7 +487,7 @@ final class AppModel: ObservableObject {
             await refreshEvents()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't lock that time in.")
         }
     }
 
@@ -476,22 +498,33 @@ final class AppModel: ObservableObject {
 
     // MARK: Events
 
+    /// An all-day event covers midnight to midnight; anything else is a
+    /// duration from the chosen time.
+    static func span(start: Date, minutes: Int, allDay: Bool) -> (Date, Date) {
+        guard allDay else { return (start, start.addingTimeInterval(TimeInterval(minutes * 60))) }
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: start)
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+        return (dayStart, dayEnd)
+    }
+
     /// Change an event you own.
     @discardableResult
     func updateEvent(_ event: PEvent, title: String, start: Date, minutes: Int,
-                     location: String) async -> Bool {
+                     location: String, allDay: Bool = false) async -> Bool {
         let place = location.isEmpty ? nil : location
-        let end = start.addingTimeInterval(TimeInterval(minutes * 60))
+        let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
 
         guard Config.isLiveBackend else {
             if let i = events.firstIndex(where: { $0.id == event.id }) {
                 let tf = DateFormatter(); tf.dateFormat = "h:mm a"
                 var e = events[i]
                 e = PEvent(id: e.id, start: start, end: end, title: title,
-                           time: tf.string(from: start), location: place, group: e.group,
+                           time: allDay ? "All day" : tf.string(from: start),
+                           location: place, group: e.group,
                            hue: e.hue, icon: e.icon, people: e.people, badge: e.badge,
-                           badgeTone: e.badgeTone, source: e.source, ownerId: e.ownerId,
-                           sharedGroupIds: e.sharedGroupIds)
+                           badgeTone: e.badgeTone, source: e.source, isAllDay: allDay,
+                           ownerId: e.ownerId, sharedGroupIds: e.sharedGroupIds)
                 events[i] = e
             }
             return true
@@ -501,7 +534,8 @@ final class AppModel: ObservableObject {
         do {
             try await SupabaseClient.shared.update("events", values: EventUpdate(
                 title: title, location: place,
-                start_at: iso.string(from: start), end_at: iso.string(from: end)),
+                start_at: iso.string(from: start), end_at: iso.string(from: end),
+                all_day: allDay),
                 match: ["id": "eq.\(event.id)"])
             await refreshEvents()
             return true
@@ -527,7 +561,7 @@ final class AppModel: ObservableObject {
             await refreshEvents()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't delete that event.")
         }
     }
 
@@ -551,7 +585,7 @@ final class AppModel: ObservableObject {
             await refreshGroups()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't rename that group.")
         }
     }
 
@@ -592,7 +626,7 @@ final class AppModel: ObservableObject {
             await refreshEvents()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't update sharing.")
         }
     }
 
@@ -600,17 +634,19 @@ final class AppModel: ObservableObject {
     /// which is how an event made from inside a group reaches that group.
     @discardableResult
     func createEvent(title: String, start: Date, minutes: Int, location: String,
-                     shareWith group: PGroup? = nil) async -> Bool {
+                     allDay: Bool = false, shareWith group: PGroup? = nil) async -> Bool {
         let place = location.isEmpty ? nil : location
-        let end = start.addingTimeInterval(TimeInterval(minutes * 60))
+        let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
 
         guard Config.isLiveBackend, let uid = userId else {
             let tf = DateFormatter(); tf.dateFormat = "h:mm a"
-            events.append(PEvent(id: UUID().uuidString, start: start, title: title,
-                                 time: tf.string(from: start), location: place,
+            events.append(PEvent(id: UUID().uuidString, start: start, end: end, title: title,
+                                 time: allDay ? "All day" : tf.string(from: start),
+                                 location: place,
                                  group: group?.name,
                                  hue: group?.hue ?? GroupHue.forName(title), icon: "calendar",
                                  badge: group == nil ? "Private" : nil,
+                                 isAllDay: allDay,
                                  sharedGroupIds: group.map { [$0.id] } ?? []))
             return true
         }
@@ -622,6 +658,7 @@ final class AppModel: ObservableObject {
                 "events", values: EventInsert(
                     owner_id: uid, title: title, location: place,
                     start_at: iso.string(from: start), end_at: iso.string(from: end),
+                    all_day: allDay,
                     timezone: TimeZone.current.identifier, source: "plannit"))
             if let group, let event = created.first {
                 try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
@@ -715,7 +752,7 @@ final class AppModel: ObservableObject {
             await refreshGroups()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't add them — only the group's owner can.")
         }
     }
 
@@ -735,7 +772,7 @@ final class AppModel: ObservableObject {
             await refreshGroups()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't remove them. Try again.")
         }
     }
 
@@ -751,7 +788,7 @@ final class AppModel: ObservableObject {
             await refreshGroups()
             return true
         } catch {
-            return false
+            return failed(false, "Couldn't delete that group.")
         }
     }
 

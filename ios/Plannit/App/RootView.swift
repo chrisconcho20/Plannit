@@ -98,14 +98,19 @@ struct RootView: View {
                     .padding(.bottom, Space.tabBarH + 30)
             }
 
-            if let toast {
-                Toast(text: toast)
+            // Either the shell's own message (a plan was sent) or one a screen
+            // couldn't show itself (a write failed three sheets deep).
+            if let message = toast ?? model.toast {
+                Toast(text: message,
+                      icon: model.toast == nil ? "circle-check" : "circle-alert",
+                      tone: model.toast == nil ? .free : .neutral)
                     .padding(.horizontal, Space.gutter)
                     .padding(.bottom, Space.tabBarH + 24)
                     .frame(maxWidth: .infinity, alignment: .bottom)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(Motion.base, value: model.toast)
         .task {
             await model.resumeCalendarIfAuthorized()
             await model.loadData()

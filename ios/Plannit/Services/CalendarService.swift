@@ -57,14 +57,21 @@ final class CalendarService {
     // MARK: - Read
 
     /// Events in a window around today, mapped to a lightweight model.
+    ///
+    /// **Excludes our own "Plannit" calendar.** We mirror Plannit events into
+    /// it, so reading them back would show every plan twice — once as a Plannit
+    /// event and once as a device event. Availability deliberately still counts
+    /// them: a locked-in plan does make you busy.
+    ///
     /// `limit` exists for the UI list only — availability must never be capped,
-    /// so `busyIntervals` deliberately doesn't use it.
+    /// so `busyIntervals` doesn't use it.
     func fetchDeviceEvents(daysBack: Int = 1, daysAhead: Int = 60, limit: Int? = 50) -> [DeviceEvent] {
         let cal = Calendar.current
         let now = Date()
         let start = cal.date(byAdding: .day, value: -daysBack, to: now) ?? now
         let end = cal.date(byAdding: .day, value: daysAhead, to: now) ?? now
-        let sorted = matching(from: start, to: end).sorted { $0.startDate < $1.startDate }
+        let sorted = matching(from: start, to: end, includingPlannit: false)
+            .sorted { $0.startDate < $1.startDate }
         let capped = limit.map { Array(sorted.prefix($0)) } ?? sorted
         return capped.map {
             DeviceEvent(id: $0.eventIdentifier ?? UUID().uuidString,
@@ -93,9 +100,18 @@ final class CalendarService {
     }
 
     /// EventKit refuses predicates longer than four years; ours are far shorter.
-    private func matching(from: Date, to: Date) -> [EKEvent] {
+    private func matching(from: Date, to: Date, includingPlannit: Bool = true) -> [EKEvent] {
         guard hasAccess else { return [] }
-        let predicate = store.predicateForEvents(withStart: from, end: to, calendars: nil)
+        var calendars: [EKCalendar]? = nil
+        if !includingPlannit {
+            let all = store.calendars(for: .event)
+            let others = all.filter { $0.title != Self.plannitCalendarTitle }
+            // `nil` means "every calendar"; only narrow it if we'd actually
+            // exclude something, since an empty array matches nothing.
+            calendars = others.count == all.count ? nil : others
+            if others.isEmpty { return [] }
+        }
+        let predicate = store.predicateForEvents(withStart: from, end: to, calendars: calendars)
         return store.events(matching: predicate)
     }
 
@@ -149,6 +165,7 @@ final class CalendarService {
             // load would churn the user's calendar database.
             if let existing, existing.title == event.title,
                existing.startDate == start, existing.endDate == end,
+               existing.isAllDay == event.isAllDay,
                existing.location == event.location {
                 continue
             }
@@ -157,6 +174,7 @@ final class CalendarService {
             ekEvent.title = event.title
             ekEvent.startDate = start
             ekEvent.endDate = end
+            ekEvent.isAllDay = event.isAllDay
             ekEvent.location = event.location
             ekEvent.notes = "Planned with Plannit"
             do {

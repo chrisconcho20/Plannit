@@ -39,12 +39,27 @@ cleanly separable, reversible, and non-destructive.
 
 ## Import — device → Plannit
 
-1. On first full-access grant, enumerate `EKEvent`s in the sync window
-   (e.g. −1 month … +6 months).
-2. For each, upsert an `events` row: `source='device'`,
-   `external_cal_id = calendarItemExternalIdentifier`, mapping fields below.
+> **Amended 2026-08-14 by decision D-17.** Steps 1–2 below are **not
+> implemented, and deliberately so.** Uploading device events would contradict
+> what the app promises at the permission prompt — *"Event details stay on your
+> device — only free/busy is shared"*. The import is a **local merge**: device
+> events are read for display and for deriving `busy_blocks`, and never written
+> to `events`. The rest of this section is kept as the design we'd follow if
+> that product decision were ever reversed.
+
+1. ~~On first full-access grant, enumerate `EKEvent`s in the sync window
+   (e.g. −1 month … +6 months).~~ We enumerate, but only to display and to
+   compute availability.
+2. ~~For each, upsert an `events` row: `source='device'`,
+   `external_cal_id = calendarItemExternalIdentifier`, mapping fields below.~~
+   Not done. `source` and `external_cal_id` remain in the schema, unused.
 3. While the app runs, observe `EKEventStoreChanged` and re-reconcile the window.
-4. On foreground/launch, always run a full reconcile (see Deltas).
+   **Implemented.**
+4. On foreground/launch, always run a full reconcile. **Implemented.**
+
+Because nothing is uploaded, the device→server half needs no deltas, tombstones
+or `last_synced_at`. Those rules still govern the **export** direction and the
+Plannit-origin rows.
 
 ## Export — Plannit → device
 
