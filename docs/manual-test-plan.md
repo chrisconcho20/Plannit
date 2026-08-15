@@ -78,7 +78,7 @@ the account can't be confirmed. **For the beta, turn Confirm email off.**
 | 3.6 | Lock in this time | Toast, plan moves to **Locked in**, voting stops |
 | 3.7 | Calendar | The event is there on the right day, in the group's colour |
 | 3.8 | Group → Shared events | The same event is listed |
-| 3.9 | Sign in as `maya@plannit.test` / `plannit123` | She sees the plan, can vote, and has **no** Lock-in button (organiser only) |
+| 3.9 | Sign in as `maya@plannit.test` (password = your `test_password`) | She sees the plan, can vote, and has **no** Lock-in button (organiser only) |
 
 ## 4. Events and sharing
 
@@ -133,7 +133,8 @@ Needs `supabase db push` for `0005_friends_beta.sql` first.
 
 ## 6c. Live updates (needs `db push` for 0006)
 
-Two browser sessions, two accounts: yours and `maya@plannit.test` / `plannit123`.
+Two browser sessions, two accounts: yours and `maya@plannit.test` (password = the
+`test_password` you set in the seed).
 
 | # | Do this | Expect |
 |---|---|---|

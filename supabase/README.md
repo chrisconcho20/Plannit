@@ -58,7 +58,7 @@ next few weekends".
 | | |
 |---|---|
 | Users | Maya Ellis, Theo Sand, Ada Kim, Sam Roe, Jo Vane |
-| Sign-in | `maya@plannit.test` … / `plannit123` |
+| Sign-in | `maya@plannit.test` … / whatever you set as `test_password` |
 | Groups | added to every group you own (creates "Test Crew" if you own none) |
 
 What the seeded availability is designed to prove, searching afternoons:

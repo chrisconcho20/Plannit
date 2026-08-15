@@ -115,6 +115,14 @@ begin
     test_ids := array_append(test_ids, u.id);
   end loop;
 
+  -- Rotating the password does NOT sign out someone who already has a session:
+  -- their refresh token keeps working until it expires. Dropping the sessions is
+  -- what actually revokes access, so re-running this file is a real "change the
+  -- locks" and not just a new password on an open door.
+  delete from auth.refresh_tokens where user_id = any(
+    select u.id::text from auth.users u where u.id = any(test_ids));
+  delete from auth.sessions where user_id = any(test_ids);
+
   -- --------------------------------------------------------------- groups ---
   if not exists (select 1 from public.groups where owner_id = owner_uid) then
     insert into public.groups (name, owner_id) values ('Test Crew', owner_uid);
