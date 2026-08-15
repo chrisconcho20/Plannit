@@ -72,7 +72,9 @@ Deno.serve(async (req) => {
     .from("busy_blocks")
     .select("user_id,start_at,end_at")
     .in("user_id", memberIds)
-    .lt("start_at", new Date(body.constraints.windowEnd).toISOString())
+    .lt("start_at", new Date(Math.min(
+        body.constraints.windowEnd,
+        body.constraints.windowStart + 400 * 24 * 60 * 60 * 1000)).toISOString())
     .gt("end_at", new Date(body.constraints.windowStart).toISOString());
   if (busyErr) return json({ error: "busy_failed", detail: busyErr.message }, 500);
 
@@ -85,8 +87,30 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Bounds, before we hand anything to the scheduler.
+  //
+  // Not paranoia: every returned slot carries `availableUserIds`, so an
+  // unbounded request (maxResults: 100000, quorum: 1, stepMinutes: 5, a
+  // year-long window) would hand a group member every other member's complete
+  // free/busy grid in one call. Free/busy is what the product shares — but a
+  // slot at a time, for a plan being made, not the whole calendar on demand.
+  // These caps also keep one request from pinning the function's CPU.
+  const MAX_RESULTS = 20;
+  const MAX_WINDOW_MS = 400 * 24 * 60 * 60 * 1000;   // ~13 months
+  const MIN_STEP_MINUTES = 15;
+
+  const constraints = {
+    ...body.constraints,
+    stepMinutes: Math.max(MIN_STEP_MINUTES, body.constraints.stepMinutes ?? 30),
+    windowEnd: Math.min(
+      body.constraints.windowEnd,
+      body.constraints.windowStart + MAX_WINDOW_MS,
+    ),
+  };
+  const maxResults = Math.min(Math.max(1, body.maxResults ?? 10), MAX_RESULTS);
+
   // Prefers a date the whole group can make; falls back to the best turnout.
-  const search = findBestSlots([...byUser.values()], body.constraints, body.maxResults ?? 10);
+  const search = findBestSlots([...byUser.values()], constraints, maxResults);
   const { slots, everyoneFree, memberCount, quorum } = search;
 
   // Preview mode — compute without persisting.
@@ -98,9 +122,9 @@ Deno.serve(async (req) => {
       group_id: body.groupId,
       created_by: uid,
       title: body.title ?? "",
-      constraints: body.constraints,
-      window_start: new Date(body.constraints.windowStart).toISOString(),
-      window_end: new Date(body.constraints.windowEnd).toISOString(),
+      constraints,
+      window_start: new Date(constraints.windowStart).toISOString(),
+      window_end: new Date(constraints.windowEnd).toISOString(),
     })
     .select()
     .single();

@@ -5,8 +5,15 @@
 -- (safe to run again), it attaches everything to YOUR account, and it re-creates
 -- the busy blocks relative to today so the date-finder always has fresh data.
 --
+-- ⚠️  These are REAL, SIGN-IN-ABLE ACCOUNTS on your live project, and they are
+--     auto-friended to everyone and added to every group you own. Anyone who
+--     knows an email and the password below can sign in and see whatever those
+--     accounts can see — your groups, your shared events, your plans. Set
+--     `test_password` to something of your own, and rotate it before the live
+--     Appetize preview link goes anywhere public. See docs/security-review.md.
+--
 -- It creates:
---   • 5 test users (auth.users + profiles), password `plannit123`
+--   • 5 test users (auth.users + profiles), password = `test_password` below
 --   • membership in every group you own (or a new "Test Crew" if you own none)
 --   • busy blocks designed to exercise both scheduler paths (see below)
 --   • a few events on your own calendar for the next fortnight
@@ -21,8 +28,11 @@
 
 do $$
 declare
-  owner_email  text := 'johnnysilverhands@gmail.com';
-  owner_tz     text := 'America/Los_Angeles';
+  owner_email   text := 'johnnysilverhands@gmail.com';
+  -- CHANGE THIS. It's a shared password for accounts on a live database, and
+  -- this file is in the repo — anything left here is effectively published.
+  test_password text := 'change-me-before-sharing';
+  owner_tz      text := 'America/Los_Angeles';
   owner_uid    uuid;
   test_ids     uuid[];
   gid          uuid;
@@ -67,12 +77,15 @@ begin
       confirmation_token, recovery_token, email_change, email_change_token_new
     ) values (
       '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated',
-      u.email, crypt('plannit123', gen_salt('bf')), now(),
+      u.email, crypt(test_password, gen_salt('bf')), now(),
       now(), now(),
       '{"provider":"email","providers":["email"]}'::jsonb,
       jsonb_build_object('display_name', u.name, 'timezone', owner_tz),
       '', '', '', ''
-    ) on conflict (id) do nothing;
+    ) on conflict (id) do update
+        -- Re-running rotates the password, so changing test_password above and
+        -- re-running is the way to revoke a leaked one.
+        set encrypted_password = excluded.encrypted_password;
 
     -- GoTrue wants an identity row for email sign-in; the column layout has
     -- changed across versions, so only write it when this project has provider_id.

@@ -171,6 +171,12 @@ account. See §6 for URLs/creds.
 ---
 
 ## 3. Known issues / tech debt
+
+- **Security review (2026-08-15):** [`security-review.md`](security-review.md).
+  Nothing catastrophic; the live thing to act on is that the seeded test
+  accounts + the public live-preview URL + beta auto-friending let anyone with
+  the link read your data. Rotate `test_password`, and treat that URL as a
+  credential.
 - ~~**No realtime**~~ ✅ **done (2026-08-14, D-16).** Broadcast from Database
   (`0006`) sends a hint per group topic; the app subscribes with the official
   `Realtime` SPM module and refreshes that slice. Voting is optimistic, writes
