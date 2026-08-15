@@ -58,6 +58,18 @@ struct CalendarScreen: View {
         return model.events.filter { $0.start >= now }.sorted { $0.start < $1.start }
     }
 
+    /// Your own calendar's events, scoped exactly like the Plannit ones above:
+    /// the selected day, or everything upcoming in List mode. Unfiltered, this
+    /// dumped all 60 days under whichever day you'd tapped — invisible on an
+    /// empty simulator, a wall of text on a real phone.
+    private var deviceEvents: [DeviceEvent] {
+        let all = model.deviceEvents.sorted { $0.start < $1.start }
+        if mode != .list, let selectedDate {
+            return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
+        }
+        return all.filter { $0.start >= cal.startOfDay(for: Date()) }
+    }
+
     private var sectionTitle: String {
         if mode != .list, let selectedDate {
             let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
@@ -119,7 +131,7 @@ struct CalendarScreen: View {
                     }
                     .padding(.horizontal, Space.gutter)
 
-                    if events.isEmpty && model.deviceEvents.isEmpty {
+                    if events.isEmpty && deviceEvents.isEmpty {
                         EmptyState(icon: "calendar", title: "Nothing here",
                                    message: mode != .list
                                             ? "No events on this day."
@@ -127,12 +139,12 @@ struct CalendarScreen: View {
                                    actionTitle: "New event") { showNewEvent = true }
                     }
 
-                    if !model.deviceEvents.isEmpty {
-                        SectionLabel("From your calendar") {
-                            Text("\(model.deviceEvents.count)").textStyle(.caption, color: .textFaint)
+                    if !deviceEvents.isEmpty {
+                        SectionLabel("Also on your calendar") {
+                            Text("\(deviceEvents.count)").textStyle(.caption, color: .textFaint)
                         }
                         LazyVStack(spacing: Space.gapList) {
-                            ForEach(model.deviceEvents) { device in
+                            ForEach(deviceEvents) { device in
                                 EventCard(title: device.title, time: Self.deviceTime(device),
                                           location: device.location, hue: .coral, group: nil,
                                           people: [], icon: "calendar", badge: "Private", badgeTone: .neutral)

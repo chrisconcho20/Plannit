@@ -829,7 +829,9 @@ final class AppModel: ObservableObject {
 
     func refreshCalendar() {
         guard calendarConnected else { return }
-        deviceEvents = calendar.fetchDeviceEvents()
+        // No cap: the screen filters to one day, and a 50-event ceiling meant a
+        // real calendar's later events simply vanished from the UI.
+        deviceEvents = calendar.fetchDeviceEvents(limit: nil)
     }
 
     /// Re-read the device calendar and push availability again. Called when the
@@ -837,7 +839,7 @@ final class AppModel: ObservableObject {
     /// availability that's only uploaded once is stale by the next morning.
     func syncCalendar() async {
         guard calendarConnected else { return }
-        deviceEvents = calendar.fetchDeviceEvents()
+        deviceEvents = calendar.fetchDeviceEvents(limit: nil)
         await uploadBusyBlocksIfLive()
         mirrorToDeviceCalendar()
     }
