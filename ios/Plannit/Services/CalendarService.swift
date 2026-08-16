@@ -96,7 +96,9 @@ final class CalendarService {
         let raw = matching(from: now, to: horizon)
             .filter { !$0.isAllDay && $0.availability != .free && $0.status != .canceled }
             .map { BusyInterval(start: $0.startDate, end: $0.endDate) }
-        return Availability.prepare(raw, from: now, to: horizon)
+        let merged = Availability.prepare(raw, from: now, to: horizon)
+        Log.cal("busy: \(raw.count) events in \(daysAhead)d → \(merged.count) merged blocks")
+        return merged
     }
 
     /// EventKit refuses predicates longer than four years; ours are far shorter.
@@ -127,6 +129,7 @@ final class CalendarService {
             return existing
         }
 
+        Log.cal("creating the Plannit calendar")
         let calendar = EKCalendar(for: .event, eventStore: store)
         calendar.title = Self.plannitCalendarTitle
         calendar.cgColor = UIColor(Palette.coral500).cgColor
@@ -135,11 +138,15 @@ final class CalendarService {
         calendar.source = store.defaultCalendarForNewEvents?.source
             ?? store.sources.first { $0.sourceType == .local }
             ?? store.sources.first
-        guard calendar.source != nil else { return nil }
+        guard calendar.source != nil else {
+            Log.cal("no writable calendar source — cannot create the Plannit calendar")
+            return nil
+        }
         do {
             try store.saveCalendar(calendar, commit: true)
             return calendar
         } catch {
+            Log.cal("saveCalendar failed: \(error.localizedDescription)")
             return nil
         }
     }
@@ -149,7 +156,11 @@ final class CalendarService {
     /// never written back — the device already owns those.
     @discardableResult
     func mirror(_ events: [PEvent]) -> Int {
-        guard hasAccess, let calendar = plannitCalendar() else { return 0 }
+        guard hasAccess else { Log.cal("mirror skipped: no calendar access"); return 0 }
+        guard let calendar = plannitCalendar() else {
+            Log.cal("mirror skipped: no Plannit calendar")
+            return 0
+        }
         var map = Self.mirrorMap
         var written = 0
 
@@ -202,6 +213,7 @@ final class CalendarService {
         }
 
         try? store.commit()
+        Log.cal("mirror: \(wanted.count) plannit events, \(written) written")
         Self.mirrorMap = map
         return written
     }

@@ -28,6 +28,7 @@ enum BackgroundRefresh {
     /// the *only* thing that happens here: it's the one piece of state that goes
     /// stale without us, it needs no UI, and it's a single round trip.
     static func run() async {
+        Log.sync("background refresh fired")
         await MainActor.run { _ = SupabaseClient.shared.restoreSession() }
         await AvailabilityUploader.upload(calendar: CalendarService())
         schedule()   // one run only ever earns the next

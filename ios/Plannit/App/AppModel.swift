@@ -138,8 +138,10 @@ final class AppModel: ObservableObject {
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
             await realtime.sync(groupIds: g.map(\.id))
+            Log.sync("loaded: \(g.count) groups, \(e.count) events, \(p.count) plans, \(mates.count) friends")
         } catch {
             loadError = Self.message(for: error)
+            Log.sync("load failed: \(Self.message(for: error))")
         }
     }
 
@@ -963,6 +965,7 @@ final class AppModel: ObservableObject {
     // MARK: Calendar
     func connectCalendar() async {
         let granted = await calendar.requestAccess()
+        Log.cal("access request → \(granted ? "granted" : "denied")")
         calendarConnected = granted
         calendarDenied = !granted
         if granted {

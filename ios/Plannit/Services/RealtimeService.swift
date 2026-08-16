@@ -86,6 +86,7 @@ final class RealtimeService {
         }
 
         await channel.subscribe()
+        Log.sync("realtime: joined group topic")
     }
 
     private func leave(_ groupId: String) async {

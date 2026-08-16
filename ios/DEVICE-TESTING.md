@@ -10,7 +10,8 @@ actually be checked. Appetize hands you a fresh, empty simulator every session.
 
 ## What you need
 
-- A Mac with **Xcode 16+** (App Store).
+- A Mac with **Xcode 16.4 or newer** (App Store). Not negotiable: the Supabase
+  Realtime package needs Swift 6.1, and CI runs on exactly 16.4.
 - `brew install xcodegen` — the project is generated from
   [`project.yml`](project.yml), there's no `.xcodeproj` in git.
 - Your iPhone and its cable. iOS 17 or newer (the deployment target).
@@ -23,6 +24,10 @@ cd Plannit/ios
 xcodegen generate
 open Plannit.xcodeproj
 ```
+
+First open takes a minute or two: Xcode resolves the Swift package
+(`supabase-swift`, pinned at 2.55.1) before it will build. Let it finish —
+"Resolving Package Graph" in the toolbar.
 
 Then, in Xcode, three things — all in the **Plannit** target →
 **Signing & Capabilities**:
@@ -37,7 +42,7 @@ Then, in Xcode, three things — all in the **Plannit** target →
    in with Apple capability"*. Nothing calls it yet — live mode signs in with
    dev email — so you lose nothing.
 
-   Easiest: change one line in `project.yml` **before** generating —
+   Do this **before** `xcodegen generate` — change one line in `project.yml`:
 
    ```yaml
    CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit-Personal.entitlements
@@ -75,6 +80,28 @@ demo preview. `git checkout ios/Plannit/App/Info.plist` when you're done.
 
 Sign in with the dev email account you seeded
 ([`../supabase/seed-test-users.sql`](../supabase/seed-test-users.sql)).
+
+## Watching what it's doing
+
+Debug builds log to the console — counts and states only, never event titles,
+emails or tokens (`Services/Log.swift`). Xcode's console shows it while the app
+runs; Console.app filtered to subsystem `com.plannit.app` catches it when it's
+running untethered.
+
+The lines worth watching:
+
+```
+calendar  access request → granted
+calendar  busy: 143 events in 56d → 38 merged blocks
+calendar  creating the Plannit calendar
+calendar  mirror: 3 plannit events, 1 written
+sync      loaded: 2 groups, 11 events, 1 plans, 5 friends
+sync      realtime: joined group topic
+```
+
+If availability looks wrong, the `busy:` line tells you whether the problem is
+reading (`143 events` looks too low) or merging (`38 merged blocks` looks
+wrong). If the Plannit calendar never appears, `mirror skipped:` says why.
 
 ## What a real device gets you that Appetize can't
 
