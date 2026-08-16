@@ -119,8 +119,8 @@ This is the point of the exercise — everything here is unverified today:
 - **Feel.** Scrolling, the swipe-to-delete gesture, sheet heights, Dynamic Type,
   and whether the layout survives a real notch and home indicator.
 
-Follow [`../docs/manual-test-plan.md`](../docs/manual-test-plan.md) — sections 4
-and 5 are the ones that only mean something here.
+Follow [`../docs/manual-test-plan.md`](../docs/manual-test-plan.md). **§6d is
+the device-only section** — those eight checks are impossible anywhere else.
 
 ## Limits of a personal team
 
@@ -138,7 +138,7 @@ While you're there, both suites run locally:
 ```bash
 cd ios
 xcodebuild test -project Plannit.xcodeproj -scheme Plannit \
-  -destination 'platform=iOS Simulator,name=iPhone 16'   # 33 unit tests
+  -destination 'platform=iOS Simulator,name=iPhone 16'   # 67 unit tests
 
 deno test supabase/functions/_shared/                     # 19 scheduler tests
 ```
