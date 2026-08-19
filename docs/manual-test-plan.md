@@ -10,6 +10,10 @@ then tries to break it. Automated coverage lives in `ios/PlannitTests/` and
 `supabase/functions/_shared/*.test.ts`; **everything below is the part a machine
 can't check** — layout, wording, whether the thing feels right.
 
+> **Testing now?** Use [`tests/`](tests/) instead — the same coverage broken into
+> 16 standalone step-by-step scripts, each starting from launching the app. This
+> file stays as the overview and the reference for what's deliberately not built.
+
 ## Before you start
 
 1. Run `supabase/seed-test-users.sql` in the SQL editor (idempotent — re-run it
