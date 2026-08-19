@@ -572,7 +572,13 @@ final class SupabaseClient {
         }
 
         guard (200..<300).contains(http.statusCode) else {
-            throw SupabaseError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+            let body = String(data: data, encoding: .utf8) ?? ""
+            // The user-facing message is deliberately vague; the actual reason
+            // (a constraint, an RLS refusal, a missing column) only ever shows
+            // up here, and only in a debug build.
+            Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") "
+                     + "\(req.url?.path ?? "") → \(body.prefix(300))")
+            throw SupabaseError.http(http.statusCode, body)
         }
         return data
     }
