@@ -578,15 +578,12 @@ final class SupabaseClient {
             // up here, and only in a debug build.
             // The request payload too, on failure only. A rejected write is
             // almost always a mismatch between what we sent and what the policy
-            // expected, and you can't see that from the response alone.
+            // expected, which the response alone never shows.
             let sent = req.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") "
-                     + "\(req.url?.path ?? "")
-  sent: \(sent.prefix(400))"
-                     + "
-  got:  \(body.prefix(300))"
-                     + "
-  as user: \(userId ?? "nobody")")
+            Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") \(req.url?.path ?? "")"
+                     + " | as user: \(userId ?? "nobody")"
+                     + " | sent: \(sent.prefix(400))"
+                     + " | got: \(body.prefix(300))")
             throw SupabaseError.http(http.statusCode, body)
         }
         return data
