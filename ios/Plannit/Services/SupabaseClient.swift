@@ -576,8 +576,17 @@ final class SupabaseClient {
             // The user-facing message is deliberately vague; the actual reason
             // (a constraint, an RLS refusal, a missing column) only ever shows
             // up here, and only in a debug build.
+            // The request payload too, on failure only. A rejected write is
+            // almost always a mismatch between what we sent and what the policy
+            // expected, and you can't see that from the response alone.
+            let sent = req.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") "
-                     + "\(req.url?.path ?? "") → \(body.prefix(300))")
+                     + "\(req.url?.path ?? "")
+  sent: \(sent.prefix(400))"
+                     + "
+  got:  \(body.prefix(300))"
+                     + "
+  as user: \(userId ?? "nobody")")
             throw SupabaseError.http(http.statusCode, body)
         }
         return data
