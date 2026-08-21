@@ -1,6 +1,7 @@
 # Device calendar → Plannit: research and plan
 
-_Written 2026-08-21. Scope: everything between the phone's calendar and Plannit.
+_Written 2026-08-21; **Phases A–D implemented the same day** — see §3 for what
+each item became. Scope: everything between the phone's calendar and Plannit.
 Read [`backend/sync-contract.md`](backend/sync-contract.md) for the contract this
 either implements or amends, and D-05 / D-17 in [`decisions.md`](decisions.md)._
 
@@ -200,7 +201,7 @@ looked since Tuesday".
 Four phases. A is correctness and should land as one commit; B and C are
 product; D is polish. Each item names the file it lives in.
 
-### Phase A — make availability true (highest value, ~half a day)
+### Phase A — make availability true ✅ done
 
 1. **`0012_replace_busy_blocks.sql`** — `replace_busy_blocks(p_blocks jsonb)`,
    `security definer`, `user_id = auth.uid()` forced server-side (never trusted
@@ -218,7 +219,7 @@ product; D is polish. Each item names the file it lives in.
 **Verified by:** new unit tests for horizon and filters; on-device, add an event
 four months out and confirm the finder stops offering that slot.
 
-### Phase B — one calendar, not two (~a day)
+### Phase B — one calendar, not two ✅ done
 
 5. **Fix the occurrence id** and merge device events into the day's list,
    time-ordered, keeping the muted styling and "Private" badge. *(F3, F11)*
@@ -232,7 +233,7 @@ four months out and confirm the finder stops offering that slot.
 **Verified by:** on device, a weekly standup renders once per week without
 duplicate-id warnings; scroll to +4 months and events are still there.
 
-### Phase C — control and trust (~a day)
+### Phase C — control and trust ✅ done
 
 8. **Calendar picker** in You → Your calendar: every calendar with a toggle,
    defaulting to on, persisted by `calendarIdentifier`. Applied to both reads.
@@ -244,7 +245,7 @@ duplicate-id warnings; scroll to +4 months and events are still there.
     write-only; when reading is denied, the app says what it can't do
     (availability, the date-finder) rather than looking empty. *(F8)*
 
-### Phase D — robustness (~half a day)
+### Phase D — robustness ✅ done
 
 11. **Move EventKit off the main actor** — a background store, `nonisolated`
     read functions, results handed back to `@MainActor`. *(F5)*
@@ -267,12 +268,30 @@ duplicate-id warnings; scroll to +4 months and events are still there.
 
 ---
 
+### Found while implementing
+
+**`rpcVoid`.** PostgREST answers a `returns void` function with an empty body,
+and the generic `rpc` helper decodes every response — so `rsvp_to_event` threw a
+decoding error *after the write succeeded*, and the caller rolled back state the
+server had already changed. Both RSVP call sites and the new
+`replace_busy_blocks` now go through a variant that ignores the body. Anything
+returning void or a bare scalar must use it.
+
+**Occurrence ids were random.** The old fallback for an event with no
+identifier was `UUID()`, which handed the same event a new id on every read —
+the list would churn rather than update in place. The fallback is now derived
+from the title and calendar, so it's stable.
+
+---
+
 ## 5. Decisions this needs
 
-| # | Question | Recommendation |
+All five were taken as recommended and are now implemented (D-19):
+
+| # | Question | Decided |
 |---|---|---|
-| a | Upload device events to the server? | **No** — keep D-17 (§0) |
-| b | Busy horizon | **Match the search window**, capped at 12 months |
+| a | Upload device events to the server? | **No** — D-17 stands (§0) |
+| b | Busy horizon | **Matches the search window**, +14 days, capped at 12 months |
 | c | Multi-day all-day events | **Busy**; single-day all-day stays free |
 | d | New calendars found later | **Included by default**, listed in the picker |
 | e | Declined invitations | **Not busy** |

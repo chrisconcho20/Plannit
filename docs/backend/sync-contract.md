@@ -37,6 +37,18 @@ cleanly separable, reversible, and non-destructive.
 - Request **full access** only when reading device events for import/availability.
   Explain why at the prompt; expect some users to grant write-only.
 
+**Write-only is a real state, not a failure.** `CalendarService.canRead` and
+`canWrite` are separate: with write-only, the mirror still runs (plans land on
+your calendar) and the app says plainly that availability and the date-finder
+can't work. Treating anything short of full access as "no access" meant someone
+who granted exactly what the mirror needs got no mirror.
+
+Reads run on `CalendarReader`, an actor with **its own** `EKEventStore`, so a
+read never shares a store with the main actor's mirror writes and never blocks
+the UI. `EKEventStoreChanged` is coalesced with a 1s trailing debounce, and
+`refreshSourcesIfNecessary()` runs on foreground so remote accounts (Exchange,
+Google, CalDAV) are pulled before a reconcile.
+
 ## Import — device → Plannit
 
 > **Amended 2026-08-14 by decision D-17.** Steps 1–2 below are **not
@@ -83,10 +95,46 @@ Plannit-origin rows.
 
 - Derive busy intervals **on-device** from the calendar (merge overlapping
   events into opaque start/end ranges). **No titles, locations, or notes.**
-- Upsert them into `busy_blocks` covering the scheduling horizon (e.g. next
-  8 weeks); refresh on calendar change and on a periodic background task.
 - This is the only availability data that leaves the phone. The `find-slots`
   function reads these (never raw events) to compute group availability.
+
+### The horizon must cover the search window
+
+`find-slots` reads "no busy block" as **free**. A horizon shorter than the
+furthest the date-finder can look therefore doesn't make it cautious past the
+end — it makes it *confident and wrong*, and the scheduler prefers the earliest
+all-free date, which is exactly where the fabricated ones begin.
+
+`Availability.horizon()` follows `SearchWindow.months` (the user's own
+preference, 1–12) plus a fortnight of slack for the gap between syncs. It was a
+fixed 8 weeks until 2026-08-21, against a 6-month default search.
+
+### Replacing, not appending
+
+Upload through **`replace_busy_blocks(p_blocks jsonb)`** (migration 0012), which
+deletes the future window and inserts the new set in one transaction, taking
+`user_id` from `auth.uid()` rather than the payload.
+
+The client used to delete and then insert as two calls. Anything happening in
+between — a failed insert, a killed app — left the user with **no blocks at
+all**, which reads as *free at all times*. Every failure in this path has to
+land on "we couldn't check", never on "everyone's free". The client also:
+
+- refuses to upload an empty set when the calendar had events in the window
+  (an empty merge means our read broke, not that you're free all year);
+- skips the upload entirely when a SHA-256 of the blocks matches the last one.
+
+### What counts as busy
+
+Skipped: events marked **Free**, **cancelled** ones, invitations **you
+declined**, and **single-day all-day** events (a birthday shouldn't block a
+day). Counted: everything else, including **multi-day all-day** events — five
+all-day days called "Portugal" is exactly the week nobody should be offered.
+
+Users can exclude whole calendars (You → Which calendars). Exclusions apply to
+display *and* availability: a subscribed fixtures feed shouldn't be able to mark
+you busy. The set is stored as the calendars switched **off**, so one added
+later is included by default.
 
 ## Background refresh
 

@@ -60,6 +60,20 @@ Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 |---|---|---|---|---|
 | D-16 | Realtime *mechanism* (refines D-13) | `postgres_changes` / **Broadcast from Database** / local-first sync engine | **Broadcast from Database**, consumed via the official `Realtime` SPM module | Accepted 2026-08-14 |
 | D-18 | Outcome of a proposal (supersedes D-12) | Vote between slots / **Organiser picks, everyone RSVPs** | **Organiser picks one date, everyone answers going / not going** | Accepted 2026-08-20 |
+| D-19 | Availability horizon & what counts as busy (refines D-17) | Fixed 8 weeks / **Follow the user's search window** | **Follow the search window**; fail toward "we couldn't check", never "everyone's free" | Accepted 2026-08-21 |
+
+**D-19 in full.** What the phone tells the server about when you're free
+(2026-08-21). Availability was uploaded for a fixed 8 weeks while the date-finder
+searches up to 12 months, and `find-slots` reads a missing busy block as *free* —
+so every date past week 8 came back "everyone's free" whether or not they were,
+and the scheduler prefers the earliest all-free date. The rule now: **the busy
+horizon follows the search window**, and every failure in this path resolves to
+"we couldn't check" rather than "everyone's free" — hence `replace_busy_blocks`
+(0012) doing the delete and insert in one transaction, a refusal to upload an
+empty set when the calendar wasn't empty, declined invitations no longer counting
+as busy, multi-day all-day events starting to, and a per-calendar opt-out that
+applies to availability as well as display. Device events still never leave the
+phone (D-17). Full working: [`calendar-sync-plan.md`](calendar-sync-plan.md).
 
 **D-18 in full.** D-12 chose voting because picking a time together felt more
 social than one person deciding. Building it showed the cost: the group makes

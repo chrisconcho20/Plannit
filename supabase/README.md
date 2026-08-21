@@ -23,7 +23,8 @@ supabase/
 │  ├─ 0008_activity.sql             # my_activity() — one feed, one snapshot
 │  ├─ 0009_select_policy_selfreference.sql  # the 403: RETURNING re-runs SELECT
 │  ├─ 0010_group_events_rsvp.sql    # going / not-going replaces voting (D-18)
-│  └─ 0011_activity_rsvp.sql        # my_activity() follows it
+│  ├─ 0011_activity_rsvp.sql        # my_activity() follows it
+│  └─ 0012_replace_busy_blocks.sql  # atomic availability upload (D-19)
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder
