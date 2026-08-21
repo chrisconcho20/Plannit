@@ -198,9 +198,22 @@ final class CalendarService {
     /// Multi-day all-day events *do* count: five all-day days called "Portugal"
     /// is exactly the week nobody should be offered.
     static func isBusy(_ event: EKEvent) -> Bool {
-        guard event.availability != .free, event.status != .canceled else { return false }
-        if declined(event) { return false }
-        if event.isAllDay { return spansMultipleDays(event) }
+        isBusy(start: event.startDate, end: event.endDate, isAllDay: event.isAllDay,
+               availability: event.availability, status: event.status,
+               declined: declined(event))
+    }
+
+    /// The rule itself, in terms of facts rather than an `EKEvent`.
+    ///
+    /// Split out because an EKEvent can't be built honestly in a test — with no
+    /// calendar attached, `availability` reads back `.notSupported` however you
+    /// set it, so a test of "marked Free doesn't block you" was really testing
+    /// EventKit's setter. The rule is the part worth pinning down.
+    static func isBusy(start: Date, end: Date, isAllDay: Bool,
+                       availability: EKEventAvailability, status: EKEventStatus,
+                       declined: Bool) -> Bool {
+        guard availability != .free, status != .canceled, !declined else { return false }
+        if isAllDay { return spansMultipleDays(start: start, end: end) }
         return true
     }
 
@@ -211,12 +224,12 @@ final class CalendarService {
         event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
     }
 
-    private static func spansMultipleDays(_ event: EKEvent) -> Bool {
+    static func spansMultipleDays(start: Date, end: Date) -> Bool {
         let cal = Calendar.current
         // All-day events end at midnight on the following day, so a one-day
         // event is already a "24 hour" span — compare the last *inclusive* day.
-        let lastMoment = event.endDate.addingTimeInterval(-1)
-        return !cal.isDate(event.startDate, inSameDayAs: max(lastMoment, event.startDate))
+        let lastMoment = end.addingTimeInterval(-1)
+        return !cal.isDate(start, inSameDayAs: max(lastMoment, start))
     }
 
     /// EventKit refuses predicates longer than four years; ours are far shorter.

@@ -50,72 +50,90 @@ final class CalendarHorizonTests: XCTestCase {
 
     // MARK: what counts as busy
 
-    /// EKEvents need a store; an in-memory one is fine, nothing is saved.
-    private let store = EKEventStore()
-    private func event(_ start: Date, _ end: Date, allDay: Bool = false,
-                       availability: EKEventAvailability = .busy,
-                       status: EKEventStatus = .confirmed) -> EKEvent {
-        let e = EKEvent(eventStore: store)
-        e.startDate = start
-        e.endDate = end
-        e.isAllDay = allDay
-        e.availability = availability
-        // `status` is read-only on EKEvent; the cancelled case is covered by
-        // the filter's own source order and exercised on device (test 02).
-        return e
+    /// The rule takes facts, not an `EKEvent` — an event with no calendar
+    /// attached reports `.notSupported` for availability however you set it,
+    /// so building one here would test EventKit's setter rather than our rule.
+    private func isBusy(_ start: Date, _ end: Date, allDay: Bool = false,
+                        availability: EKEventAvailability = .busy,
+                        status: EKEventStatus = .confirmed,
+                        declined: Bool = false) -> Bool {
+        CalendarService.isBusy(start: start, end: end, isAllDay: allDay,
+                               availability: availability, status: status,
+                               declined: declined)
     }
     private func hours(_ n: Double, from date: Date) -> Date {
         date.addingTimeInterval(n * 3600)
     }
 
     func testAnOrdinaryMeetingIsBusy() {
-        XCTAssertTrue(CalendarService.isBusy(event(now, hours(1, from: now))))
+        XCTAssertTrue(isBusy(now, hours(1, from: now)))
     }
 
     func testSomethingMarkedFreeIsNotBusy() {
-        XCTAssertFalse(CalendarService.isBusy(
-            event(now, hours(1, from: now), availability: .free)),
-            "you told your own calendar this doesn't block you")
+        XCTAssertFalse(isBusy(now, hours(1, from: now), availability: .free),
+                       "you told your own calendar this doesn't block you")
+    }
+
+    func testACancelledEventIsNotBusy() {
+        XCTAssertFalse(isBusy(now, hours(1, from: now), status: .canceled))
+    }
+
+    func testAMeetingYouDeclinedIsNotBusy() {
+        XCTAssertFalse(isBusy(now, hours(1, from: now), declined: true),
+                       "you told them you're not coming — Plannit shouldn't think otherwise")
     }
 
     func testABirthdayDoesNotBlockTheDay() {
         let day = cal.startOfDay(for: now)
-        let allDay = event(day, cal.date(byAdding: .day, value: 1, to: day)!, allDay: true)
-        XCTAssertFalse(CalendarService.isBusy(allDay))
+        XCTAssertFalse(isBusy(day, cal.date(byAdding: .day, value: 1, to: day)!, allDay: true),
+                       "all-day events end at midnight the next day — that's still one day")
     }
 
     func testAMultiDayTripDoesBlock() {
         // Five all-day days called "Portugal" is exactly the week nobody should
         // be offered — and the old filter let it through as free.
         let day = cal.startOfDay(for: now)
-        let trip = event(day, cal.date(byAdding: .day, value: 5, to: day)!, allDay: true)
-        XCTAssertTrue(CalendarService.isBusy(trip))
+        XCTAssertTrue(isBusy(day, cal.date(byAdding: .day, value: 5, to: day)!, allDay: true))
     }
 
-    func testAnAllDayEventEndingAtMidnightIsStillOneDay() {
-        // All-day events end at 00:00 the *next* day. Comparing end dates
-        // naively makes every birthday look like a two-day trip.
+    func testADeclinedTripIsStillNotBusy() {
         let day = cal.startOfDay(for: now)
-        let birthday = event(day, cal.date(byAdding: .day, value: 1, to: day)!, allDay: true)
-        XCTAssertFalse(CalendarService.isBusy(birthday))
+        XCTAssertFalse(isBusy(day, cal.date(byAdding: .day, value: 5, to: day)!,
+                              allDay: true, declined: true))
     }
 
     // MARK: occurrence identity
 
+    private let store = EKEventStore()
+    private func event(_ start: Date) -> EKEvent {
+        let e = EKEvent(eventStore: store)
+        e.startDate = start
+        e.endDate = hours(1, from: start)
+        e.title = "Standup"
+        return e
+    }
+
     func testEveryOccurrenceOfARepeatingEventGetsItsOwnId() {
         // EventKit hands every occurrence the same eventIdentifier. Used raw as
         // a SwiftUI id, a weekly standup renders as duplicate rows.
-        let week1 = event(now, hours(1, from: now))
-        let week2 = event(cal.date(byAdding: .day, value: 7, to: now)!,
-                          hours(1, from: cal.date(byAdding: .day, value: 7, to: now)!))
+        let week1 = event(now)
+        let week2 = event(cal.date(byAdding: .day, value: 7, to: now)!)
         XCTAssertNotEqual(CalendarService.occurrenceId(for: week1),
                           CalendarService.occurrenceId(for: week2))
     }
 
     func testTheSameOccurrenceKeepsAStableId() {
-        let e = event(now, hours(1, from: now))
+        let e = event(now)
         XCTAssertEqual(CalendarService.occurrenceId(for: e),
                        CalendarService.occurrenceId(for: e),
-                       "re-reading the calendar must not reshuffle the list")
+                       "an id that changes per read reshuffles the list on every sync")
+    }
+
+    func testMultiDaySpansAreMeasuredInclusively() {
+        let day = cal.startOfDay(for: now)
+        XCTAssertFalse(CalendarService.spansMultipleDays(
+            start: day, end: cal.date(byAdding: .day, value: 1, to: day)!))
+        XCTAssertTrue(CalendarService.spansMultipleDays(
+            start: day, end: cal.date(byAdding: .day, value: 2, to: day)!))
     }
 }
