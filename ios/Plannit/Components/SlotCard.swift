@@ -53,7 +53,10 @@ struct SlotCard: View {
                         if !people.isEmpty { AvatarStack(names: people, size: 24, max: 4) }
                     }
                 }
-                PIcon("chevron-right", size: 18, color: .textFaint)
+                // A pick-one list, not a drill-down: the trailing mark says
+                // which time you've chosen.
+                PIcon(selected ? "circle-check" : "circle", size: 20,
+                      color: selected ? .actionPrimary : .textFaint)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)

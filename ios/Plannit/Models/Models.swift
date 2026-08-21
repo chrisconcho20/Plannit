@@ -67,12 +67,42 @@ struct PEvent: Identifiable, Hashable {
     /// occurrence needs its own `id` to be unique in a list, but every action
     /// (edit, delete, share) has to act on the underlying series.
     var seriesId: String? = nil
+    /// Who has answered, and how. Only group events have these.
+    var rsvps: [String: Bool] = [:]        // user id -> going
     /// Groups this event is visible to. Empty = private to the owner.
     var sharedGroupIds: [String] = []
     /// People it's shared with directly, by profile id.
     var sharedUserIds: [String] = []
 
     var isPrivate: Bool { sharedGroupIds.isEmpty && sharedUserIds.isEmpty }
+
+    /// A plan someone made with a group, as opposed to something you put in your
+    /// own calendar. Only these get the going/not-going treatment.
+    var isGroupEvent: Bool { !sharedGroupIds.isEmpty }
+
+    var goingCount: Int { rsvps.values.filter { $0 }.count }
+
+    /// Your answer: true going, false not going, nil not asked yet.
+    func myRsvp(_ userId: String?) -> Bool? {
+        guard let userId else { return nil }
+        if isOwned(by: userId) { return rsvps[userId] ?? true }   // creators are in by default
+        return rsvps[userId]
+    }
+
+    /// On your calendar only once you've said yes. Before that it's an
+    /// invitation, and lives in Plans and the group instead.
+    func isOnCalendar(for userId: String?) -> Bool {
+        guard isGroupEvent else { return true }
+        guard let userId else { return true }
+        if isOwned(by: userId) { return myRsvp(userId) != false }
+        return sharedUserIds.contains(userId)
+    }
+
+    /// Waiting on you: offered to a group you're in, and you haven't answered.
+    func needsAnswer(from userId: String?) -> Bool {
+        guard isGroupEvent, let userId, !isOwned(by: userId) else { return false }
+        return rsvps[userId] == nil
+    }
     func isOwned(by userId: String?) -> Bool {
         guard let ownerId, let userId else { return true }   // demo: everything is yours
         return ownerId == userId
@@ -102,7 +132,7 @@ struct PEvent: Identifiable, Hashable {
                     hue: hue, icon: icon, people: people, badge: badge,
                     badgeTone: badgeTone, source: source, isAllDay: isAllDay,
                     ownerId: ownerId,
-                    recurrence: recurrence, seriesId: id,
+                    recurrence: recurrence, seriesId: id, rsvps: rsvps,
                     sharedGroupIds: sharedGroupIds, sharedUserIds: sharedUserIds)
                 return copy
             }
@@ -113,9 +143,10 @@ struct PEvent: Identifiable, Hashable {
 /// lives here rather than in SQL — copy changes shouldn't need a migration.
 struct PActivity: Identifiable, Hashable {
     enum Kind: String {
-        case planCreated = "plan_created"
-        case vote
-        case planLocked = "plan_locked"
+        /// Someone offered your group a date — the one that matters.
+        case invited
+        /// Someone said they're going to a plan of yours.
+        case rsvp
         case eventShared = "event_shared"
         case friendRequest = "friend_request"
         case joinedGroup = "joined_group"
@@ -130,9 +161,8 @@ struct PActivity: Identifiable, Hashable {
 
     var icon: String {
         switch kind {
-        case .planCreated:   return "wand-sparkles"
-        case .vote:          return "thumbs-up"
-        case .planLocked:    return "calendar-check"
+        case .invited:       return "wand-sparkles"
+        case .rsvp:          return "calendar-check"
         case .eventShared:   return "share-2"
         case .friendRequest: return "user-plus"
         case .joinedGroup:   return "users"
@@ -141,19 +171,18 @@ struct PActivity: Identifiable, Hashable {
 
     var hue: GroupHue {
         switch kind {
-        case .planCreated, .planLocked: return .teal
-        case .vote:                     return .indigo
-        case .eventShared:              return .coral
-        case .friendRequest:            return .rose
-        case .joinedGroup:              return .sky
+        case .invited:       return .teal
+        case .rsvp:          return .indigo
+        case .eventShared:   return .coral
+        case .friendRequest: return .rose
+        case .joinedGroup:   return .sky
         }
     }
 
     var sentence: String {
         switch kind {
-        case .planCreated:   return "\(actor) started \(title)"
-        case .vote:          return "\(actor) voted on \(title)"
-        case .planLocked:    return "\(title) is locked in"
+        case .invited:       return "\(actor) wants to plan \(title)"
+        case .rsvp:          return "\(actor) is going to \(title)"
         case .eventShared:   return "\(actor) shared \(title)"
         case .friendRequest: return "\(actor) wants to be friends"
         case .joinedGroup:   return "\(actor) joined \(title)"
@@ -197,53 +226,6 @@ struct PAvailability: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let blocks: [BusyRange]
-}
-
-struct PProposal: Identifiable, Hashable {
-    let id: String
-    let title: String
-    let group: PGroup
-    let constraint: String
-    let status: String       // "voting" | "found"
-    var votes: Int = 0
-    let slots: [PSlot]
-    var availability: [PAvailability] = []
-    /// Votes cast per slot id, and which slot you picked.
-    var voteCounts: [String: Int] = [:]
-    var myVoteSlotId: String? = nil
-    /// Set once someone locks a time in.
-    var finalizedSlotId: String? = nil
-    /// Who created it — only they (or the group's owner) may lock a time in.
-    var createdBy: String? = nil
-
-    var total: Int { group.members.count }
-    var isFinalized: Bool { finalizedSlotId != nil }
-    var finalizedSlot: PSlot? { slots.first { $0.id == finalizedSlotId } }
-
-    /// Why this plan wants your attention — nil when it doesn't.
-    /// Drives the Plans tab badge, so it counts real reasons only.
-    enum Nudge { case needsYourVote, happeningToday }
-    func nudge(for userId: String?) -> Nudge? {
-        if isFinalized {
-            return finalizedSlot?.isToday == true ? .happeningToday : nil
-        }
-        // Someone put a plan in front of you and you haven't answered it.
-        return myVoteSlotId == nil ? .needsYourVote : nil
-    }
-    func canFinalize(_ userId: String?) -> Bool {
-        guard let userId else { return true }              // demo
-        return createdBy == nil || createdBy == userId || group.ownerId == userId
-    }
-    /// The names of the members free for a slot, for the avatar row.
-    func people(for slot: PSlot) -> [String] {
-        guard !slot.availableIds.isEmpty else {
-            return Array(group.memberNames.prefix(slot.free))   // demo fallback
-        }
-        return group.members.filter { slot.availableIds.contains($0.id) }.map(\.name)
-    }
-
-    static func == (a: PProposal, b: PProposal) -> Bool { a.id == b.id }
-    func hash(into h: inout Hasher) { h.combine(id) }
 }
 
 extension BusyRange: Hashable {

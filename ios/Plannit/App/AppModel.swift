@@ -19,7 +19,6 @@ final class AppModel: ObservableObject {
     // groups while their real ones load is a lie.
     @Published var groups: [PGroup] = Config.isLiveBackend ? [] : Sample.groups
     @Published var events: [PEvent] = Config.isLiveBackend ? [] : Sample.events
-    @Published var proposals: [PProposal] = Config.isLiveBackend ? [] : Sample.proposals
     /// People you can add to a group. Until friend requests land this is
     /// everyone RLS lets you see: your groups' co-members.
     @Published var people: [PMember] = Config.isLiveBackend ? [] : Sample.people
@@ -95,6 +94,13 @@ final class AppModel: ObservableObject {
 
     nonisolated init() {}
 
+    /// Demo mode has no session, but the going/not-going rules are all
+    /// questions about a particular person — so demo gets a stable stand-in.
+    func startDemoIdentity() {
+        guard !Config.isLiveBackend else { return }
+        userId = Sample.meId
+    }
+
     /// EKEventStoreChanged only fires while we're running — the foreground
     /// reconcile in RootView covers everything we miss (sync-contract §Background).
     func startObservingCalendar() {
@@ -121,7 +127,6 @@ final class AppModel: ObservableObject {
         do {
             let g = try await repo.fetchGroups()
             let e = try await repo.fetchEvents(groups: g)
-            let p = try await repo.fetchProposals()
             let who = try await repo.fetchPeople()
             let mates = try await repo.fetchFriends()
             let requests = try await repo.fetchFriendRequests()
@@ -129,7 +134,6 @@ final class AppModel: ObservableObject {
             let recent = (try? await repo.fetchActivity(limit: 50)) ?? []
             groups = g
             events = e
-            proposals = p
             people = who
             friends = mates
             friendRequests = requests
@@ -138,7 +142,7 @@ final class AppModel: ObservableObject {
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
             await realtime.sync(groupIds: g.map(\.id))
-            Log.sync("loaded: \(g.count) groups, \(e.count) events, \(p.count) plans, \(mates.count) friends")
+            Log.sync("loaded: \(g.count) groups, \(e.count) events, \(mates.count) friends")
         } catch {
             loadError = Self.message(for: error)
             Log.sync("load failed: \(Self.message(for: error))")
@@ -161,8 +165,9 @@ final class AppModel: ObservableObject {
         realtime.onChange = { [weak self] change in
             Task { @MainActor in
                 switch change {
-                case .proposals: await self?.refreshProposals()
-                case .events:    await self?.refreshEvents()
+                // `proposals` is the old slot-voting hint; group plans are
+                // events now, so both mean "refresh the events".
+                case .proposals, .events: await self?.refreshEvents()
                 case .groups:    await self?.refreshGroups()
                 }
             }
@@ -172,14 +177,6 @@ final class AppModel: ObservableObject {
 
     func stopRealtime() async {
         await realtime.stop()
-    }
-
-    func refreshProposals() async {
-        guard Config.isLiveBackend, signedIn else { return }
-        if let fresh = try? await SupabaseRepository().fetchProposals() {
-            proposals = fresh
-            loadError = nil
-        }
     }
 
     func refreshEvents() async {
@@ -247,7 +244,6 @@ final class AppModel: ObservableObject {
         openGroup = nil
         groups = Config.isLiveBackend ? [] : Sample.groups
         events = Config.isLiveBackend ? [] : Sample.events
-        proposals = Config.isLiveBackend ? [] : Sample.proposals
         people = Config.isLiveBackend ? [] : Sample.people
         friends = Config.isLiveBackend ? [] : Sample.people
         friendRequests = []
@@ -307,11 +303,25 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// What the Plans tab badge counts: plans waiting on your vote, plus ones
-    /// locked in for today. Nil when there's nothing to answer — a badge that's
-    /// always lit teaches people to ignore it.
+    /// Group plans you've been invited to and haven't answered. Nil when
+    /// there's nothing to answer — a badge that's always lit teaches people to
+    /// ignore it.
+    var invitations: [PEvent] {
+        events.filter { $0.needsAnswer(from: userId) }
+            .sorted { $0.start < $1.start }
+    }
+
+    /// Group plans you said yes to, still ahead of you.
+    var upcomingPlans: [PEvent] {
+        let now = Date()
+        return events.filter {
+            $0.isGroupEvent && $0.myRsvp(userId) == true && ($0.end ?? $0.start) >= now
+        }
+        .sorted { $0.start < $1.start }
+    }
+
     var plansBadge: Int? {
-        let count = proposals.filter { $0.nudge(for: userId) != nil }.count
+        let count = invitations.count
         return count > 0 ? count : nil
     }
 
@@ -459,132 +469,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: Voting
-
-    /// Vote for one slot. A vote is a choice, not a tally, so this replaces any
-    /// vote you'd already cast on this proposal.
-    ///
-    /// Applied locally first: tapping a slot should move immediately, not after
-    /// two round trips. The server is the truth — if it refuses, we put the old
-    /// state back and say so.
-    @discardableResult
-    func vote(for slot: PSlot, on proposal: PProposal) async -> Bool {
-        let rollback = proposals
-        applyVote(slot.id, on: proposal.id)
-
-        guard Config.isLiveBackend, let uid = userId else { return true }
-        do {
-            try await SupabaseClient.shared.delete("votes", match: [
-                "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
-            ])
-            try await SupabaseClient.shared.insert("votes", values: VoteInsert(
-                proposal_id: proposal.id, slot_id: slot.id, user_id: uid, response: "yes"))
-            await refreshProposals()   // picks up everyone else's votes too
-            return true
-        } catch {
-            proposals = rollback
-            return false
-        }
-    }
-
-    /// The local half of voting, shared by the optimistic path and demo mode.
-    private func applyVote(_ slotId: String?, on proposalId: String) {
-        replaceProposal(proposalId) {
-            var p = $0
-            if let previous = p.myVoteSlotId {
-                p.voteCounts[previous] = max(0, (p.voteCounts[previous] ?? 1) - 1)
-            }
-            if let slotId { p.voteCounts[slotId, default: 0] += 1 }
-            p.myVoteSlotId = slotId
-            p.votes = p.voteCounts.values.reduce(0, +)
-            return p
-        }
-    }
-
-    /// Take your vote back — you can be undecided, and a stale vote is worse
-    /// than none when the organiser is reading the tally.
-    @discardableResult
-    func removeVote(on proposal: PProposal) async -> Bool {
-        let rollback = proposals
-        applyVote(nil, on: proposal.id)
-
-        guard Config.isLiveBackend, let uid = userId else { return true }
-        do {
-            try await SupabaseClient.shared.delete("votes", match: [
-                "proposal_id": "eq.\(proposal.id)", "user_id": "eq.\(uid)",
-            ])
-            await refreshProposals()
-            return true
-        } catch {
-            proposals = rollback
-            return false
-        }
-    }
-
-    /// Call the whole thing off. RLS allows the creator or the group's owner;
-    /// slots and votes go with it by cascade.
-    @discardableResult
-    func cancelPlan(_ proposal: PProposal) async -> Bool {
-        guard Config.isLiveBackend else {
-            proposals.removeAll { $0.id == proposal.id }
-            return true
-        }
-        do {
-            try await SupabaseClient.shared.delete("proposals", match: ["id": "eq.\(proposal.id)"])
-            await refreshProposals()
-            return true
-        } catch {
-            return failed(false, "Couldn't cancel that plan.")
-        }
-    }
-
-    /// Lock a time in: mark the proposal finalized, then put the winning slot on
-    /// the calendar as a real event shared with the group.
-    @discardableResult
-    func lockIn(slot: PSlot, on proposal: PProposal) async -> Bool {
-        guard Config.isLiveBackend, let uid = userId else {
-            replaceProposal(proposal.id) {
-                var p = $0
-                p.finalizedSlotId = slot.id
-                return p
-            }
-            return true
-        }
-        do {
-            try await SupabaseClient.shared.update(
-                "proposals",
-                values: ProposalFinalizeUpdate(finalized_slot_id: slot.id, status: "finalized"),
-                match: ["id": "eq.\(proposal.id)"])
-
-            // The event belongs to whoever locked it in, and is shared with the
-            // group so everyone can see it (events are private by default).
-            if let start = slot.startsAt, let end = slot.endsAt {
-                let iso = ISO8601DateFormatter()
-                let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
-                    "events", values: EventInsert(
-                        owner_id: uid, title: proposal.title, location: nil,
-                        start_at: iso.string(from: start), end_at: iso.string(from: end),
-                        all_day: false,
-                        timezone: TimeZone.current.identifier, source: "plannit",
-                        recurrence_rule: nil))
-                if let event = created.first {
-                    try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
-                        event_id: event.id, group_id: proposal.group.id))
-                }
-            }
-            await refreshProposals()
-            await refreshEvents()
-            return true
-        } catch {
-            return failed(false, "Couldn't lock that time in.")
-        }
-    }
-
-    private func replaceProposal(_ id: String, _ transform: (PProposal) -> PProposal) {
-        guard let i = proposals.firstIndex(where: { $0.id == id }) else { return }
-        proposals[i] = transform(proposals[i])
-    }
-
     // MARK: Events
 
     /// An all-day event covers midnight to midnight whatever times were picked.
@@ -680,6 +564,78 @@ final class AppModel: ObservableObject {
             return true
         } catch {
             return failed(false, "Couldn't rename that group.")
+        }
+    }
+
+    // MARK: Group plans
+
+    /// Answer an invitation. Saying yes is what puts it on your calendar — the
+    /// database grants you a personal share, and your calendar reads shares.
+    /// Applied locally first so the tap lands immediately.
+    @discardableResult
+    func rsvp(to event: PEvent, going: Bool) async -> Bool {
+        guard let uid = userId else { return false }
+        let rollback = events
+        applyRsvp(going, to: event.rowId, by: uid)
+
+        guard Config.isLiveBackend else { return true }
+        do {
+            let _: [EmptyRow] = try await SupabaseClient.shared.rpc(
+                "rsvp_to_event", args: RsvpArgs(p_event: event.rowId, p_going: going))
+            await refreshEvents()
+            return true
+        } catch {
+            events = rollback
+            return failed(false, "Couldn't save your answer. Try again.")
+        }
+    }
+
+    private func applyRsvp(_ going: Bool, to eventId: String, by uid: String) {
+        guard let i = events.firstIndex(where: { $0.id == eventId }) else { return }
+        var e = events[i]
+        e.rsvps[uid] = going
+        if going {
+            if !e.sharedUserIds.contains(uid) { e.sharedUserIds.append(uid) }
+        } else {
+            e.sharedUserIds.removeAll { $0 == uid }
+        }
+        events[i] = e
+    }
+
+    /// Send a time the finder suggested to a group. The event is yours; sharing
+    /// it with the group is what makes it an invitation rather than a private
+    /// plan, and everyone else answers going or not.
+    @discardableResult
+    func proposeGroupEvent(title: String, start: Date, end: Date,
+                           to group: PGroup) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else {
+            events.append(PEvent(id: UUID().uuidString, start: start, end: end,
+                                 title: title, time: "", group: group.name,
+                                 hue: group.hue, icon: "calendar",
+                                 ownerId: userId, rsvps: [userId ?? "me": true],
+                                 sharedGroupIds: [group.id]))
+            return true
+        }
+        let iso = ISO8601DateFormatter()
+        do {
+            let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
+                "events", values: EventInsert(
+                    owner_id: uid, title: title, location: nil,
+                    start_at: iso.string(from: start), end_at: iso.string(from: end),
+                    all_day: false, timezone: TimeZone.current.identifier,
+                    source: "plannit", recurrence_rule: nil))
+            guard let event = created.first else {
+                return failed(false, "Couldn't send that to the group.")
+            }
+            try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
+                event_id: event.id, group_id: group.id))
+            // Whoever picked the time is going — that's what picking it meant.
+            let _: [EmptyRow] = try await SupabaseClient.shared.rpc(
+                "rsvp_to_event", args: RsvpArgs(p_event: event.id, p_going: true))
+            await refreshEvents()
+            return true
+        } catch {
+            return failed(false, "Couldn't send that to the group.")
         }
     }
 

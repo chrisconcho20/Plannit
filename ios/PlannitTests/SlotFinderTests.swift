@@ -125,4 +125,46 @@ final class SlotFinderTests: XCTestCase {
         XCTAssertEqual(TimeOfDay.describing(from: 9 * 60 + 30, to: 11 * 60), "9:30–11:00",
                        "a hand-rolled window still reads back")
     }
+
+    // MARK: grouping by date
+    //
+    // The organiser picks a DATE. Offering five slots on one afternoon is the
+    // same date wearing five hats, so the list is thinned to two times a day.
+
+    private func found(_ start: Date, hours: Int = 2, score: Int = 6) -> PSlot {
+        SlotFinder.slot(from: FoundSlotDTO(
+            start: epochMs(start),
+            end: epochMs(start.addingTimeInterval(Double(hours) * 3600)),
+            score: score, availableUserIds: []))
+    }
+
+    func testAtMostTwoTimesPerDate() {
+        let sat = date(2026, 8, 15, 12)
+        let slots = (0..<5).map { found(sat.addingTimeInterval(Double($0) * 3600)) }
+        let grouped = SlotFinder.byDate(slots)
+
+        XCTAssertEqual(grouped.count, 1, "one date")
+        XCTAssertEqual(grouped[0].slots.count, 2, "two times, not five")
+        XCTAssertEqual(grouped[0].slots.map(\.time), slots.prefix(2).map(\.time),
+                       "the scheduler already ranked them — keep the best two")
+    }
+
+    func testDatesStayInRankedOrder() {
+        let sun = date(2026, 8, 16, 14)
+        let sat = date(2026, 8, 15, 14)
+        // Sunday scored better, so the scheduler put it first: date order must
+        // not quietly re-sort it.
+        let grouped = SlotFinder.byDate([found(sun, score: 6), found(sat, score: 5)])
+        XCTAssertEqual(grouped.map { self.cal.component(.day, from: $0.date) }, [16, 15])
+    }
+
+    func testTheListOfDatesIsCapped() {
+        let slots = (0..<10).map { found(date(2026, 8, 15, 14).addingTimeInterval(Double($0) * 86_400)) }
+        XCTAssertEqual(SlotFinder.byDate(slots).count, SlotFinder.maxDates)
+    }
+
+    func testASlotWithoutAnInstantIsSkipped() {
+        let orphan = PSlot(day: "SAT", date: 15, time: "2:00 PM", free: 3)   // no startsAt
+        XCTAssertTrue(SlotFinder.byDate([orphan]).isEmpty)
+    }
 }

@@ -138,6 +138,17 @@ struct GroupDetailView: View {
             .sorted { $0.start < $1.start }
     }
 
+    /// The group's plans that haven't happened yet. These are the ones with an
+    /// answer attached, so they get the count and the ✓/✗ rather than a card.
+    private var upcomingPlans: [PEvent] {
+        let now = Date()
+        return sharedEvents.filter { ($0.end ?? $0.start) >= now }
+    }
+    private var pastPlans: [PEvent] {
+        let now = Date()
+        return sharedEvents.filter { ($0.end ?? $0.start) < now }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -159,18 +170,31 @@ struct GroupDetailView: View {
                     .padding(.horizontal, Space.gutter)
                     .padding(.top, 16)
 
-                SectionLabel("Shared events")
+                SectionLabel("Plans") {
+                    if !upcomingPlans.isEmpty {
+                        Text("\(upcomingPlans.count) coming up")
+                            .textStyle(.caption, color: .textFaint)
+                    }
+                }
                 if sharedEvents.isEmpty {
-                    EmptyState(icon: "calendar", title: "Nothing shared yet",
-                               message: "Events you share with \(group.name) — and any date the group locks in — collect here.")
+                    EmptyState(icon: "calendar", title: "Nothing planned yet",
+                               message: "Find a date for \(group.name) and it lands here — with who's coming.")
                 } else {
                     LazyVStack(spacing: Space.gapList) {
-                        ForEach(sharedEvents) { event in
-                            NavigationLink(value: event) {
-                                EventCard(title: event.title, time: event.time, location: event.location,
-                                          hue: event.hue, group: nil, people: event.people, icon: event.icon)
+                        // Whoever hasn't answered sees the buttons; everyone
+                        // else sees where the plan stands.
+                        ForEach(upcomingPlans) { event in
+                            if event.needsAnswer(from: model.userId) {
+                                InvitationCard(event: event)
+                            } else {
+                                NavigationLink(value: event) { PlanRow(event: event) }
+                                    .buttonStyle(CardPressStyle())
                             }
-                            .buttonStyle(CardPressStyle())
+                        }
+                        ForEach(pastPlans) { event in
+                            NavigationLink(value: event) { PlanRow(event: event) }
+                                .buttonStyle(CardPressStyle())
+                                .opacity(0.6)
                         }
                     }
                     .padding(.horizontal, Space.gutter)
@@ -272,6 +296,7 @@ struct GroupDetailView: View {
         .onDisappear { if model.openGroup?.id == group.id { model.openGroup = nil } }
         .sheet(isPresented: $showNewPlan) {
             NewPlanSheet(groups: model.groups, preselected: group) { _, _ in showNewPlan = false }
+                .environmentObject(model)
         }
         .sheet(isPresented: $showAddPeople) {
             AddPeopleSheet(group: live).environmentObject(model)

@@ -45,7 +45,13 @@ struct CalendarScreen: View {
     /// not one.
     private var monthOccurrences: [PEvent] {
         guard let monthRange else { return [] }
-        return model.events.flatMap { $0.occurrences(in: monthRange) }
+        return calendarEvents.flatMap { $0.occurrences(in: monthRange) }
+    }
+
+    /// What belongs on *your* calendar. A group plan you haven't answered is an
+    /// invitation, not a commitment — it lives in Plans until you say yes.
+    private var calendarEvents: [PEvent] {
+        model.events.filter { $0.isOnCalendar(for: model.userId) }
     }
 
     /// Events in the shown month, grouped by day — the source of the grid's dots.
@@ -66,7 +72,7 @@ struct CalendarScreen: View {
         if mode != .list, let selectedDate {
             let day = cal.startOfDay(for: selectedDate)
             let end = cal.date(byAdding: .day, value: 1, to: day) ?? day
-            return model.events.flatMap { $0.occurrences(in: day...end) }
+            return calendarEvents.flatMap { $0.occurrences(in: day...end) }
                 .filter { $0.isOn(selectedDate) }
                 .sorted { $0.start < $1.start }
         }
@@ -74,7 +80,7 @@ struct CalendarScreen: View {
         // not once forever at its original start.
         let now = cal.startOfDay(for: Date())
         let horizon = cal.date(byAdding: .month, value: 3, to: now) ?? now
-        return model.events.flatMap { $0.occurrences(in: now...horizon) }
+        return calendarEvents.flatMap { $0.occurrences(in: now...horizon) }
             .sorted { $0.start < $1.start }
     }
 
@@ -163,7 +169,7 @@ struct CalendarScreen: View {
                     }
                     .padding(.horizontal, Space.gutter)
 
-                    if model.firstLoad(of: model.events) {
+                    if model.firstLoad(of: calendarEvents) {
                         SkeletonList(count: 3).padding(.horizontal, Space.gutter)
                     } else if events.isEmpty && deviceEvents.isEmpty {
                         EmptyState(icon: "calendar",
@@ -318,6 +324,8 @@ struct EventDetailView: View {
     @State private var showShare = false
     @State private var showEdit = false
     @State private var confirmDelete = false
+    @State private var confirmDecline = false
+    @State private var answering = false
 
     /// Re-read so the visibility row updates as soon as sharing changes.
     /// An expanded occurrence has a synthetic id, so resolve through the row it
@@ -326,6 +334,22 @@ struct EventDetailView: View {
         (model.events.first { $0.id == event.rowId } ?? event)
     }
     private var isOwner: Bool { live.isOwned(by: model.userId) }
+    /// Your answer to a group plan: true going, false not, nil not yet.
+    private var answer: Bool? { live.myRsvp(model.userId) }
+    private var invitingGroup: PGroup? {
+        live.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id } }.first
+    }
+
+    /// Everyone the plan was offered to, with what they said. Real names and
+    /// real answers — the old "Busy/Free" row was sample data wearing a badge.
+    private var attendees: [(member: PMember, going: Bool?)] {
+        guard let group = invitingGroup else { return [] }
+        return group.members.map { ($0, live.myRsvp($0.id)) }
+            .sorted { rank($0.1) < rank($1.1) }
+    }
+    private func rank(_ going: Bool?) -> Int {
+        switch going { case .some(true): return 0; case .none: return 1; default: return 2 }
+    }
 
     /// "Private" · "Shared with Soccer" · "Shared with Soccer and Maya + 2 more".
     private var visibility: String {
@@ -373,19 +397,51 @@ struct EventDetailView: View {
                 .padding(.horizontal, Space.gutter)
                 .padding(.top, 8)
 
-                if !event.people.isEmpty {
-                    SectionLabel("Who's going")
+                if live.isGroupEvent && !attendees.isEmpty {
+                    SectionLabel("Who's going") {
+                        Text("\(live.goingCount) of \(attendees.count)")
+                            .textStyle(.caption, color: .textFaint)
+                    }
                     VStack(spacing: Space.gapInline) {
-                        ForEach(Array(event.people.enumerated()), id: \.offset) { i, name in
+                        ForEach(attendees, id: \.member.id) { row in
                             HStack(spacing: 12) {
-                                Avatar(name: name, size: 36, status: i % 3 == 0 ? .busy : .free)
-                                Text(name).textStyle(.body, color: .textBody)
+                                Avatar(name: row.member.name, size: 36,
+                                       status: row.going == true ? .free : .busy)
+                                Text(row.member.name).textStyle(.body, color: .textBody)
                                 Spacer()
-                                Badge(text: i % 3 == 0 ? "Busy" : "Free", tone: i % 3 == 0 ? .neutral : .free)
+                                switch row.going {
+                                case .some(true):  Badge(text: "Going", tone: .free, icon: "check")
+                                case .some(false): Badge(text: "Can't make it", tone: .neutral)
+                                case .none:        Badge(text: "No answer yet", tone: .neutral)
+                                }
                             }
                             .padding(.horizontal, Space.gutter)
                         }
                     }
+                } else if !live.isGroupEvent && !event.people.isEmpty {
+                    SectionLabel("Who's going")
+                    VStack(spacing: Space.gapInline) {
+                        ForEach(Array(event.people.enumerated()), id: \.offset) { i, name in
+                            HStack(spacing: 12) {
+                                Avatar(name: name, size: 36, status: .free)
+                                Text(name).textStyle(.body, color: .textBody)
+                                Spacer()
+                            }
+                            .padding(.horizontal, Space.gutter)
+                        }
+                    }
+                }
+
+                if live.isGroupEvent && !isOwner {
+                    rsvpBlock
+                } else if isOwner && live.isGroupEvent {
+                    HStack(spacing: 8) {
+                        PIcon("calendar-check", size: 16, color: .statusFree)
+                        Text("You're going — you picked the time.")
+                            .textStyle(.footnote, color: .textMuted)
+                    }
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.top, 20)
                 }
 
                 // Sharing is the owner's call — RLS won't let anyone else write
@@ -432,6 +488,11 @@ struct EventDetailView: View {
                             .clipShape(Circle())
                     }
                     .accessibilityLabel("More")
+                } else if live.isGroupEvent && answer == true {
+                    Button { confirmDecline = true } label: {
+                        Text("Remove").textStyle(.subhead, color: .statusDanger)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, Space.gutter)
@@ -450,9 +511,73 @@ struct EventDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(live.isPrivate
-                 ? "This removes it from your calendar."
-                 : "This removes it for everyone it's shared with.")
+            Text(deleteWarning)
+        }
+        .confirmationDialog("Not going to “\(live.title)”?", isPresented: $confirmDecline,
+                            titleVisibility: .visible) {
+            Button("Remove from my calendar", role: .destructive) {
+                answerInvitation(false)
+                dismiss()
+            }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text("It comes off your calendar and the group sees you as not going.")
+        }
+    }
+
+    private var deleteWarning: String {
+        if live.isGroupEvent {
+            let going = max(0, live.goingCount - 1)
+            return going == 0
+                ? "The plan is off — nobody else has said yes yet."
+                : "The plan is off. \(going) \(going == 1 ? "person who's" : "people who are") going will be told."
+        }
+        return live.isPrivate
+            ? "This removes it from your calendar."
+            : "This removes it for everyone it's shared with."
+    }
+
+    /// Going or not — the whole of a group plan's participation model. Saying
+    /// yes is what puts it on your calendar (decision D-12, revised).
+    @ViewBuilder
+    private var rsvpBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let group = invitingGroup {
+                HStack(spacing: 6) {
+                    Circle().fill(group.hue.color).frame(width: 7, height: 7)
+                    Text(answer == nil
+                         ? "\(group.name) — are you in?"
+                         : (answer == true ? "You're going" : "You said you can't make it"))
+                        .textStyle(.subhead, color: .textBody)
+                }
+            }
+            HStack(spacing: 10) {
+                PlannitButton(title: "Going", variant: answer == true ? .free : .secondary,
+                              size: .lg, icon: "check", fullWidth: true) {
+                    answerInvitation(true)
+                }
+                .disabled(answering)
+                PlannitButton(title: "Can't make it",
+                              variant: answer == false ? .primary : .secondary,
+                              size: .lg, icon: "x", fullWidth: true) {
+                    answerInvitation(false)
+                }
+                .disabled(answering)
+            }
+            Text(answer == true
+                 ? "It's on your calendar. You can change your mind any time."
+                 : "Say yes and it goes straight on your calendar.")
+                .textStyle(.caption, color: .textFaint)
+        }
+        .padding(.horizontal, Space.gutter)
+        .padding(.top, 20)
+    }
+
+    private func answerInvitation(_ going: Bool) {
+        answering = true
+        Task {
+            await model.rsvp(to: live, going: going)
+            answering = false
         }
     }
 

@@ -9,7 +9,6 @@ protocol DataRepository {
     func fetchGroups() async throws -> [PGroup]
     /// `groups` resolves an event's shares to a group name for display.
     func fetchEvents(groups: [PGroup]) async throws -> [PEvent]
-    func fetchProposals() async throws -> [PProposal]
     func fetchPeople() async throws -> [PMember]
     func fetchFriends() async throws -> [PMember]
     func fetchFriendRequests() async throws -> [PFriendRequest]
@@ -19,7 +18,6 @@ protocol DataRepository {
 struct SampleRepository: DataRepository {
     func fetchGroups() async -> [PGroup] { Sample.groups }
     func fetchEvents(groups: [PGroup]) async -> [PEvent] { Sample.events }
-    func fetchProposals() async -> [PProposal] { Sample.proposals }
     func fetchPeople() async -> [PMember] { Sample.people }
     func fetchFriends() async -> [PMember] { Sample.people }
     func fetchFriendRequests() async -> [PFriendRequest] {
@@ -125,73 +123,14 @@ struct SupabaseRepository: DataRepository {
         // Embedding the shares tells us, in the same round trip, which groups
         // can see each event — that's what makes an event "shared" in the UI.
         let dtos: [EventDTO] = try await client.select(
-            "events", columns: "*,event_shares(group_id,shared_user_id)",
+            "events", columns: "*,event_shares(group_id,shared_user_id),event_rsvps(user_id,response)",
             query: ["deleted_at": "is.null", "order": "start_at.asc"])
         let names = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
         let me = client.userId
         return dtos.map { Self.map($0, groups: names, me: me) }
     }
 
-    /// The Plans tab in two queries: proposals (with their group's members, so
-    /// scores have a denominator and faces, plus every vote), then the slots.
-    ///
-    /// The slots are fetched separately on purpose. `proposals` and
-    /// `proposal_slots` reference each other — `proposal_slots.proposal_id` one
-    /// way, `proposals.finalized_slot_id` the other — so a PostgREST embed is
-    /// ambiguous and needs a hint that depends on generated constraint names.
-    /// A second query is cheaper than that fragility. RLS scopes both to the
-    /// groups you belong to.
-    func fetchProposals() async throws -> [PProposal] {
-        let rows: [ProposalRowDTO] = try await client.select(
-            "proposals",
-            columns: """
-                     id,group_id,created_by,title,status,finalized_slot_id,created_at,constraints,\
-                     groups(id,name,owner_id,avatar_url,group_memberships(user_id,profiles(id,display_name))),\
-                     votes(slot_id,user_id,response)
-                     """,
-            query: ["order": "created_at.desc"])
-        guard !rows.isEmpty else { return [] }
-
-        let slotsByProposal = try await fetchSlots(for: rows.map(\.id))
-        let me = client.userId
-
-        return rows.map { row in
-            let group = Self.mapGroup(row.groups, fallbackId: row.group_id)
-            // Best turnout first, ties broken by the earliest date — the same
-            // ranking the scheduler used when it wrote them.
-            let slots = (slotsByProposal[row.id] ?? []).sorted { a, b in
-                a.score != b.score ? a.score > b.score : a.start_at < b.start_at
-            }
-            let best = slots.first?.id
-
-            var counts: [String: Int] = [:]
-            for vote in row.votes ?? [] where vote.response == "yes" {
-                counts[vote.slot_id, default: 0] += 1
-            }
-
-            return PProposal(
-                id: row.id,
-                title: row.title.isEmpty ? "Untitled plan" : row.title,
-                group: group,
-                constraint: Self.describe(row.constraints),
-                status: row.finalized_slot_id == nil ? "voting" : "found",
-                votes: (row.votes ?? []).filter { $0.response == "yes" }.count,
-                slots: slots.map { Self.mapSlot($0, best: $0.id == best) },
-                voteCounts: counts,
-                myVoteSlotId: (row.votes ?? []).first { $0.user_id == me && $0.response == "yes" }?.slot_id,
-                finalizedSlotId: row.finalized_slot_id,
-                createdBy: row.created_by)
-        }
-    }
-
     private func parseISO(_ s: String) -> Date? { Self.parseISO(s) }
-
-    private func fetchSlots(for proposalIds: [String]) async throws -> [String: [ProposalSlotDTO]] {
-        let rows: [ProposalSlotDTO] = try await client.select(
-            "proposal_slots", columns: "id,proposal_id,start_at,end_at,score,available_user_ids",
-            query: ["proposal_id": "in.(\(proposalIds.joined(separator: ",")))"])
-        return Dictionary(grouping: rows.filter { $0.proposal_id != nil }, by: { $0.proposal_id! })
-    }
 
     private static func mapGroup(_ dto: GroupDTO?, fallbackId: String) -> PGroup {
         guard let dto else {
@@ -207,39 +146,6 @@ struct SupabaseRepository: DataRepository {
                       members: members, note: "", ownerId: dto.owner_id)
     }
 
-    private static func mapSlot(_ dto: ProposalSlotDTO, best: Bool) -> PSlot {
-        let start = parseDate(dto.start_at) ?? Date()
-        let end = parseDate(dto.end_at)
-        let weekday = DateFormatter(); weekday.dateFormat = "EEE"
-        return PSlot(id: dto.id,
-                     day: weekday.string(from: start).uppercased(),
-                     date: Calendar.current.component(.day, from: start),
-                     time: timeLabel(start, end),
-                     free: dto.score,
-                     best: best,
-                     availableIds: dto.available_user_ids ?? [],
-                     startsAt: start,
-                     endsAt: end)
-    }
-
-    /// "Sat, Sun · afternoon · 2h" from the constraints the scheduler stored.
-    private static func describe(_ c: StoredConstraintsDTO?) -> String {
-        guard let c else { return "" }
-        let names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        var parts: [String] = []
-        if let days = c.allowedWeekdays, !days.isEmpty, days.count < 7 {
-            parts.append(days.sorted().compactMap { names.indices.contains($0) ? names[$0] : nil }
-                             .joined(separator: ", "))
-        }
-        if let from = c.dayStartMinutes, let to = c.dayEndMinutes {
-            parts.append(TimeOfDay.describing(from: from, to: to))
-        }
-        if let minutes = c.durationMinutes {
-            parts.append(minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes)m")
-        }
-        return parts.joined(separator: " · ")
-    }
-
     /// "Private" is only true of your own unshared events. Something shared
     /// *with* you isn't private — labelling it that way was misleading.
     private static func badge(shares: Int, isMine: Bool) -> String? {
@@ -253,6 +159,9 @@ struct SupabaseRepository: DataRepository {
         let isDevice = d.source == "device"
         let sharedIds = (d.event_shares ?? []).compactMap(\.group_id)
         let sharedPeople = (d.event_shares ?? []).compactMap(\.shared_user_id)
+        let answers = Dictionary(
+            (d.event_rsvps ?? []).map { ($0.user_id, $0.response == "going") },
+            uniquingKeysWith: { _, latest in latest })
         let firstGroup = sharedIds.compactMap { groups[$0] }.first
 
         return PEvent(
@@ -271,6 +180,7 @@ struct SupabaseRepository: DataRepository {
             isAllDay: d.all_day,
             ownerId: d.owner_id,
             recurrence: Recurrence.rule(from: d.recurrence_rule),
+            rsvps: answers,
             sharedGroupIds: sharedIds,
             sharedUserIds: sharedPeople
         )

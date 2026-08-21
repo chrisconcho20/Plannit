@@ -1,18 +1,21 @@
 import SwiftUI
 import UIKit
 
-// Plans tab — proposals awaiting votes, the plan detail (slots + who's-free),
+// Plans tab — group plans waiting on your answer, the ones you've said yes to,
 // the New Plan (date-finder) flow, and the You screen.
-// Mirrors ui_kits/plannit-ios/PlansScreen.jsx.
+//
+// There is no voting here any more (decision D-12, revised): the organiser
+// picks a date the finder found, everyone else answers going or not going, and
+// saying yes is what puts it on your calendar.
 
-/// The Plans tab's one destination beyond a plan itself.
+/// The Plans tab's one destination beyond an event.
 enum PlansRoute: Hashable { case activity }
 
 struct PlansScreen: View {
     @EnvironmentObject private var model: AppModel
 
-    private var open: [PProposal] { model.proposals.filter { !$0.isFinalized } }
-    private var settled: [PProposal] { model.proposals.filter(\.isFinalized) }
+    private var invitations: [PEvent] { model.invitations }
+    private var upcoming: [PEvent] { model.upcomingPlans }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,33 +46,32 @@ struct PlansScreen: View {
                 if let error = model.loadError {
                     LoadBanner(message: error) { Task { await model.loadData() } }
                 }
-                if !open.isEmpty {
-                    SectionLabel("Awaiting your vote") {
-                        Text("\(open.count)").textStyle(.caption, color: .textFaint)
+                if !invitations.isEmpty {
+                    SectionLabel("Are you in?") {
+                        Text("\(invitations.count)").textStyle(.caption, color: .textFaint)
                     }
                     LazyVStack(spacing: Space.gapList) {
-                        ForEach(open) { proposal in
-                            NavigationLink(value: proposal) { ProposalRow(proposal: proposal) }
+                        ForEach(invitations) { event in
+                            InvitationCard(event: event)
+                        }
+                    }
+                    .padding(.horizontal, Space.gutter)
+                }
+
+                if !upcoming.isEmpty {
+                    SectionLabel("You're going")
+                    LazyVStack(spacing: Space.gapList) {
+                        ForEach(upcoming) { event in
+                            NavigationLink(value: event) { PlanRow(event: event) }
                                 .buttonStyle(CardPressStyle())
                         }
                     }
                     .padding(.horizontal, Space.gutter)
                 }
 
-                if !settled.isEmpty {
-                    SectionLabel("Locked in")
-                    LazyVStack(spacing: Space.gapList) {
-                        ForEach(settled) { proposal in
-                            NavigationLink(value: proposal) { ProposalRow(proposal: proposal) }
-                                .buttonStyle(CardPressStyle())
-                        }
-                    }
-                    .padding(.horizontal, Space.gutter)
-                }
-
-                if model.firstLoad(of: model.proposals) {
+                if model.firstLoad(of: model.events) {
                     SkeletonList(count: 2).padding(.horizontal, Space.gutter)
-                } else if model.proposals.isEmpty {
+                } else if invitations.isEmpty && upcoming.isEmpty {
                     EmptyState(icon: "sparkles", title: "No plans in the air",
                                message: "Pick a group, say roughly when — “a weekend afternoon” — and Plannit checks everyone's calendars and comes back with dates that actually work.")
                 }
@@ -79,264 +81,127 @@ struct PlansScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
-        .liveRefresh(every: 20) { await model.refreshProposals() }
-        .navigationDestination(for: PProposal.self) { PlanDetailView(proposal: $0) }
+        .liveRefresh(every: 20) { await model.refreshEvents() }
+        .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
         .navigationDestination(for: PlansRoute.self) { _ in ActivityScreen() }
     }
 }
 
-struct ProposalRow: View {
-    let proposal: PProposal
+/// An invitation you haven't answered — the whole decision, on one card, so
+/// nobody has to open a screen to say yes.
+struct InvitationCard: View {
+    let event: PEvent
+    @EnvironmentObject private var model: AppModel
+    @State private var answering = false
+
+    private var group: PGroup? {
+        event.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id } }.first
+    }
 
     var body: some View {
         PlannitCard(elevation: 1) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Text(proposal.title).textStyle(.headline, color: .textStrong)
-                    Spacer()
-                    if proposal.status == "voting" {
-                        Badge(text: "\(proposal.votes) voted", tone: .primary, icon: "thumbs-up")
-                    } else {
-                        Badge(text: "Found", tone: .free, icon: "check")
+            VStack(alignment: .leading, spacing: 12) {
+                NavigationLink(value: event) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Text(event.title).textStyle(.headline, color: .textStrong)
+                            Spacer()
+                            Badge(text: "\(event.goingCount) going", tone: .primary, icon: "check")
+                        }
+                        HStack(spacing: 6) {
+                            Circle().fill((group?.hue ?? event.hue).color).frame(width: 7, height: 7)
+                            Text(group?.name ?? event.group ?? "A group")
+                                .textStyle(.caption, color: .textMuted)
+                        }
+                        HStack(spacing: 10) {
+                            PIcon("calendar", size: 16, color: .statusFree)
+                            Text(PlanRow.when(event)).textStyle(.subhead, color: .textBody)
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .contentShape(Rectangle())
                 }
-                HStack(spacing: 6) {
-                    Circle().fill(proposal.group.hue.color).frame(width: 7, height: 7)
-                    Text(proposal.group.name).textStyle(.caption, color: .textMuted)
-                    Text("·").foregroundStyle(Color.textFaint)
-                    Text(proposal.constraint).textStyle(.caption, color: .textMuted)
+                .buttonStyle(.plain)
+
+                HStack(spacing: 10) {
+                    PlannitButton(title: "Going", variant: .free, size: .md,
+                                  icon: "check", fullWidth: true) { answer(true) }
+                        .disabled(answering)
+                    PlannitButton(title: "Can't make it", variant: .secondary, size: .md,
+                                  icon: "x", fullWidth: true) { answer(false) }
+                        .disabled(answering)
                 }
-                // Once a time is locked in, that's the one to show.
-                let headline = proposal.slots.first { $0.id == proposal.finalizedSlotId }
-                    ?? proposal.slots.first
-                if let best = headline {
-                    HStack(spacing: 10) {
-                        PIcon("calendar-check", size: 16, color: .statusFree)
-                        Text("\(best.day) \(best.date) · \(best.time)").textStyle(.subhead, color: .textBody)
-                        Spacer()
-                        Badge(text: "\(best.free)/\(proposal.total) free", tone: best.free == proposal.total ? .free : .neutral)
-                    }
-                    .padding(.top, 2)
-                }
+            }
+        }
+        .opacity(answering ? 0.6 : 1)
+    }
+
+    private func answer(_ going: Bool) {
+        answering = true
+        Task {
+            let ok = await model.rsvp(to: event, going: going)
+            answering = false
+            if ok {
+                model.say(going ? "Added to your calendar" : "You're down as not going")
             }
         }
     }
 }
 
-struct PlanDetailView: View {
-    let proposal: PProposal
+/// A plan you've said yes to.
+struct PlanRow: View {
+    let event: PEvent
     @EnvironmentObject private var model: AppModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedSlot: String?
-    @State private var busy = false
-    @State private var toast: String?
-    @State private var confirmCancel = false
 
-    /// Re-read from the model so votes and the lock-in land without a reopen.
-    private var live: PProposal { model.proposals.first { $0.id == proposal.id } ?? proposal }
-    private var canFinalize: Bool { live.canFinalize(model.userId) }
-    private var chosen: PSlot? { live.slots.first { $0.id == selectedSlot } }
+    private var group: PGroup? {
+        event.sharedGroupIds.compactMap { id in model.groups.first { $0.id == id } }.first
+    }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(live.title).textStyle(.title1, color: .textStrong)
-                        HStack(spacing: 6) {
-                            Circle().fill(live.group.hue.color).frame(width: 8, height: 8)
-                            Text(live.group.name).textStyle(.subhead, color: .textMuted)
-                        }
-                        Text(live.constraint).textStyle(.footnote, color: .textFaint)
-                        if live.isFinalized {
-                            Badge(text: "Locked in", tone: .free, icon: "calendar-check")
-                        }
-                    }
-                    .padding(.horizontal, Space.gutter)
-                    .padding(.top, 4)
-
-                    SectionLabel(live.isFinalized ? "The time" : "Best times") {
-                        if !live.isFinalized {
-                            Text("\(live.votes) of \(live.total) voted")
-                                .textStyle(.caption, color: .textFaint)
-                        }
-                    }
-                    LazyVStack(spacing: Space.gapList) {
-                        ForEach(live.slots) { slot in
-                            let mine = live.myVoteSlotId == slot.id
-                            let count = live.voteCounts[slot.id] ?? 0
-                            Button { withAnimation(Motion.fast) { selectedSlot = slot.id } } label: {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    SlotCard(day: slot.day, date: slot.date, time: slot.time,
-                                             freeCount: slot.free, total: live.total,
-                                             people: live.people(for: slot),
-                                             best: slot.best,
-                                             selected: selectedSlot == slot.id)
-                                    if mine || count > 0 {
-                                        HStack(spacing: 6) {
-                                            if mine {
-                                                Badge(text: "Your pick", tone: .primary, icon: "check")
-                                            }
-                                            if count > 0 {
-                                                Text("\(count) vote\(count == 1 ? "" : "s")")
-                                                    .textStyle(.caption, color: .textMuted)
-                                            }
-                                        }
-                                        .padding(.leading, 4)
-                                    }
-                                }
-                            }
-                            .buttonStyle(CardPressStyle())
-                            .opacity(live.isFinalized && live.finalizedSlotId != slot.id ? 0.45 : 1)
-                        }
-                    }
-                    .padding(.horizontal, Space.gutter)
-
-                    if !proposal.availability.isEmpty {
-                        SectionLabel("Who's free") { Text("8am – 10pm").textStyle(.caption, color: .textFaint) }
-                        PlannitCard(elevation: 1) {
-                            VStack(spacing: 12) {
-                                ForEach(proposal.availability) { person in
-                                    AvailabilityBar(name: person.name, blocks: person.blocks)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, Space.gutter)
-                    }
-                    Color.clear.frame(height: 120)
+        PlannitCard(elevation: 1) {
+            HStack(spacing: 14) {
+                VStack(spacing: 0) {
+                    Text(Self.weekday(event)).textStyle(.overline, color: Palette.teal700)
+                    Text("\(event.day)")
+                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.teal700)
                 }
-            }
+                .frame(width: 52)
+                .padding(.vertical, 6)
+                .background(Palette.teal50)
+                .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
 
-            footer
-        }
-        .background(Color.appBg)
-        .navigationBarHidden(true)
-        .safeAreaInset(edge: .top) {
-            HStack {
-                IconButton(icon: "chevron-left", variant: .secondary, size: 40, iconSize: 18,
-                           accessibilityLabel: "Back") { dismiss() }
-                Spacer()
-                if canFinalize {
-                    Button(role: .destructive) { confirmCancel = true } label: {
-                        Text("Cancel plan").textStyle(.subhead, color: .statusDanger)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(event.title).textStyle(.headline, color: .textStrong)
+                    HStack(spacing: 6) {
+                        Circle().fill((group?.hue ?? event.hue).color).frame(width: 7, height: 7)
+                        Text(group?.name ?? event.group ?? "A group")
+                            .textStyle(.caption, color: .textMuted)
+                        Text("·").foregroundStyle(Color.textFaint)
+                        Text(Self.when(event)).textStyle(.caption, color: .textMuted)
                     }
-                    .buttonStyle(.plain)
                 }
-            }
-            .padding(.horizontal, Space.gutter).padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-        }
-        .confirmationDialog("Cancel “\(live.title)”?", isPresented: $confirmCancel,
-                            titleVisibility: .visible) {
-            Button("Cancel this plan", role: .destructive) {
-                Task { await model.cancelPlan(live) }
-                dismiss()
-            }
-            Button("Keep it", role: .cancel) {}
-        } message: {
-            Text("The times and everyone's votes go with it.")
-        }
-        .overlay(alignment: .top) {
-            if let toast {
-                Toast(text: toast)
-                    .padding(.horizontal, Space.gutter).padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                Spacer(minLength: 0)
+                Badge(text: "\(event.goingCount) going", tone: .free, icon: "check")
             }
         }
-        .onAppear {
-            // Open on your vote if you've cast one, else the locked time, else the best.
-            selectedSlot = live.myVoteSlotId ?? live.finalizedSlotId
-                ?? live.slots.first(where: { $0.best })?.id
-        }
-        .liveRefresh(every: 10) { await model.refreshProposals() }
     }
 
-    // Vote first; locking a time in is the organiser's call and comes second.
-    @ViewBuilder
-    private var footer: some View {
-        VStack(spacing: 8) {
-            if live.isFinalized {
-                HStack(spacing: 8) {
-                    PIcon("calendar-check", size: 18, color: .statusFree)
-                    Text("Locked in — it's on everyone's calendar")
-                        .textStyle(.subhead, color: .textBody)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            } else {
-                PlannitButton(title: voteTitle, variant: .primary, size: .lg,
-                              icon: live.myVoteSlotId == selectedSlot ? "check" : "thumbs-up",
-                              fullWidth: true) { castVote() }
-                    .disabled(voteDisabled)
-                    .opacity(voteDisabled ? 0.5 : 1)
-
-                if live.myVoteSlotId != nil {
-                    Button { removeVote() } label: {
-                        Text("Remove my vote").textStyle(.subhead, color: .textMuted)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
-                }
-
-                if canFinalize {
-                    PlannitButton(title: busy ? "Locking in…" : "Lock in this time",
-                                  variant: .free, size: .md, icon: "calendar-check",
-                                  fullWidth: true) { lockIn() }
-                        .disabled(chosen == nil || busy)
-                        .opacity(chosen == nil || busy ? 0.5 : 1)
-                }
-            }
-        }
-        .padding(Space.gutter)
-        .background(.ultraThinMaterial)
+    static func weekday(_ event: PEvent) -> String {
+        let f = DateFormatter(); f.dateFormat = "EEE"
+        return f.string(from: event.start).uppercased()
     }
 
-    private var voteTitle: String {
-        if busy { return "Saving…" }
-        if live.myVoteSlotId == selectedSlot { return "Your pick" }
-        return live.myVoteSlotId == nil ? "Vote for this time" : "Change my vote"
-    }
-    private var voteDisabled: Bool {
-        chosen == nil || busy || live.myVoteSlotId == selectedSlot
-    }
-
-    private func removeVote() {
-        busy = true
-        Task {
-            let ok = await model.removeVote(on: live)
-            busy = false
-            show(ok ? "Vote removed" : "Couldn't remove your vote. Try again.")
-        }
-    }
-
-    private func castVote() {
-        guard let slot = chosen else { return }
-        busy = true
-        Task {
-            let ok = await model.vote(for: slot, on: live)
-            busy = false
-            show(ok ? "Voted — \(slot.day) \(slot.date), \(slot.time)"
-                    : "Couldn't save your vote. Try again.")
-        }
-    }
-
-    private func lockIn() {
-        guard let slot = chosen else { return }
-        busy = true
-        Task {
-            let ok = await model.lockIn(slot: slot, on: live)
-            busy = false
-            show(ok ? "Locked in — everyone will get it on their calendar"
-                    : "Couldn't lock that in. Try again.")
-        }
-    }
-
-    private func show(_ message: String) {
-        withAnimation(Motion.base) { toast = message }
-        Task {
-            try? await Task.sleep(nanoseconds: 2_600_000_000)
-            withAnimation(Motion.base) { toast = nil }
-        }
+    /// "Sat 16 Aug · 2:00 PM" — the date first, because that's what was decided.
+    static func when(_ event: PEvent) -> String {
+        let f = DateFormatter()
+        f.dateFormat = Calendar.current.isDate(event.start, equalTo: Date(), toGranularity: .year)
+            ? "EEE d MMM" : "EEE d MMM yyyy"
+        let day = f.string(from: event.start)
+        guard !event.isAllDay else { return "\(day) · all day" }
+        let t = DateFormatter(); t.dateFormat = "h:mm a"
+        return "\(day) · \(t.string(from: event.start))"
     }
 }
 

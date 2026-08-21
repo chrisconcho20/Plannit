@@ -108,10 +108,21 @@ struct EventDTO: Decodable, Identifiable {
     let source: String
     let recurrence_rule: String?
     let event_shares: [EventShareEmbedDTO]?   // only one FK to events — safe to embed
+    let event_rsvps: [RsvpEmbedDTO]?
 }
 struct EventShareEmbedDTO: Decodable {
     let group_id: String?
     let shared_user_id: String?
+}
+struct RsvpEmbedDTO: Decodable {
+    let user_id: String
+    let response: String       // "going" | "not_going"
+}
+/// A void RPC still answers with a JSON array; nothing in it to decode.
+struct EmptyRow: Decodable {}
+struct RsvpArgs: Encodable {
+    let p_event: String
+    let p_going: Bool
 }
 
 struct EventInsert: Encodable {
@@ -132,50 +143,6 @@ struct BusyBlockInsert: Encodable {
     let end_at: String
 }
 
-// A proposal with its group and votes. Slots are fetched separately — see
-// SupabaseRepository.fetchProposals for why.
-struct ProposalRowDTO: Decodable, Identifiable {
-    let id: String
-    let group_id: String
-    let created_by: String
-    let title: String
-    let status: String
-    let finalized_slot_id: String?
-    let created_at: String?
-    let constraints: StoredConstraintsDTO?
-    let groups: GroupDTO?
-    let votes: [VoteDTO]?
-}
-/// The `constraints` jsonb as stored by find-slots — enough to describe the ask.
-struct StoredConstraintsDTO: Decodable {
-    let allowedWeekdays: [Int]?
-    let dayStartMinutes: Int?
-    let dayEndMinutes: Int?
-    let durationMinutes: Int?
-}
-struct ProposalSlotDTO: Decodable, Identifiable {
-    let id: String
-    let proposal_id: String?
-    let start_at: String
-    let end_at: String
-    let score: Int
-    let available_user_ids: [String]?
-}
-struct VoteDTO: Decodable {
-    let slot_id: String
-    let user_id: String
-    let response: String
-}
-struct VoteInsert: Encodable {
-    let proposal_id: String
-    let slot_id: String
-    let user_id: String
-    let response: String   // "yes" | "no" | "maybe"
-}
-struct ProposalFinalizeUpdate: Encodable {
-    let finalized_slot_id: String
-    let status: String     // "finalized"
-}
 struct EventUpdate: Encodable {
     let title: String
     let location: String?

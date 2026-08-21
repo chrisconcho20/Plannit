@@ -5,6 +5,9 @@ import SwiftUI
 
 enum Sample {
     static let me = "You Concho"
+    /// Demo mode still needs an identity: RSVPs, ownership and "is this on my
+    /// calendar" are all answers about *someone*.
+    static let meId = "demo-me"
 
     static let people = PMember.named(
         ["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"])
@@ -53,37 +56,23 @@ enum Sample {
                sharedGroupIds: ["flat"]),
         PEvent(id: "e5", start: date(inDays: 9, at: 9, 15), title: "Dentist", time: "9:15 AM",
                hue: .coral, icon: "clock", badge: "Private", badgeTone: .neutral, source: .device),
+        // Someone else's plan, waiting on your answer — the Plans tab's whole
+        // job. Not on your calendar until you say yes.
+        PEvent(id: "e6", start: date(inDays: 5, at: 19), title: "Someone's 30th", time: "7:00–11:00 PM",
+               location: "The Windmill",
+               group: "Family", hue: .amber, icon: "cake", source: .plannit,
+               ownerId: "Maya Ellis", rsvps: ["Maya Ellis": true, "Ada Kim": true],
+               sharedGroupIds: ["family"]),
     ]
 
     static let activity: [PActivity] = [
-        PActivity(id: "a1", kind: .vote, happenedAt: Date().addingTimeInterval(-900),
+        PActivity(id: "a1", kind: .rsvp, happenedAt: Date().addingTimeInterval(-900),
                   actor: "Maya Ellis", title: "Five-a-side", subtitle: "Soccer"),
-        PActivity(id: "a2", kind: .planCreated, happenedAt: Date().addingTimeInterval(-7200),
+        PActivity(id: "a2", kind: .invited, happenedAt: Date().addingTimeInterval(-7200),
                   actor: "Theo Sand", title: "Someone's 30th", subtitle: "Family"),
         PActivity(id: "a3", kind: .eventShared, happenedAt: Date().addingTimeInterval(-90000),
                   actor: "Ada Kim", title: "Film night", subtitle: "Flatmates"),
         PActivity(id: "a4", kind: .friendRequest, happenedAt: Date().addingTimeInterval(-200000),
                   actor: "Kit Halloran", title: "", subtitle: nil),
-    ]
-
-    static let proposals: [PProposal] = [
-        PProposal(id: "p1", title: "Five-a-side", group: groups[0],
-                  constraint: "Sat, Sun · afternoon · 2 hours", status: "voting", votes: 4,
-                  slots: [
-                      PSlot(day: "SAT", date: 16, time: "2:00 – 4:00 PM", free: 6, best: true),
-                      PSlot(day: "SUN", date: 17, time: "11:00 AM – 1:00 PM", free: 5),
-                      PSlot(day: "SAT", date: 23, time: "3:00 – 5:00 PM", free: 5),
-                  ],
-                  availability: [
-                      PAvailability(name: "Maya", blocks: [BusyRange(start: 9, end: 11)]),
-                      PAvailability(name: "Theo", blocks: [BusyRange(start: 8, end: 9), BusyRange(start: 18, end: 21)]),
-                      PAvailability(name: "Ada", blocks: [BusyRange(start: 13, end: 14)]),
-                      PAvailability(name: "Sam", blocks: []),
-                      PAvailability(name: "Rae", blocks: [BusyRange(start: 19, end: 22)]),
-                      PAvailability(name: "Jo", blocks: [BusyRange(start: 8, end: 10)]),
-                  ]),
-        PProposal(id: "p2", title: "Someone's 30th", group: groups[1],
-                  constraint: "Fri, Sat · evening · next 3 months", status: "found", votes: 3,
-                  slots: [PSlot(day: "SAT", date: 6, time: "7:00 PM", free: 3, best: true)]),
     ]
 }

@@ -48,6 +48,7 @@ struct RootView: View {
         .environmentObject(model)
         // Straight back in if the Keychain still has a session.
         .task {
+            model.startDemoIdentity()
             guard flow == .restoring else { return }
             flow = await model.restoreSession() ? .app : .welcome
         }
@@ -75,10 +76,9 @@ struct RootView: View {
             NewPlanSheet(groups: model.groups, preselected: model.openGroup) { name, group in
                 showNewPlan = false
                 tab = .plans
-                showToast(model.isLiveBackend
-                          ? "\(name) sent to \(group) — we’ll ping you as votes come in"
-                          : "\(name) sent to \(group) — 4 have voted already")
+                showToast("\(name) sent to \(group) — we’ll tell you who's in")
             }
+            .environmentObject(model)
         }
         .sheet(isPresented: $showNewEvent) {
             NewEventSheet(date: Date(), group: model.openGroup).environmentObject(model)

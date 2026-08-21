@@ -56,8 +56,14 @@ enum SearchWindow {
 }
 
 enum SlotFinder {
-    /// Slots to show — enough to choose from without burying the best one.
-    static let maxResults = 5
+    /// Ask for plenty and thin them out by date: what matters is a choice of
+    /// *days*, and five slots on the same afternoon is one day dressed as five.
+    /// 20 is the server's cap.
+    static let maxResults = 20
+    /// Times offered per date. Two is a choice; five is a menu.
+    static let perDate = 2
+    /// Dates offered.
+    static let maxDates = 4
     static let stepMinutes = 30
 
     static func constraints(days: Set<Int>, timeOfDay: String, duration: String,
@@ -100,7 +106,9 @@ enum SlotFinder {
                      time: timeRange(start, end),
                      free: dto.score,
                      best: best,
-                     availableIds: dto.availableUserIds)
+                     availableIds: dto.availableUserIds,
+                     startsAt: start,
+                     endsAt: end)
     }
 
     /// "2:00 – 4:00 PM" — the meridiem is only repeated when it changes.
@@ -110,6 +118,24 @@ enum SlotFinder {
         let cal = Calendar.current
         let sameHalf = (cal.component(.hour, from: start) < 12) == (cal.component(.hour, from: end) < 12)
         return "\(sameHalf ? short.string(from: start) : full.string(from: start)) – \(full.string(from: end))"
+    }
+
+    /// Group ranked slots into dates, keeping the best couple of times on each.
+    /// The scheduler already ordered them, so first-seen is best-first.
+    static func byDate(_ slots: [PSlot]) -> [(date: Date, slots: [PSlot])] {
+        let cal = Calendar.current
+        var order: [Date] = []
+        var buckets: [Date: [PSlot]] = [:]
+        for slot in slots {
+            guard let start = slot.startsAt else { continue }
+            let day = cal.startOfDay(for: start)
+            if buckets[day] == nil { order.append(day) }
+            var times = buckets[day] ?? []
+            guard times.count < perDate else { continue }
+            times.append(slot)
+            buckets[day] = times
+        }
+        return order.prefix(maxDates).map { (date: $0, slots: buckets[$0] ?? []) }
     }
 
     private static func epochMs(_ d: Date) -> Int64 { Int64(d.timeIntervalSince1970 * 1000) }

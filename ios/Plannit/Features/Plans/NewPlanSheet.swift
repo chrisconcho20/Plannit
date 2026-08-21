@@ -2,7 +2,9 @@ import SwiftUI
 
 // NewPlanSheet — the date-finder (the wedge). Pick a group, describe a
 // plain-language constraint ("a weekend afternoon"), let Plannit check
-// everyone's availability, then send ranked slots to the group to vote.
+// everyone's availability, then pick one of the dates it found and send *that*
+// to the group (decision D-12, revised): the group answers going or not going,
+// it doesn't vote between times. Whoever picks the time is going by definition.
 // Mirrors the ＋ flow in ui_kits/plannit-ios/PlansScreen.jsx.
 
 struct NewPlanSheet: View {
@@ -10,6 +12,7 @@ struct NewPlanSheet: View {
     var preselected: PGroup? = nil
     var onFound: (_ name: String, _ group: String) -> Void
 
+    @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var step = 0                    // 0 group · 1 constraint · 2 results
     @State private var group: PGroup?
@@ -20,6 +23,7 @@ struct NewPlanSheet: View {
     @State private var finding = false
     @State private var sending = false
     @State private var slots: [PSlot] = []
+    @State private var chosen: PSlot?
     @State private var everyoneFree = true
     @State private var errorText: String?
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
@@ -39,11 +43,27 @@ struct NewPlanSheet: View {
     private var total: Int { group?.members.count ?? 0 }
     private var isLive: Bool { Config.isLiveBackend }
 
-    /// Demo-mode stand-in for the scheduler's output.
+    /// Demo-mode stand-in for the scheduler's output: this weekend and the
+    /// next, with real instants so picking one still produces a real event.
     private var sampleSlots: [PSlot] {
-        [PSlot(day: "SAT", date: 16, time: "2:00 – 4:00 PM", free: total, best: true),
-         PSlot(day: "SUN", date: 17, time: "11:00 AM – 1:00 PM", free: max(0, total - 1)),
-         PSlot(day: "SAT", date: 23, time: "3:00 – 5:00 PM", free: max(0, total - 1))]
+        let cal = Calendar.current
+        let hours = max(1, SlotFinder.minutes(from: duration) / 60)
+        let saturday = cal.nextDate(after: Date(),
+                                    matching: DateComponents(hour: 14, weekday: 7),
+                                    matchingPolicy: .nextTime) ?? Date()
+        let starts = [saturday,
+                      cal.date(byAdding: .hour, value: 3, to: saturday) ?? saturday,
+                      cal.date(byAdding: .day, value: 1, to: saturday) ?? saturday,
+                      cal.date(byAdding: .day, value: 7, to: saturday) ?? saturday]
+        return starts.enumerated().map { i, start in
+            let end = cal.date(byAdding: .hour, value: hours, to: start) ?? start
+            return SlotFinder.slot(
+                from: FoundSlotDTO(start: Int64(start.timeIntervalSince1970 * 1000),
+                                   end: Int64(end.timeIntervalSince1970 * 1000),
+                                   score: i == 0 ? total : max(0, total - 1),
+                                   availableUserIds: []),
+                best: i == 0)
+        }
     }
 
     var body: some View {
@@ -67,7 +87,7 @@ struct NewPlanSheet: View {
     }
 
     private var stepTitle: String {
-        switch step { case 0: return "Pick a group"; case 1: return "What are you planning?"; default: return "Found some times" }
+        switch step { case 0: return "Pick a group"; case 1: return "What are you planning?"; default: return "Pick a date" }
     }
 
     // MARK: Step 0 — group
@@ -187,14 +207,36 @@ struct NewPlanSheet: View {
                          : "No time works for all \(total) in \(SearchWindow.phrase(searchMonths)) — here’s the best turnout.")
                         .textStyle(.footnote, color: .textMuted)
                 }
-                ForEach(slots) { slot in
-                    SlotCard(day: slot.day, date: slot.date, time: slot.time,
-                             freeCount: slot.free, total: total,
-                             people: people(for: slot),
-                             best: slot.best)
+                // One decision to make: which date. At most two times per
+                // date — five slots on the same afternoon is a menu, not a
+                // choice.
+                ForEach(dates, id: \.date) { day in
+                    VStack(alignment: .leading, spacing: Space.gapList) {
+                        Text(dayHeading(day.date)).textStyle(.overline, color: .textFaint)
+                        ForEach(day.slots) { slot in
+                            Button { withAnimation(Motion.fast) { chosen = slot } } label: {
+                                SlotCard(day: slot.day, date: slot.date, time: slot.time,
+                                         freeCount: slot.free, total: total,
+                                         people: people(for: slot),
+                                         best: slot.best,
+                                         selected: chosen?.id == slot.id)
+                            }
+                            .buttonStyle(CardPressStyle())
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private var dates: [(date: Date, slots: [PSlot])] { SlotFinder.byDate(slots) }
+
+    /// "SATURDAY 16 AUGUST" — the year only when it isn't this one.
+    private func dayHeading(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year)
+            ? "EEEE d MMMM" : "EEEE d MMMM yyyy"
+        return f.string(from: date).uppercased()
     }
 
     // MARK: Footer
@@ -216,7 +258,7 @@ struct NewPlanSheet: View {
                 .disabled(days.isEmpty).opacity(days.isEmpty ? 0.5 : 1)
                 .padding(Space.gutter)
             default:
-                PlannitButton(title: sending ? "Sending…" : "Send to group to vote",
+                PlannitButton(title: sending ? "Sending…" : sendTitle,
                               variant: .primary, size: .lg, icon: "send", fullWidth: true) {
                     send()
                 }
@@ -227,7 +269,14 @@ struct NewPlanSheet: View {
         .background(.ultraThinMaterial)
     }
 
-    private var sendDisabled: Bool { finding || sending || slots.isEmpty }
+    private var sendDisabled: Bool { finding || sending || chosen == nil }
+
+    /// Name the date you're about to commit to — "Send Sat 16 to the group".
+    private var sendTitle: String {
+        guard let start = chosen?.startsAt else { return "Pick a date" }
+        let f = DateFormatter(); f.dateFormat = "EEE d"
+        return "Send \(f.string(from: start)) to the group"
+    }
 
     /// The members actually free then — the scheduler tells us who, so show
     /// their faces rather than the first N people in the group.
@@ -241,9 +290,9 @@ struct NewPlanSheet: View {
 
     // MARK: Actions
 
-    /// Run the scheduler. Live mode previews real slots (`persist: false`) so an
-    /// abandoned sheet never leaves an orphan proposal behind; the proposal is
-    /// written only when the user sends it to the group.
+    /// Run the scheduler. Nothing is persisted here (`persist: false`) — the
+    /// search is a preview, and the only thing that outlives this sheet is the
+    /// one date you pick.
     private func findTimes() {
         errorText = nil
         withAnimation(Motion.base) { step = 2; finding = true }
@@ -251,6 +300,7 @@ struct NewPlanSheet: View {
         guard isLive, let selected = group else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
                 slots = sampleSlots
+                chosen = slots.first
                 everyoneFree = true
                 withAnimation(Motion.base) { finding = false }
             }
@@ -264,6 +314,7 @@ struct NewPlanSheet: View {
                 slots = res.slots.enumerated().map { i, dto in
                     SlotFinder.slot(from: dto, best: i == 0)
                 }
+                chosen = dates.first?.slots.first
             } catch {
                 slots = []
                 errorText = Self.message(for: error)
@@ -272,25 +323,23 @@ struct NewPlanSheet: View {
         }
     }
 
-    /// Persist the proposal so the group can vote on it.
+    /// Turn the picked slot into a real group event. You're going — picking the
+    /// time is what said so — and everyone else gets an invitation to answer.
     private func send() {
-        guard isLive, let selected = group else {
-            onFound(planTitle, group?.name ?? "your group")
-            dismiss()
-            return
-        }
+        guard let selected = group, let slot = chosen,
+              let start = slot.startsAt, let end = slot.endsAt else { return }
 
         sending = true
         Task {
-            do {
-                _ = try await invokeFindSlots(group: selected, persist: true)
-                sending = false
-                onFound(planTitle, selected.name)
-                dismiss()
-            } catch {
-                sending = false
-                errorText = Self.message(for: error)
+            let ok = await model.proposeGroupEvent(title: planTitle, start: start,
+                                                   end: end, to: selected)
+            sending = false
+            guard ok else {
+                errorText = "Couldn’t send that to the group. Try again."
+                return
             }
+            onFound(planTitle, selected.name)
+            dismiss()
         }
     }
 
