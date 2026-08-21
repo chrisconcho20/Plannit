@@ -40,6 +40,7 @@ struct PIcon: View {
         "settings": "gearshape.fill", "bell": "bell.fill", "lock": "lock.fill",
         "eye": "eye", "eye-off": "eye.slash", "info": "info.circle", "inbox": "tray.fill",
         "list": "list.bullet", "map-pin": "mappin.and.ellipse", "house": "house.fill",
+        "external-link": "arrow.up.forward.app",
         "message-circle": "message.fill", "sun": "sun.max.fill", "moon": "moon.fill",
         // the wedge / delight
         "sparkles": "sparkles", "wand-sparkles": "wand.and.stars", "star": "star.fill",

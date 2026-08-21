@@ -118,8 +118,6 @@ struct RsvpEmbedDTO: Decodable {
     let user_id: String
     let response: String       // "going" | "not_going"
 }
-/// A void RPC still answers with a JSON array; nothing in it to decode.
-struct EmptyRow: Decodable {}
 struct RsvpArgs: Encodable {
     let p_event: String
     let p_going: Bool
@@ -137,10 +135,14 @@ struct EventInsert: Encodable {
     let recurrence_rule: String?
 }
 
-struct BusyBlockInsert: Encodable {
-    let user_id: String
+/// One busy range on its way to `replace_busy_blocks`. No `user_id`: the
+/// function takes it from auth.uid() rather than believing the payload.
+struct BusyBlockRow: Encodable {
     let start_at: String   // ISO-8601
     let end_at: String
+}
+struct ReplaceBusyBlocksArgs: Encodable {
+    let p_blocks: [BusyBlockRow]
 }
 
 struct EventUpdate: Encodable {
@@ -524,6 +526,24 @@ final class SupabaseClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(args)
         return try await send(req)
+    }
+
+    /// Call a function whose result we don't need.
+    ///
+    /// This is not a convenience. PostgREST answers a `returns void` function
+    /// with an **empty body**, and decoding that into any type throws — so the
+    /// generic `rpc` above reports a decoding failure for a write that
+    /// succeeded, and the caller rolls back state the server has already
+    /// changed. Anything returning void or a bare scalar goes through here.
+    func rpcVoid<Args: Encodable>(_ name: String, args: Args) async throws {
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("rest/v1/rpc/\(name)"))
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(args)
+        _ = try await sendRaw(req)
     }
 
     // MARK: Edge Functions

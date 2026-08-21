@@ -1,4 +1,5 @@
 import BackgroundTasks
+import CryptoKit
 import Foundation
 
 // BackgroundRefresh — keep availability from going stale while the app is shut.
@@ -30,7 +31,8 @@ enum BackgroundRefresh {
     static func run() async {
         Log.sync("background refresh fired")
         await MainActor.run { _ = SupabaseClient.shared.restoreSession() }
-        await AvailabilityUploader.upload(calendar: CalendarService())
+        await CalendarReader.shared.refreshSources()
+        await AvailabilityUploader.upload(reading: CalendarReader.shared.read())
         schedule()   // one run only ever earns the next
     }
 }
@@ -38,28 +40,68 @@ enum BackgroundRefresh {
 /// Shared by the app and the background task, so the rules about what leaves the
 /// phone live in exactly one place.
 enum AvailabilityUploader {
+    /// When the last upload succeeded, for the You screen. Nil until one has.
+    @MainActor private(set) static var lastUploadedAt: Date?
+    /// Set when the last attempt failed, so the UI can say so instead of
+    /// looking merely quiet.
+    @MainActor private(set) static var lastUploadFailed = false
+    /// Digest of what we last sent. An unchanged calendar shouldn't cost a
+    /// write on every foreground.
+    private static let digestKey = "plannit.busyDigest"
+
     @MainActor
-    static func upload(calendar: CalendarService) async {
+    static func upload(reading: BusyReading) async {
         guard SupabaseClient.shared.isConfigured, SupabaseClient.shared.isSignedIn,
-              let uid = SupabaseClient.shared.userId else { return }
+              SupabaseClient.shared.userId != nil else { return }
 
         let iso = ISO8601DateFormatter()
-        let now = Date()
-        let blocks = calendar.busyIntervals().map {
-            BusyBlockInsert(user_id: uid,
-                            start_at: iso.string(from: $0.start),
-                            end_at: iso.string(from: $0.end))
+        let blocks = reading.blocks
+
+        // An empty upload is indistinguishable from "free all year", and it is
+        // the shape every bug in this path produces. If the calendar had events
+        // in the window, an empty merge means something went wrong on our side
+        // — keep yesterday's blocks and say so in the log.
+        if blocks.isEmpty && reading.eventCount > 0 {
+            Log.cal("busy: refusing to upload an empty set — the calendar isn't empty")
+            lastUploadFailed = true
+            return
         }
+
+        let payload = blocks.map {
+            BusyBlockRow(start_at: iso.string(from: $0.start), end_at: iso.string(from: $0.end))
+        }
+        let digest = Self.digest(of: payload)
+        guard digest != UserDefaults.standard.string(forKey: digestKey) else {
+            Log.cal("busy: unchanged since the last upload, skipping")
+            lastUploadFailed = false
+            return
+        }
+
         do {
-            // Replace the future window rather than appending to it — a plain
-            // insert stacked a fresh copy of the calendar every time.
-            try await SupabaseClient.shared.delete("busy_blocks", match: [
-                "user_id": "eq.\(uid)", "end_at": "gte.\(iso.string(from: now))",
-            ])
-            guard !blocks.isEmpty else { return }
-            try await SupabaseClient.shared.insert("busy_blocks", values: blocks)
+            // One transaction, server-side. The old delete-then-insert pair left
+            // a window — and a whole failure mode — where you looked free.
+            try await SupabaseClient.shared.rpcVoid(
+                "replace_busy_blocks", args: ReplaceBusyBlocksArgs(p_blocks: payload))
+            UserDefaults.standard.set(digest, forKey: digestKey)
+            lastUploadedAt = Date()
+            lastUploadFailed = false
+            Log.cal("busy: uploaded \(payload.count) blocks")
         } catch {
-            // Best-effort: the next foreground sync tries again.
+            // Best-effort: the next foreground sync tries again. The previous
+            // blocks are still there, which is the right way to fail.
+            lastUploadFailed = true
+            Log.cal("busy: upload failed, keeping the previous blocks")
         }
+    }
+
+    /// Content hash of what we're about to send. SHA-256 rather than
+    /// `Hasher`, which is seeded per process — the digest has to mean the same
+    /// thing after a relaunch or it never matches and never saves a write.
+    ///
+    /// The list is already clipped, sorted and merged, so equal strings really
+    /// do mean equal availability.
+    private static func digest(of blocks: [BusyBlockRow]) -> String {
+        let joined = blocks.map { "\($0.start_at)/\($0.end_at)" }.joined(separator: ",")
+        return SHA256.hash(data: Data(joined.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

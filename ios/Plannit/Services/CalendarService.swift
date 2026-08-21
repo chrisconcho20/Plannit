@@ -12,7 +12,14 @@ import UIKit
 //   • write — Plannit-origin events mirrored into a dedicated "Plannit"
 //             calendar, so a locked-in plan really is on your calendar
 
-struct DeviceEvent: Identifiable, Hashable {
+/// What one sweep of the calendar found: the merged busy ranges, and how many
+/// events were in the window at all.
+struct BusyReading: Sendable {
+    let blocks: [BusyInterval]
+    let eventCount: Int
+}
+
+struct DeviceEvent: Identifiable, Hashable, Sendable {
     let id: String
     /// The stable cross-device id (`calendarItemExternalIdentifier`) — the
     /// dedupe key the sync contract keys imports on. `id` above is the local
@@ -47,11 +54,64 @@ final class CalendarService {
         }
     }
 
-    var hasAccess: Bool {
+    /// May we read the calendar? Availability and the whole date-finder depend
+    /// on this one.
+    var canRead: Bool {
         if #available(iOS 17.0, *) {
             return EKEventStore.authorizationStatus(for: .event) == .fullAccess
         }
         return EKEventStore.authorizationStatus(for: .event) == .authorized
+    }
+
+    /// May we write into our own calendar? **Write-only counts.** Treating
+    /// anything short of full access as "no access" meant someone who granted
+    /// exactly what the mirror needs got no mirror — a permission we asked for,
+    /// were given, and then ignored.
+    var canWrite: Bool {
+        if #available(iOS 17.0, *) {
+            let status = EKEventStore.authorizationStatus(for: .event)
+            return status == .fullAccess || status == .writeOnly
+        }
+        return EKEventStore.authorizationStatus(for: .event) == .authorized
+    }
+
+    /// Kept as the old name for callers that mean "can we do the reading half".
+    var hasAccess: Bool { canRead }
+
+    // MARK: - Which calendars
+
+    /// Calendars the user has switched **off** for Plannit, by identifier.
+    ///
+    /// Not cosmetic: a subscribed fixtures feed or a shared family calendar can
+    /// otherwise mark you busy for the scheduler, and you'd have no way to say
+    /// so. Stored as the excluded set rather than the included one so a calendar
+    /// added later (a new account, a shared invite) is included by default —
+    /// silently dropping new calendars is the failure that looks like data loss.
+    private static let excludedKey = "plannit.excludedCalendars"
+
+    static var excludedCalendarIds: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: excludedKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: excludedKey) }
+    }
+
+    /// Every calendar we could read, minus our own mirror — that one isn't a
+    /// choice, it's ours.
+    func selectableCalendars() -> [EKCalendar] {
+        guard canRead else { return [] }
+        return store.calendars(for: .event)
+            .filter { $0.title != Self.plannitCalendarTitle }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    static func isEnabled(_ calendar: EKCalendar) -> Bool {
+        !excludedCalendarIds.contains(calendar.calendarIdentifier)
+    }
+
+    static func setEnabled(_ enabled: Bool, for calendar: EKCalendar) {
+        var excluded = excludedCalendarIds
+        if enabled { excluded.remove(calendar.calendarIdentifier) }
+        else { excluded.insert(calendar.calendarIdentifier) }
+        excludedCalendarIds = excluded
     }
 
     // MARK: - Read
@@ -74,7 +134,7 @@ final class CalendarService {
             .sorted { $0.startDate < $1.startDate }
         let capped = limit.map { Array(sorted.prefix($0)) } ?? sorted
         return capped.map {
-            DeviceEvent(id: $0.eventIdentifier ?? UUID().uuidString,
+            DeviceEvent(id: Self.occurrenceId(for: $0),
                         externalId: $0.calendarItemExternalIdentifier,
                         title: $0.title ?? "Event",
                         start: $0.startDate,
@@ -84,35 +144,97 @@ final class CalendarService {
         }
     }
 
+    /// EventKit reuses one `eventIdentifier` across every occurrence of a
+    /// repeating event, so a weekly standup arrives as N rows sharing an id.
+    /// `ForEach` then renders the wrong rows and logs "ID occurs multiple
+    /// times". The start instant is what actually distinguishes them — the same
+    /// shape `PEvent.occurrences` uses for Plannit's own series.
+    static func occurrenceId(for event: EKEvent) -> String {
+        // Never a UUID: a random fallback would hand the same event a new id on
+        // every read, and the list would churn instead of updating in place.
+        let base = event.eventIdentifier
+            ?? event.calendarItemExternalIdentifier
+            ?? "\(event.title ?? "event")@\(event.calendar?.calendarIdentifier ?? "?")"
+        return "\(base)#\(Int(event.startDate.timeIntervalSince1970))"
+    }
+
     /// Privacy-safe availability: merged busy ranges as absolute times.
     ///
     /// Every event in the horizon counts — a cap here would quietly tell the
-    /// scheduler you're free when you aren't. Skipped: all-day events (a
-    /// birthday shouldn't block the day), events you've marked Free, and
-    /// cancelled ones.
-    func busyIntervals(daysAhead: Int = 56) -> [BusyInterval] {
+    /// scheduler you're free when you aren't.
+    ///
+    /// The horizon defaults to the date-finder's own search window rather than a
+    /// fixed 8 weeks. See `Availability.horizon`: a shorter horizon doesn't make
+    /// the finder cautious past its end, it makes it *confident and wrong*.
+    func busyIntervals(until horizon: Date = Availability.horizon()) -> [BusyInterval] {
+        read(until: horizon).blocks
+    }
+
+    /// The blocks **and** how many events they came from.
+    ///
+    /// The count is not diagnostics. An empty block list is the shape every bug
+    /// in this path produces, and on the wire it means "free at all times" — so
+    /// the uploader has to be able to tell "genuinely nothing on" from "our read
+    /// came back empty". Answering that with a second EventKit sweep would cost
+    /// another full pass over the calendar, so it rides along with the first.
+    func read(until horizon: Date = Availability.horizon()) -> BusyReading {
         let now = Date()
-        let horizon = Calendar.current.date(byAdding: .day, value: daysAhead, to: now) ?? now
-        let raw = matching(from: now, to: horizon)
-            .filter { !$0.isAllDay && $0.availability != .free && $0.status != .canceled }
-            .map { BusyInterval(start: $0.startDate, end: $0.endDate) }
-        let merged = Availability.prepare(raw, from: now, to: horizon)
-        Log.cal("busy: \(raw.count) events in \(daysAhead)d → \(merged.count) merged blocks")
-        return merged
+        let all = matching(from: now, to: horizon)
+        let busy = all.filter { Self.isBusy($0) }
+        let merged = Availability.prepare(
+            busy.map { BusyInterval(start: $0.startDate, end: $0.endDate) },
+            from: now, to: horizon)
+        let days = Calendar.current.dateComponents([.day], from: now, to: horizon).day ?? 0
+        Log.cal("busy: \(busy.count) of \(all.count) events in \(days)d → \(merged.count) merged blocks")
+        return BusyReading(blocks: merged, eventCount: all.count)
+    }
+
+    /// Does this event make you unavailable?
+    ///
+    /// Skipped: events you marked Free, cancelled ones, meetings you **declined**
+    /// (you told them you're not coming — Plannit shouldn't think otherwise),
+    /// and single-day all-day events, because a birthday shouldn't block a day.
+    ///
+    /// Multi-day all-day events *do* count: five all-day days called "Portugal"
+    /// is exactly the week nobody should be offered.
+    static func isBusy(_ event: EKEvent) -> Bool {
+        guard event.availability != .free, event.status != .canceled else { return false }
+        if declined(event) { return false }
+        if event.isAllDay { return spansMultipleDays(event) }
+        return true
+    }
+
+    /// Your own answer to an invitation. `EKEvent.status` reports the *event's*
+    /// state, not yours, so a meeting you declined still arrives as `.confirmed`
+    /// — the answer is on the attendee record flagged `isCurrentUser`.
+    private static func declined(_ event: EKEvent) -> Bool {
+        event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
+    }
+
+    private static func spansMultipleDays(_ event: EKEvent) -> Bool {
+        let cal = Calendar.current
+        // All-day events end at midnight on the following day, so a one-day
+        // event is already a "24 hour" span — compare the last *inclusive* day.
+        let lastMoment = event.endDate.addingTimeInterval(-1)
+        return !cal.isDate(event.startDate, inSameDayAs: max(lastMoment, event.startDate))
     }
 
     /// EventKit refuses predicates longer than four years; ours are far shorter.
     private func matching(from: Date, to: Date, includingPlannit: Bool = true) -> [EKEvent] {
-        guard hasAccess else { return [] }
-        var calendars: [EKCalendar]? = nil
-        if !includingPlannit {
-            let all = store.calendars(for: .event)
-            let others = all.filter { $0.title != Self.plannitCalendarTitle }
-            // `nil` means "every calendar"; only narrow it if we'd actually
-            // exclude something, since an empty array matches nothing.
-            calendars = others.count == all.count ? nil : others
-            if others.isEmpty { return [] }
+        guard canRead else { return [] }
+        let all = store.calendars(for: .event)
+        let excluded = Self.excludedCalendarIds
+        let wanted = all.filter {
+            // Our own mirror is excluded from *display* (it would show every
+            // plan twice) but never from availability — a plan you said yes to
+            // does make you busy.
+            if !includingPlannit && $0.title == Self.plannitCalendarTitle { return false }
+            return !excluded.contains($0.calendarIdentifier)
         }
+        if wanted.isEmpty { return [] }
+        // `nil` means "every calendar"; only narrow it when we'd actually
+        // exclude something, since an empty array matches nothing.
+        let calendars: [EKCalendar]? = wanted.count == all.count ? nil : wanted
         let predicate = store.predicateForEvents(withStart: from, end: to, calendars: calendars)
         return store.events(matching: predicate)
     }
@@ -122,7 +244,7 @@ final class CalendarService {
     /// Find or create the dedicated "Plannit" calendar. Returns nil when we
     /// can't write — mirroring is best-effort and must never block the app.
     func plannitCalendar() -> EKCalendar? {
-        guard hasAccess else { return nil }
+        guard canWrite else { return nil }
         if let existing = store.calendars(for: .event).first(where: {
             $0.title == Self.plannitCalendarTitle && $0.allowsContentModifications
         }) {
@@ -156,7 +278,7 @@ final class CalendarService {
     /// never written back — the device already owns those.
     @discardableResult
     func mirror(_ events: [PEvent]) -> Int {
-        guard hasAccess else { Log.cal("mirror skipped: no calendar access"); return 0 }
+        guard canWrite else { Log.cal("mirror skipped: no write access"); return 0 }
         guard let calendar = plannitCalendar() else {
             Log.cal("mirror skipped: no Plannit calendar")
             return 0

@@ -14,12 +14,9 @@ struct CalendarScreen: View {
 
     private let cal = Calendar.current
 
-    private static let deviceTimeFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "EEE d · h:mm a"; return f
+    private static let clock: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "h:mm a"; return f
     }()
-    private static func deviceTime(_ d: DeviceEvent) -> String {
-        d.isAllDay ? "All day" : deviceTimeFormatter.string(from: d.start)
-    }
 
     private var year: Int { cal.component(.year, from: visibleMonth) }
     private var month: Int { cal.component(.month, from: visibleMonth) }
@@ -86,7 +83,7 @@ struct CalendarScreen: View {
 
     /// Your own calendar's events, scoped exactly like the Plannit ones above:
     /// the selected day, or everything upcoming in List mode. Unfiltered, this
-    /// dumped all 60 days under whichever day you'd tapped — invisible on an
+    /// dumped every day under whichever day you'd tapped — invisible on an
     /// empty simulator, a wall of text on a real phone.
     private var deviceEvents: [DeviceEvent] {
         let all = model.deviceEvents.sorted { $0.start < $1.start }
@@ -94,6 +91,43 @@ struct CalendarScreen: View {
             return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
         }
         return all.filter { $0.start >= cal.startOfDay(for: Date()) }
+    }
+
+    /// A day is one list, in time order. Two stacked sections — Plannit's plans
+    /// above, "also on your calendar" below — made a 9am dentist appointment
+    /// sort after an 8pm film night, which is the exact split Plannit exists to
+    /// remove. The source stays legible in the row itself, not in the layout.
+    private enum Row: Identifiable {
+        case plan(PEvent)
+        case device(DeviceEvent)
+
+        var id: String {
+            switch self {
+            case .plan(let e):   return "p-\(e.id)"
+            case .device(let d): return "d-\(d.id)"
+            }
+        }
+        var start: Date {
+            switch self {
+            case .plan(let e):   return e.start
+            case .device(let d): return d.start
+            }
+        }
+        /// All-day things lead the day, the way every calendar app shows them.
+        var isAllDay: Bool {
+            switch self {
+            case .plan(let e):   return e.isAllDay
+            case .device(let d): return d.isAllDay
+            }
+        }
+    }
+
+    private var rows: [Row] {
+        (events.map(Row.plan) + deviceEvents.map(Row.device))
+            .sorted { a, b in
+                if a.isAllDay != b.isAllDay { return a.isAllDay }
+                return a.start < b.start
+            }
     }
 
     /// In Month and Week you already know the day you're looking at, so the time
@@ -105,6 +139,23 @@ struct CalendarScreen: View {
         f.dateFormat = cal.isDate(event.start, equalTo: Date(), toGranularity: .year)
             ? "EEE d MMM" : "EEE d MMM yyyy"
         return "\(f.string(from: event.start)) · \(event.time)"
+    }
+
+    /// Same rule as `timeLabel(for:)`: in Month and Week you already know the
+    /// day, so the time alone is enough; a flat upcoming list needs the date.
+    private func deviceTimeLabel(for device: DeviceEvent) -> String {
+        let time = device.isAllDay ? "All day" : Self.clock.string(from: device.start)
+        guard mode == .list else { return time }
+        let f = DateFormatter()
+        f.dateFormat = cal.isDate(device.start, equalTo: Date(), toGranularity: .year)
+            ? "EEE d MMM" : "EEE d MMM yyyy"
+        return "\(f.string(from: device.start)) · \(time)"
+    }
+
+    /// Read far enough ahead to cover the month on screen, plus a little.
+    private func widenWindowIfNeeded() {
+        guard let interval = cal.dateInterval(of: .month, for: visibleMonth) else { return }
+        model.ensureDeviceEvents(through: interval.end)
     }
 
     private var sectionTitle: String {
@@ -157,14 +208,26 @@ struct CalendarScreen: View {
                     SectionLabel(sectionTitle)
 
                     LazyVStack(spacing: Space.gapList) {
-                        ForEach(events) { event in
-                            NavigationLink(value: event) {
-                                EventCard(title: event.title, time: timeLabel(for: event),
-                                          location: event.location,
-                                          hue: event.hue, group: event.group, people: event.people,
-                                          icon: event.icon, badge: event.badge, badgeTone: event.badgeTone)
+                        ForEach(rows) { row in
+                            switch row {
+                            case .plan(let event):
+                                NavigationLink(value: event) {
+                                    EventCard(title: event.title, time: timeLabel(for: event),
+                                              location: event.location,
+                                              hue: event.hue, group: event.group, people: event.people,
+                                              icon: event.icon, badge: event.badge,
+                                              badgeTone: event.badgeTone)
+                                }
+                                .buttonStyle(CardPressStyle())
+                            case .device(let device):
+                                NavigationLink(value: device) {
+                                    EventCard(title: device.title, time: deviceTimeLabel(for: device),
+                                              location: device.location, hue: .coral, group: nil,
+                                              people: [], icon: "calendar",
+                                              badge: "Private", badgeTone: .neutral)
+                                }
+                                .buttonStyle(CardPressStyle())
                             }
-                            .buttonStyle(CardPressStyle())
                         }
                     }
                     .padding(.horizontal, Space.gutter)
@@ -180,20 +243,6 @@ struct CalendarScreen: View {
                                    actionTitle: "New event") { showNewEvent = true }
                     }
 
-                    if !deviceEvents.isEmpty {
-                        SectionLabel("Also on your calendar") {
-                            Text("\(deviceEvents.count)").textStyle(.caption, color: .textFaint)
-                        }
-                        LazyVStack(spacing: Space.gapList) {
-                            ForEach(deviceEvents) { device in
-                                EventCard(title: device.title, time: Self.deviceTime(device),
-                                          location: device.location, hue: .coral, group: nil,
-                                          people: [], icon: "calendar", badge: "Private", badgeTone: .neutral)
-                            }
-                        }
-                        .padding(.horizontal, Space.gutter)
-                    }
-
                     Color.clear.frame(height: 120)
                 }
             }
@@ -202,7 +251,10 @@ struct CalendarScreen: View {
         .background(Color.appBg)
         .navigationBarHidden(true)
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
-        .onAppear { model.refreshCalendar() }
+        .navigationDestination(for: DeviceEvent.self) { DeviceEventDetail(event: $0) }
+        .onAppear { widenWindowIfNeeded() }
+        .task { await model.refreshCalendar() }
+        .onChange(of: visibleMonth) { _, _ in widenWindowIfNeeded() }
         .sheet(isPresented: $showNewEvent) {
             NewEventSheet(date: selectedDate ?? Date()).environmentObject(model)
         }

@@ -211,6 +211,7 @@ enum YouRoute: Hashable { case friends }
 struct YouScreen: View {
     @EnvironmentObject private var model: AppModel
     @State private var showRename = false
+    @State private var showCalendars = false
     @State private var confirmSignOut = false
     @State private var connecting = false
     @State private var shareAvailability = true
@@ -288,6 +289,7 @@ struct YouScreen: View {
                 SectionLabel("Calendar")
                 settingsCard {
                     calendarRow
+                    calendarPickerRow
                     divider
                     toggleRow("eye-off", "Share availability", "Only free/busy — never event details", $shareAvailability)
                 }
@@ -314,6 +316,7 @@ struct YouScreen: View {
         .background(Color.appBg)
         .navigationBarHidden(true)
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
+        .sheet(isPresented: $showCalendars) { CalendarPicker().environmentObject(model) }
         .sheet(isPresented: $showRename) {
             DisplayNameSheet(current: model.displayName).environmentObject(model)
         }
@@ -372,13 +375,64 @@ struct YouScreen: View {
     }
 
     private var calendarStatus: String {
+        if model.calendarIsWriteOnly {
+            return "Write-only: plans land on your calendar, but Plannit can't see "
+                 + "when you're free. Change it in Settings."
+        }
         if model.calendarConnected {
-            return "\(model.deviceEvents.count) events read. Only free/busy is shared."
+            return "\(model.deviceEvents.count) events read. \(availabilityStatus)"
         }
         if model.calendarNeedsSettings {
             return "You said no earlier — iOS only asks once, so turn it on in Settings."
         }
         return "Plannit needs it to find times your groups are free."
+    }
+
+    /// The half of the sync the user can't otherwise see. "N events read" says
+    /// we looked; this says the group can actually act on it.
+    private var availabilityStatus: String {
+        if model.availabilityFailed {
+            return "Couldn't share your free/busy — we'll retry."
+        }
+        guard let at = model.availabilityUploadedAt else {
+            return "Only free/busy is shared."
+        }
+        let seconds = Date().timeIntervalSince(at)
+        let ago: String
+        if seconds < 90 { ago = "just now" }
+        else if seconds < 3600 { ago = "\(Int(seconds / 60))m ago" }
+        else if seconds < 86_400 { ago = "\(Int(seconds / 3600))h ago" }
+        else { ago = "\(Int(seconds / 86_400))d ago" }
+        return "Free/busy shared \(ago)."
+    }
+
+    /// Which calendars count. Only worth showing once we can actually read them.
+    @ViewBuilder
+    private var calendarPickerRow: some View {
+        if model.calendarConnected && model.calendarAuthorized {
+            Rectangle().fill(Color.hairline).frame(height: 1)
+            Button { showCalendars = true } label: {
+                HStack(spacing: 12) {
+                    PIcon("list", size: 20, color: .textMuted).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Which calendars").textStyle(.headline, color: .textStrong)
+                        Text(excludedSummary).textStyle(.caption, color: .textMuted)
+                    }
+                    Spacer()
+                    PIcon("chevron-right", size: 16, color: .textFaint)
+                }
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var excludedSummary: String {
+        let off = CalendarService.excludedCalendarIds.count
+        return off == 0
+            ? "All of them count towards when you're busy"
+            : "\(off) switched off"
     }
 
     private func nameRow() -> some View {

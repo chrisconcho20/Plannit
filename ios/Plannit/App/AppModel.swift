@@ -1,3 +1,4 @@
+import EventKit
 import SwiftUI
 
 // App-wide state. In demo mode (no Supabase config) the app runs entirely on
@@ -13,6 +14,11 @@ final class AppModel: ObservableObject {
     @Published var calendarConnected = false
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
+    /// How far ahead `deviceEvents` has been read. The calendar screen widens
+    /// this as you scroll: a fixed 60-day read meant your own events — and the
+    /// month grid's dots — silently stopped existing in the third month, which
+    /// reads as "Plannit lost my calendar".
+    @Published private(set) var deviceWindowMonths = 3
 
     // Screen data. Demo mode starts on sample data so the app is explorable with
     // no network; live mode starts EMPTY, because showing someone else's sample
@@ -90,6 +96,7 @@ final class AppModel: ObservableObject {
     private let calendar = CalendarService()
     private let realtime = RealtimeService()
     private var appleCoordinator: AppleSignInCoordinator?
+    private var calendarChangeTask: Task<Void, Never>?
     private var calendarObserver: NSObjectProtocol?
 
     nonisolated init() {}
@@ -107,12 +114,25 @@ final class AppModel: ObservableObject {
         guard calendarObserver == nil else { return }
         calendarObserver = NotificationCenter.default.addObserver(
             forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in await self?.syncCalendar() }
+            Task { @MainActor in self?.calendarDidChange() }
+        }
+    }
+
+    /// EventKit fires once per save, and a remote account syncing fires a
+    /// burst. Each one used to cost a full read, a merge and an upload — so
+    /// coalesce them and reconcile once when the noise stops.
+    private func calendarDidChange() {
+        calendarChangeTask?.cancel()
+        calendarChangeTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.syncCalendar()
         }
     }
 
     deinit {
         if let calendarObserver { NotificationCenter.default.removeObserver(calendarObserver) }
+        calendarChangeTask?.cancel()
     }
 
     var isLiveBackend: Bool { Config.isLiveBackend }
@@ -580,7 +600,7 @@ final class AppModel: ObservableObject {
 
         guard Config.isLiveBackend else { return true }
         do {
-            let _: [EmptyRow] = try await SupabaseClient.shared.rpc(
+            try await SupabaseClient.shared.rpcVoid(
                 "rsvp_to_event", args: RsvpArgs(p_event: event.rowId, p_going: going))
             await refreshEvents()
             return true
@@ -630,7 +650,7 @@ final class AppModel: ObservableObject {
             try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
                 event_id: event.id, group_id: group.id))
             // Whoever picked the time is going — that's what picking it meant.
-            let _: [EmptyRow] = try await SupabaseClient.shared.rpc(
+            try await SupabaseClient.shared.rpcVoid(
                 "rsvp_to_event", args: RsvpArgs(p_event: event.id, p_going: true))
             await refreshEvents()
             return true
@@ -925,8 +945,10 @@ final class AppModel: ObservableObject {
     func connectCalendar() async {
         let granted = await calendar.requestAccess()
         Log.cal("access request → \(granted ? "granted" : "denied")")
-        calendarConnected = granted
-        calendarDenied = !granted
+        // Write-only still connects: the mirror works, and the app says what it
+        // can't do rather than pretending nothing happened.
+        calendarConnected = granted || calendar.canWrite
+        calendarDenied = !calendarConnected
         if granted {
             startObservingCalendar()
             await syncCalendar()
@@ -935,26 +957,60 @@ final class AppModel: ObservableObject {
 
     /// Has the system already granted calendar access? Distinct from
     /// `calendarConnected`, which is our session state.
-    var calendarAuthorized: Bool { calendar.hasAccess }
+    var calendarAuthorized: Bool { calendar.canRead }
+
+    /// Granted the write half only. Plans still land on your calendar; the
+    /// date-finder can't see when you're free. Worth saying out loud rather
+    /// than showing an empty screen.
+    var calendarIsWriteOnly: Bool { calendar.canWrite && !calendar.canRead }
+
+    /// The calendars we could read, for the picker in You.
+    func selectableCalendars() -> [EKCalendar] { calendar.selectableCalendars() }
+
+    /// Turn one on or off and re-read straight away, so the list and the
+    /// availability both move at the moment you tap.
+    func setCalendar(_ ekCalendar: EKCalendar, enabled: Bool) {
+        CalendarService.setEnabled(enabled, for: ekCalendar)
+        Task { await syncCalendar() }
+    }
+
+    /// When availability last reached the server, and whether the last try
+    /// failed. Nil means it hasn't managed one yet this install.
+    var availabilityUploadedAt: Date? { AvailabilityUploader.lastUploadedAt }
+    var availabilityFailed: Bool { AvailabilityUploader.lastUploadFailed }
 
     /// Send someone to Settings — iOS only ever prompts once, so a denial can
     /// only be undone there.
-    var calendarNeedsSettings: Bool { calendarDenied && !calendar.hasAccess }
+    var calendarNeedsSettings: Bool { calendarDenied && !calendar.canWrite }
 
     /// Pick the connection back up on launch when access was already granted,
     /// so returning users don't have to reconnect to stay in sync.
     func resumeCalendarIfAuthorized() async {
-        guard !calendarConnected, calendar.hasAccess else { return }
+        guard !calendarConnected, calendar.canWrite else { return }
         calendarConnected = true
         startObservingCalendar()
         await syncCalendar()
     }
 
-    func refreshCalendar() {
+    /// Re-read the device events for the current window. No cap: the screen
+    /// filters to one day, and a 50-event ceiling meant a real calendar's later
+    /// events simply vanished from the UI.
+    func refreshCalendar() async {
+        guard calendarConnected, calendarAuthorized else { return }
+        deviceEvents = await CalendarReader.shared.deviceEvents(
+            daysAhead: deviceWindowMonths * 31)
+    }
+
+    /// Make sure the device read covers the month being looked at. Widening
+    /// only — the window never shrinks in a session, so paging back and forth
+    /// doesn't re-read the calendar every time.
+    func ensureDeviceEvents(through date: Date) {
         guard calendarConnected else { return }
-        // No cap: the screen filters to one day, and a 50-event ceiling meant a
-        // real calendar's later events simply vanished from the UI.
-        deviceEvents = calendar.fetchDeviceEvents(limit: nil)
+        let months = Calendar.current.dateComponents([.month], from: Date(), to: date).month ?? 0
+        let wanted = min(max(months + 2, 3), 24)     // a little past the edge, and a sane ceiling
+        guard wanted > deviceWindowMonths else { return }
+        deviceWindowMonths = wanted
+        Task { await refreshCalendar() }
     }
 
     /// Re-read the device calendar and push availability again. Called when the
@@ -962,7 +1018,10 @@ final class AppModel: ObservableObject {
     /// availability that's only uploaded once is stale by the next morning.
     func syncCalendar() async {
         guard calendarConnected else { return }
-        deviceEvents = calendar.fetchDeviceEvents(limit: nil)
+        // Remote accounts first: without this an event added on a laptop can be
+        // missing from availability for as long as EventKit feels like.
+        await CalendarReader.shared.refreshSources()
+        await refreshCalendar()
         await uploadBusyBlocksIfLive()
         mirrorToDeviceCalendar()
     }
@@ -978,6 +1037,7 @@ final class AppModel: ObservableObject {
     /// Upload merged busy intervals (no titles) so group availability can be
     /// computed. Shared with the background task — see AvailabilityUploader.
     private func uploadBusyBlocksIfLive() async {
-        await AvailabilityUploader.upload(calendar: calendar)
+        guard calendarAuthorized else { return }   // write-only has nothing to share
+        await AvailabilityUploader.upload(reading: CalendarReader.shared.read())
     }
 }
