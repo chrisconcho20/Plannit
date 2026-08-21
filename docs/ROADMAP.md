@@ -190,23 +190,32 @@ to become. Individually sensible, collectively a security incident.
   _Unverified:_ needs two live sessions to confirm end to end.
 - **Group hue is device-local** — the picker works, but the colour lives in
   UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
-- **Reaching a stranger needs their exact email** — by design (the directory
-  isn't enumerable), but it means invite links matter more than they look.
-- **No password reset** — the recovery email's link needs a real web page to
-  land on, which we don't have yet. A forgotten password means a dashboard fix.
-- **Email confirmation must be off** for sign-up to work end to end, for the
-  same reason (see `manual-test-plan.md` §0).
-- **Placeholder buttons** do nothing (see Phase 5.13).
-- **No offline support / no retry** — network failure silently keeps sample data
-  (the date-finder is the exception: it now surfaces a real error + retry).
-- **Sample data still leaks into live mode** — `AppModel` seeds sample groups/
-  events/proposals, so a failed or empty live load shows demo content. The Plans
-  tab is the visible case (see above).
+- **No password reset**, and **email confirmation must stay off** — both need a
+  real web page for the emailed link to land on. `site_url` is a deep link.
+- **No offline support** — a failed load shows a banner with Retry (live mode no
+  longer falls back to sample data), but there's no local store. D-02 chose GRDB;
+  D-16 notes PowerSync would supersede it.
+- **A locked plan can't be reopened** — cancel and re-run is the workaround.
+- **Recurrence is a closed set** — never/daily/weekly/fortnightly/monthly, with
+  no end date, no count, and no per-occurrence exceptions.
+- **Activity has no pagination and no server-side read state** — a limit only,
+  and "seen" is tracked on-device.
+- **Activity rows aren't tappable** — deep-linking into the plan is the next step.
+- **The invite page has no App Store fallback** — if the app isn't installed the
+  button does nothing. Needs a listing to link to.
+- **`plan_locked` re-floats in the feed** on any proposal update; it keys on
+  `updated_at`.
+- **RLS helper functions answer about anyone** — `are_friends(a, b)` and friends
+  take arbitrary ids and are executable by any authenticated user. Fix needs a
+  careful rewrite of 0002's policies: [`security-review.md`](security-review.md) §4.
+- **Reaching a stranger needs their exact email** — by design; invite links are
+  the way around it.
 
 ## 4. Small backlog
-- Loading skeletons; pull-to-refresh; sign-out button wiring; avatar images
-  (currently initials only); group avatars; time-zone-aware formatting; haptics;
-  app version/build display in Settings.
+- Avatar images (initials only today); group avatars; timezone-aware display for
+  a plan made in another zone; haptics; a "who can see this" list of names on an
+  event; sharing to a single person from the *event* side is done, but there's no
+  "shared with me by X" view.
 
 ---
 
