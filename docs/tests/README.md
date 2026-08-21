@@ -25,6 +25,9 @@ stop and resume anywhere.
 
 ## Before you start
 
+- **Migrations must be applied**: `npx supabase db push`. Tests 07 onwards need
+  0009, and 11/12 need 0007/0008.
+
 - The app must be in **live mode**: the first screen says *Sign in / Create
   account*. If it says *Continue with Apple*, the Supabase keys in
   `ios/Plannit/App/Info.plist` are empty — paste them in and rebuild.

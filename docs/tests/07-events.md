@@ -2,7 +2,9 @@
 
 **Tests:** making an event, all-day events, editing, deleting, and the calendar
 grid reflecting all of it.
-**Needs:** 01.
+**Needs:** 01, and **migration 0009** (`npx supabase db push`). Without it,
+creating an event fails with "Couldn't save that" — the insert asks for the row
+back, and the old SELECT policy couldn't see a row that didn't exist yet.
 **Time:** 10 minutes.
 
 ---
