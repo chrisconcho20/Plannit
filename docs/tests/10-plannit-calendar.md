@@ -21,10 +21,9 @@ reading back, or every plan would show twice.
 
 3. **Go back to Plannit, Calendar tab, that day.**
    - [ ] The plan appears **exactly once**.
-   - [ ] It is **not** listed twice — once as a plan and once as a device
-         event. If it is, the
-         mirror is being read back as a device event, which is the specific bug
-         this test exists for.
+   - [ ] It is **not** listed twice — once as a plan and once as one of your
+         own calendar's events. If it is, the mirror is being read back as a
+         device event, which is the specific bug this test exists for.
 
 4. **Create a repeating event in Plannit** (weekly), then check the simulator's
    Calendar app.
