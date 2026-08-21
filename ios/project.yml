@@ -13,7 +13,10 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     VERSIONING_SYSTEM: "apple-generic"   # lets agvtool bump the build number in CI
     SWIFT_VERSION: "5.9"
-    DEVELOPMENT_TEAM: ""   # Codemagic manages signing; leave empty
+    # Put your 10-character Apple Team ID here (Xcode → Settings → Accounts,
+    # or the Membership page) and Xcode stops asking after every regenerate.
+    # Empty is fine — you pick the team once in Signing & Capabilities.
+    DEVELOPMENT_TEAM: ""
 
 # The one third-party dependency (decision D-16). Only the Realtime product:
 # our REST/auth layer stays hand-rolled. Pinned exactly rather than a range —
@@ -35,9 +38,20 @@ targets:
         product: Realtime
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.plannit.app
+        # Defaults are the ones a FREE Apple ID can actually build (see
+        # DEVICE-TESTING.md). Regenerating the project used to reset both of
+        # these to values that fail on a personal team, so every device test
+        # started with the same two edits and the same confusing build error.
+        #
+        # `com.plannit.app` is registered to someone else; this id is ours.
+        # Switch the entitlements back to Plannit.entitlements when there's a
+        # paid membership — that one carries Sign in with Apple, which a
+        # personal team cannot sign, and nothing calls it yet (live mode signs
+        # in with email).
+        PRODUCT_BUNDLE_IDENTIFIER: com.chrisconcho.plannit
         INFOPLIST_FILE: Plannit/App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit.entitlements
+        CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit-Personal.entitlements
+        CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
         TARGETED_DEVICE_FAMILY: "1"   # iPhone

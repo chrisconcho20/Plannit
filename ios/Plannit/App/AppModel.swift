@@ -951,7 +951,9 @@ final class AppModel: ObservableObject {
         calendarDenied = !calendarConnected
         if granted {
             startObservingCalendar()
-            await syncCalendar()
+            // First sync of the install: pull remote accounts so a Google or
+            // Exchange calendar is complete before we compute anything from it.
+            await syncCalendar(pullRemote: true)
         }
     }
 
@@ -989,7 +991,7 @@ final class AppModel: ObservableObject {
         guard !calendarConnected, calendar.canWrite else { return }
         calendarConnected = true
         startObservingCalendar()
-        await syncCalendar()
+        await syncCalendar(pullRemote: true)
     }
 
     /// Re-read the device events for the current window. No cap: the screen
@@ -1016,11 +1018,13 @@ final class AppModel: ObservableObject {
     /// Re-read the device calendar and push availability again. Called when the
     /// app comes back to the foreground and when EventKit reports a change —
     /// availability that's only uploaded once is stale by the next morning.
-    func syncCalendar() async {
+    /// `pullRemote` asks EventKit to fetch server-side changes first (Exchange,
+    /// Google, CalDAV). Only the foreground reconcile does that: a source
+    /// refresh can itself raise EKEventStoreChanged, and doing it from the
+    /// change handler too would let the app chase its own tail.
+    func syncCalendar(pullRemote: Bool = false) async {
         guard calendarConnected else { return }
-        // Remote accounts first: without this an event added on a laptop can be
-        // missing from availability for as long as EventKit feels like.
-        await CalendarReader.shared.refreshSources()
+        if pullRemote { await CalendarReader.shared.refreshSources() }
         await refreshCalendar()
         await uploadBusyBlocksIfLive()
         mirrorToDeviceCalendar()

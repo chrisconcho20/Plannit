@@ -29,28 +29,26 @@ First open takes a minute or two: Xcode resolves the Swift package
 (`supabase-swift`, pinned at 2.55.1) before it will build. Let it finish —
 "Resolving Package Graph" in the toolbar.
 
-Then, in Xcode, three things — all in the **Plannit** target →
+Then, in Xcode, **one** thing — in the **Plannit** target →
 **Signing & Capabilities**:
 
-1. **Team** → *Add an Account…* → sign in with your Apple ID → pick
-   `<Your Name> (Personal Team)`.
-2. **Bundle Identifier** → change `com.plannit.app` to something nobody else has
-   registered, e.g. `com.chrisconcho.plannit`. (Bundle ids are global; a
-   generic one may already be taken by another team.)
-3. **Remove the Sign in with Apple capability.** A personal team can't sign it,
-   and the build fails with *"Personal development teams do not support the Sign
-   in with Apple capability"*. Nothing calls it yet — live mode signs in with
-   dev email — so you lose nothing.
+- **Team** → *Add an Account…* → sign in with your Apple ID → pick
+  `<Your Name> (Personal Team)`.
 
-   Do this **before** `xcodegen generate` — change one line in `project.yml`:
+The two settings that used to need changing here are now the committed defaults
+in [`project.yml`](project.yml), because regenerating the project reset them
+every time and the resulting build error (*"Personal development teams do not
+support the Sign in with Apple capability"*) doesn't say what to do about it:
 
-   ```yaml
-   CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit-Personal.entitlements
-   ```
+- **Bundle id** is `com.chrisconcho.plannit`. Bundle ids are global and
+  `com.plannit.app` belongs to someone else.
+- **Entitlements** are `Plannit-Personal.entitlements`, which is deliberately
+  empty. Sign in with Apple can't be signed by a personal team, and nothing
+  calls it yet — live mode signs in with dev email.
 
-   then `xcodegen generate` again. (`Plannit-Personal.entitlements` is an empty
-   entitlements file kept for exactly this.) Don't commit that line — CI and
-   Codemagic want the real one.
+Switch both back when there's a paid membership. To stop Xcode asking for the
+team after every `xcodegen generate`, put your 10-character Team ID in
+`project.yml` under `DEVELOPMENT_TEAM`.
 
 Pick your iPhone from the device menu and **⌘R**.
 

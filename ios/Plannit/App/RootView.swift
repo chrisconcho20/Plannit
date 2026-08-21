@@ -137,7 +137,7 @@ struct RootView: View {
                     await model.stopRealtime()
                     return
                 }
-                await model.syncCalendar()
+                await model.syncCalendar(pullRemote: true)
                 await model.loadData()
                 await model.startRealtime()
             }
