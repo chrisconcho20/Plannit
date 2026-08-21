@@ -374,6 +374,27 @@ final class SupabaseClient {
     /// The Realtime SDK calls this on every connect and reconnect.
     func currentToken() async -> String? { await authorized() }
 
+    /// The `sub` and `exp` a JWT actually carries. `auth.uid()` is the token's
+    /// sub, not whatever id the app happens to be holding — when a write is
+    /// refused for a row we believe we own, the difference between those two is
+    /// the whole answer. Debug only, and only ids, never the token itself.
+    func tokenClaims() -> String {
+        guard let token = accessToken else { return "no token" }
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return "malformed token" }
+        var payload = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while payload.count % 4 != 0 { payload += "=" }
+        guard let data = Data(base64Encoded: payload),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return "undecodable payload" }
+        let sub = json["sub"] as? String ?? "none"
+        let role = json["role"] as? String ?? "none"
+        let exp = (json["exp"] as? Double).map { Date(timeIntervalSince1970: $0) }
+        let expired = exp.map { $0 < Date() } ?? false
+        return "sub=\(sub) role=\(role) expired=\(expired)"
+    }
     private func clearSession() {
         accessToken = nil; refreshToken = nil; userId = nil
         userEmail = nil; expiresAt = nil
@@ -581,7 +602,8 @@ final class SupabaseClient {
             // expected, which the response alone never shows.
             let sent = req.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") \(req.url?.path ?? "")"
-                     + " | as user: \(userId ?? "nobody")"
+                     + " | app thinks: \(userId ?? "nobody")"
+                     + " | token says: \(tokenClaims())"
                      + " | sent: \(sent.prefix(400))"
                      + " | got: \(body.prefix(300))")
             throw SupabaseError.http(http.statusCode, body)
