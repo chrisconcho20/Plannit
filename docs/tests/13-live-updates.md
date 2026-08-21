@@ -15,20 +15,23 @@ use the live Appetize preview in a browser as the second one.
 
 2. **Simulator B: launch and sign in as** `maya@plannit.test`.
 
-3. **Both: open the same plan** (Plans tab, tap the plan).
-   - [ ] Both show the same slots and the same vote counts.
+3. **Both: open the same plan.** A finds it under "You're going" in Plans;
+   B finds it under "Are you in?".
+   - [ ] Both show the same date and the same going count.
 
-4. **On B (Maya), vote for a slot.**
-   - [ ] **On A, the count goes up within a second or two**, with no interaction.
+4. **On B (Maya), tap Going.**
+   - [ ] **On A, the going count rises within a second or two**, with no
+         interaction.
    - [ ] A's console shows `sync realtime: joined group topic` from earlier, and
-         the counts refresh.
+         the events refresh.
+   - [ ] B's own row moves to "You're going" **instantly** (before the network).
 
-5. **On A, vote for a different slot.**
-   - [ ] Your own card moves **instantly** (before the network).
-   - [ ] B sees it shortly after.
+5. **On B, open the event and tap Remove → Remove from my calendar.**
+   - [ ] B's calendar loses it immediately.
+   - [ ] A's going count comes back **down** on its own.
 
-6. **On A, lock the plan in.**
-   - [ ] B's plan moves to "Locked in" on its own.
+6. **On A, delete the plan** (open it, ⋯ → Delete event).
+   - [ ] It disappears from B's group and calendar without B doing anything.
 
 7. **On A, share an event with a group Maya is in.**
    - [ ] It appears on B's calendar without B doing anything.
@@ -37,9 +40,10 @@ use the live Appetize preview in a browser as the second one.
    - [ ] It catches up immediately. The socket is dropped on background by
          design; the foreground reconcile covers it.
 
-9. **Turn the Mac's wi-fi off, vote on A, turn it back on.**
-   - [ ] The card moved when you tapped, then reverted with an error when the
-         write failed.
+9. **Turn the Mac's wi-fi off, answer an invitation on B, turn it back on.**
+   - [ ] The row moved when you tapped, then **reverted** with an error when the
+         write failed. An answer that didn't reach the server must not keep
+         looking like it did.
 
 ---
 

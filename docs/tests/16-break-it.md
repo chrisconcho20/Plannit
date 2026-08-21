@@ -19,8 +19,10 @@
    - [ ] It renders in the You header, in member lists, and in avatars (which
          should show sensible initials).
 
-4. **Double-tap everything.** Rapidly double-tap Send to group, Vote, Lock in.
-   - [ ] One plan, one vote, one event. Buttons disable while saving.
+4. **Double-tap everything.** Rapidly double-tap "Send to the group", then
+   Going, then Can't make it, then Going again.
+   - [ ] One event, and exactly one RSVP row that ends up matching the last
+         thing you tapped. Buttons disable while saving.
 
 5. **Background mid-save.** Start creating an event, press Home immediately, come
    back.
@@ -52,7 +54,7 @@
 
 ## Known, don't report these
 
-- A locked plan can't be reopened; cancel and re-run is the workaround.
+- Only the organiser can change a plan's time; everyone else answers or doesn't.
 - Group colour is device-local, so another device shows the name-derived one.
 - No push notifications.
 - Activity rows aren't tappable.

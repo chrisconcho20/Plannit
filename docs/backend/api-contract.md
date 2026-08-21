@@ -103,6 +103,14 @@ drift from the server's.
 
 Finds the times a group is free that match a plain-language-derived constraint, and (by default) saves them as a proposal to vote on.
 
+**`persist` is effectively dead.** Since decision D-18 the search is a preview
+and nothing else: the app sends `persist:false`, the organiser picks one of the
+returned slots, and *that* becomes an ordinary `events` row shared with the
+group, which the group RSVPs to. The `persist:true` path still writes a
+proposal — it is left in the function rather than removed, because deleting it
+is a redeploy and it costs nothing unused — but no client calls it, and
+`my_activity()` stopped reading `proposals` in 0011.
+
 **A date the whole group can make always wins.** The scheduler scans the window in
 time order and returns the earliest slots where *everyone* is free, however far
 out they are. Only when the window contains no such date does it fall back to the
@@ -116,7 +124,7 @@ because "4 of 6 can make it" is a different answer than "here's a date".
   "groupId": "aaaaaaaa-…",
   "title": "Weekend hang",
   "maxResults": 10,
-  "persist": true,               // false = preview without saving
+  "persist": false,              // the iOS app ALWAYS sends false — see below
   "constraints": {
     "windowStart": 1786838400000, // epoch ms, earliest a slot may start
     "windowEnd":   1787443200000, // epoch ms, how far ahead to look (the iOS
@@ -138,7 +146,7 @@ because "4 of 6 can make it" is a different answer than "here's a date".
 ### Response `200`
 ```jsonc
 {
-  "proposal": { "id": "…", "group_id": "…", "status": "open", … }, // omitted when persist:false
+  "proposal": { "id": "…", "group_id": "…", "status": "open", … }, // omitted when persist:false (always, from the app)
   "slots": [
     {
       "start": 1786986000000,

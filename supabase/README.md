@@ -16,7 +16,14 @@ supabase/
 │  ├─ 0001_init.sql                 # schema: profiles, groups, events, shares, busy_blocks, proposals…
 │  ├─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies
 │  ├─ 0003_device_tokens.sql        # APNs device tokens (+ RLS)
-│  └─ 0004_notifications.sql        # pg_net push triggers (share/friend/finalized)
+│  ├─ 0004_notifications.sql        # pg_net push triggers (share/friend/finalized)
+│  ├─ 0005_friends_beta.sql         # friendships + my_friend_requests()
+│  ├─ 0006_realtime_broadcast.sql   # group topics + broadcast triggers (D-16)
+│  ├─ 0007_invites.sql              # invite links: create/redeem, one-way tokens
+│  ├─ 0008_activity.sql             # my_activity() — one feed, one snapshot
+│  ├─ 0009_select_policy_selfreference.sql  # the 403: RETURNING re-runs SELECT
+│  ├─ 0010_group_events_rsvp.sql    # going / not-going replaces voting (D-18)
+│  └─ 0011_activity_rsvp.sql        # my_activity() follows it
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder

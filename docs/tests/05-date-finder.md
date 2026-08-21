@@ -1,7 +1,7 @@
 # 05 — The date-finder
 
 **Tests:** the wedge. Constraint building, the everyone-free preference, the
-best-turnout fallback, the search window, error handling.
+best-turnout fallback, the search window, picking a date, error handling.
 **Needs:** 02 (so availability exists) and 03.
 **Time:** 15 minutes.
 
@@ -20,9 +20,13 @@ busy the next two Saturdays. Jo is busy every Sunday for six months.**
 
 3. **Set days to Saturday only.** Afternoon, 2h. Tap **Find times**.
    - [ ] A brief "Checking everyone's calendars..." state.
+   - [ ] The header now reads **"Pick a date"** — this is a choice, not a list.
+   - [ ] Results are grouped under a **date heading** (SATURDAY 5 SEPTEMBER),
+         with **at most two times under each**, and at most four dates.
    - [ ] **The first date is the THIRD Saturday from now**, not this weekend and
          not next. Maya, Theo and Ada are busy before then.
    - [ ] Cards read **6 of 6 free** and show real faces.
+   - [ ] The best option is **already selected** — a filled tick on the right.
    - [ ] The header shows the constraint with a green tick, no warning.
 
 4. **Go back, set days to Sunday only.** Find times.
@@ -45,24 +49,39 @@ busy the next two Saturdays. Jo is busy every Sunday for six months.**
    - [ ] It does **not** silently show made-up results.
    - [ ] Turn wi-fi back on, Try again, it recovers.
 
-9. **From a good result, tap "Send to group to vote".**
-   - [ ] A toast confirms it.
-   - [ ] You land on the Plans tab with the new plan listed.
+9. **Tap a different time under a different date.**
+   - [ ] The tick moves. Only one time is ever selected.
+   - [ ] The button at the bottom names the date you chose, e.g.
+         **"Send Sat 5 to the group"**.
+
+10. **Tap it.**
+    - [ ] A toast confirms it.
+    - [ ] You land on the Plans tab, with the plan under **"You're going"** —
+          you picked the time, so you're going. Everyone else gets an
+          invitation to answer (test 06).
 
 ---
 
 ## Verify in the database
 
-```sql
-select title, status, window_start, window_end from public.proposals
- order by created_at desc limit 1;
+The finder no longer writes anything (decision D-18): searching is a preview,
+and the only thing that survives the sheet is the date you picked. So the check
+is that a **plain event** appeared, owned by you and shared with the group:
 
-select count(*) from public.proposal_slots
- where proposal_id = (select id from public.proposals order by created_at desc limit 1);
+```sql
+select e.title, e.start_at, e.end_at, g.name as shared_with
+  from public.events e
+  join public.event_shares s on s.event_id = e.id
+  join public.groups g       on g.id = s.group_id
+ order by e.created_at desc limit 3;
+
+-- and nothing new here, ever again
+select count(*) from public.proposals;
 ```
 
-- [ ] One proposal, with the window you asked for.
-- [ ] **At most 5 slots.** The client asks for 5; the function caps at 20.
+- [ ] One event, at the time you chose, shared with the group you picked.
+- [ ] The proposal count is whatever it was before — the finder stopped writing
+      to those tables.
 
 ## If it fails
 

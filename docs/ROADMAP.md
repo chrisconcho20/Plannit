@@ -1,6 +1,6 @@
 # Plannit — Roadmap & Finalization Plan
 
-_Last updated 2026-08-14. Audience: a future Claude agent (or dev) resuming this
+_Last updated 2026-08-21. Audience: a future Claude agent (or dev) resuming this
 project. Read [`../AGENTS.md`](../AGENTS.md) first for how to build/test without a
 Mac, then this for what's left._
 
@@ -47,8 +47,10 @@ account. See §6 for URLs/creds.
 1. ~~**Live date-finder (`find-slots`)**~~ ✅ **done (2026-08-14).** `Services/SlotFinder.swift`
    builds the `SlotConstraintsDTO` (days → `allowedWeekdays`, time-of-day →
    `dayStart/EndMinutes`, duration, device timezone) and maps `FoundSlotDTO` →
-   `PSlot`. `NewPlanSheet` previews with `persist:false` and only persists the
-   proposal on **Send to group to vote**, with loading / error / no-results states.
+   `PSlot`. `NewPlanSheet` previews with `persist:false` — the search never
+   writes anything — and groups the results **by date, at most two times each,
+   at most four dates** (`SlotFinder.byDate`). The organiser picks one and sends
+   that date to the group, with loading / error / no-results states.
    **A date the whole group can make always wins:** the scheduler
    (`findBestSlots`) returns the earliest all-free slots anywhere in the window
    and only falls back to the best turnout when there are none — the results
@@ -56,18 +58,23 @@ account. See §6 for URLs/creds.
    1/3/6/12 months, default 6) stored under `SearchWindow.key`.
    _Follow-up:_ slot avatars still show the first N group members rather than the
    real `availableUserIds` (needs member ids on `PGroup`).
-2. ~~**Live proposals + voting**~~ ✅ **done (2026-08-14).** `fetchProposals`
-   reads proposals + group members + votes, and slots in a second query (the two
-   FKs between `proposals` and `proposal_slots` make an embed ambiguous).
-   `PlanDetailView` votes (one choice per proposal — casting replaces your last),
-   shows per-slot counts and "Your pick", and **Lock in** (creator or group owner,
-   matching RLS) sets `finalized_slot_id` + status, creates the winning `event`
-   and shares it to the group. Slots carry `available_user_ids`, so cards show
-   the faces of whoever is actually free.
-   ✅ **Also done (2026-08-14):** you can take your vote back, and the organiser
-   can cancel a plan.
-   _Next here:_ no realtime — votes appear on reload, not as they land; a
-   locked-in plan can't be reopened (cancel and re-run is the workaround).
+2. ~~**Live proposals + voting**~~ → **replaced by invitations + RSVP**
+   ✅ **done (2026-08-21), decision D-18.** Voting between slots is gone. The
+   organiser picks one date; it becomes a real event they own, shared with the
+   group; everyone else answers **going / not going** from the Plans row, the
+   group, or the event itself.
+
+   The mechanism is worth knowing before touching any of this: an event shared
+   with a **group** is an invitation, an event shared with a **person** is on
+   their calendar, and `rsvp_to_event()` (0010) is what converts one into the
+   other. So *saying yes is what puts it on your calendar*, and **removing a
+   group plan from your calendar is the same act as declining it** — there is no
+   way to hold a stale yes. `my_activity()` follows in 0011 (`invited`, `rsvp`).
+
+   `proposals` / `proposal_slots` / `votes` are retired: still in the schema,
+   never written, no longer read. `PProposal` and the voting UI are deleted.
+   _Next here:_ the organiser can't move a plan's time once sent (delete and
+   re-run); nobody is notified of a decline except by the count going down.
 3. ~~**Event sharing to groups (live)**~~ ✅ **done (2026-08-14).** `ShareSheet`
    lists your real groups pre-ticked with the event's current shares and diffs
    the selection on save (insert added / delete removed `event_shares`).

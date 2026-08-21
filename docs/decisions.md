@@ -44,7 +44,7 @@ Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 |---|---|---|---|---|
 | D-10 | Where the scheduler runs | Server Edge Function / On-device | **Server Edge Function** (single source of truth) | Accepted |
 | D-11 | Constraint richness for v1 | Basic (day+time+duration+quorum) / Advanced | **Basic set** for v1 | Accepted |
-| D-12 | Outcome of a proposal | Propose then vote / Auto-lock best | **Propose then vote** (social) | Accepted |
+| D-12 | Outcome of a proposal | Propose then vote / Auto-lock best | **Propose then vote** (social) | ~~Accepted~~ — superseded by **D-18** |
 
 ### Realtime & product
 
@@ -59,6 +59,36 @@ Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 | ID | Decision | Options | Choice ★ | Status |
 |---|---|---|---|---|
 | D-16 | Realtime *mechanism* (refines D-13) | `postgres_changes` / **Broadcast from Database** / local-first sync engine | **Broadcast from Database**, consumed via the official `Realtime` SPM module | Accepted 2026-08-14 |
+| D-18 | Outcome of a proposal (supersedes D-12) | Vote between slots / **Organiser picks, everyone RSVPs** | **Organiser picks one date, everyone answers going / not going** | Accepted 2026-08-20 |
+
+**D-18 in full.** D-12 chose voting because picking a time together felt more
+social than one person deciding. Building it showed the cost: the group makes
+*two* decisions (which time, then who's actually coming) to produce one date,
+and the second one is the only one anybody acts on. Worse, votes are not
+commitments — a plan could carry five votes and still have nobody turn up,
+because voting for a slot never said "I'll be there".
+
+So the finder became a preview. It shows the dates that work, at most two times
+per date, and whoever ran it picks one — a decision they're qualified to make,
+since the search already proved the group is free. That pick becomes a real
+event they own, shared with the group, and everyone else answers going or not
+going. One decision each, and the answer *is* the commitment.
+
+The implementation is the interesting half. An event shared with a **group** is
+only visible as an invitation; an event shared with a **person** is on their
+calendar. `rsvp_to_event()` (0010) turns yes into a personal share naming you and
+no into deleting it, so:
+
+- an invitation you haven't answered is in Plans and in the group, not on your
+  calendar;
+- saying yes puts it on your calendar whatever anyone else says;
+- **deleting a group plan from your calendar and declining it are the same
+  act** — there's no way to hold a stale yes;
+- the organiser deleting the event tombstones it for everyone still going.
+
+`proposals`, `proposal_slots` and `votes` are left in the schema, empty. Dropping
+them is a one-way door and they cost nothing; `my_activity()` stopped reading
+them in 0011.
 
 **D-16 in full.** D-13 chose "Realtime + APNs" as the transport but not the
 mechanism, and the API contract assumed `postgres_changes`. Supabase now

@@ -11,7 +11,7 @@ stop and resume anywhere.
 | 03 | [Groups and members](03-groups.md) | 01 |
 | 04 | [Friends](04-friends.md) | 01 |
 | 05 | [The date-finder](05-date-finder.md) | 02, 03 |
-| 06 | [Voting and locking in](06-voting-and-lock-in.md) | 05 |
+| 06 | [Invitations and RSVP](06-invitations-and-rsvp.md) | 05 |
 | 07 | [Events: create, edit, delete](07-events.md) | 01 |
 | 08 | [Repeating events](08-repeating-events.md) | 07 |
 | 09 | [Sharing](09-sharing.md) | 03, 04, 07 |

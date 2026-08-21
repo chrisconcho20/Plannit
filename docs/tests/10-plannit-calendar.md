@@ -1,8 +1,8 @@
 # 10 — The Plannit calendar (the mirror)
 
-**Tests:** whether a locked-in plan really lands on your calendar, and whether it
+**Tests:** whether a plan you've said yes to really lands on your calendar, and whether it
 appears exactly once. This is the least-verified code in the project.
-**Needs:** 06 (a locked-in plan).
+**Needs:** 06 (a group plan you've said yes to).
 **Time:** 10 minutes.
 
 Plannit writes its own events into a dedicated calendar called **Plannit** and
@@ -11,12 +11,12 @@ reading back, or every plan would show twice.
 
 ---
 
-1. **Launch the app and lock a plan in** (or use the one from 06).
+1. **Launch the app and say yes to a group plan** (or use the one from 06).
    - [ ] Console: `calendar mirror: N plannit events, M written`.
 
 2. **Open the Calendar app in the simulator.**
    - [ ] A calendar named **Plannit** exists.
-   - [ ] The locked-in plan is in it, on the right day and time.
+   - [ ] The plan is in it, on the right day and time.
    - [ ] None of your own events moved or changed.
 
 3. **Go back to Plannit, Calendar tab, that day.**
@@ -29,8 +29,8 @@ reading back, or every plan would show twice.
    Calendar app.
    - [ ] It appears as **one repeating event**, not dozens of separate copies.
 
-5. **Delete the locked-in plan's event in Plannit** (Calendar tab, the event,
-   ... menu, Delete).
+5. **Remove the plan in Plannit** (Calendar tab, the event, then ⋯ → Delete
+   event if it's yours, or **Remove** if you were invited).
    - [ ] It disappears from the simulator's Calendar app too, within a refresh.
 
 6. **Force-quit Plannit and relaunch.**
