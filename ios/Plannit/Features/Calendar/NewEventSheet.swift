@@ -20,14 +20,12 @@ struct NewEventSheet: View {
     @State private var title = ""
     @State private var location = ""
     @State private var start = Date()
-    @State private var duration = "1h"
+    @State private var end = Date()
     @State private var allDay = false
     @State private var repeats: RepeatRule = .never
     @State private var shareWithGroup = true
     @State private var saving = false
     @State private var errorText: String?
-
-    private let durations = ["30m", "1h", "2h", "3h"]
 
     init(date: Date = Date(), group: PGroup? = nil, editing: PEvent? = nil) {
         self.date = date
@@ -38,9 +36,7 @@ struct NewEventSheet: View {
             _title = State(initialValue: editing.title)
             _location = State(initialValue: editing.location ?? "")
             _start = State(initialValue: editing.start)
-            let minutes = Int((editing.end ?? editing.start.addingTimeInterval(3600))
-                                .timeIntervalSince(editing.start) / 60)
-            _duration = State(initialValue: Self.label(forMinutes: minutes))
+            _end = State(initialValue: editing.end ?? editing.start.addingTimeInterval(3600))
             _allDay = State(initialValue: editing.isAllDay)
             _repeats = State(initialValue: editing.recurrence)
             _shareWithGroup = State(initialValue: false)   // sharing is its own sheet
@@ -56,6 +52,7 @@ struct NewEventSheet: View {
             base = cal.date(bySettingHour: 9, minute: 0, second: 0, of: date) ?? date
         }
         _start = State(initialValue: base)
+        _end = State(initialValue: base.addingTimeInterval(3600))
     }
 
     var body: some View {
@@ -82,6 +79,19 @@ struct NewEventSheet: View {
                             .tint(.actionPrimary)
                             .textStyle(.body, color: .textStrong)
                             .padding(.vertical, 4)
+                        if !allDay {
+                            Divider().overlay(Color.hairline)
+                            // An end time, not a duration. "How long" is a
+                            // constraint for the date-finder — when you already
+                            // know the time, you know when it ends.
+                            DatePicker("Ends", selection: $end,
+                                       in: start...,
+                                       displayedComponents: [.date, .hourAndMinute])
+                                .datePickerStyle(.compact)
+                                .tint(.actionPrimary)
+                                .textStyle(.body, color: .textStrong)
+                                .padding(.vertical, 4)
+                        }
                     }
                     .padding(.horizontal, 14)
                     .frame(minHeight: 48)
@@ -89,17 +99,6 @@ struct NewEventSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
                         .strokeBorder(Color.lineStrong, lineWidth: 1))
-
-                    if !allDay {
-                        fieldLabel("How long")
-                        HStack(spacing: 8) {
-                            ForEach(durations, id: \.self) { d in
-                                SelectableChip(label: d, selected: duration == d) {
-                                    withAnimation(Motion.fast) { duration = d }
-                                }
-                            }
-                        }
-                    }
 
                     fieldLabel("Repeats")
                     Menu {
@@ -174,6 +173,12 @@ struct NewEventSheet: View {
         }
         .background(Color.appBg)
         .presentationDetents([.large])
+        // Dragging the start past the end would otherwise save an event that
+        // finishes before it begins; the DatePicker's range stops you choosing
+        // one, but not moving the other.
+        .onChange(of: start) { _, newStart in
+            if end <= newStart { end = newStart.addingTimeInterval(3600) }
+        }
     }
 
     private func save() {
@@ -184,36 +189,16 @@ struct NewEventSheet: View {
         Task {
             let ok: Bool
             if let editing {
-                ok = await model.updateEvent(editing, title: name, start: start,
-                                             minutes: Self.minutes(duration), location: place,
-                                             allDay: allDay, repeats: repeats)
+                ok = await model.updateEvent(editing, title: name, start: start, end: end,
+                                             location: place, allDay: allDay, repeats: repeats)
             } else {
-                ok = await model.createEvent(title: name, start: start,
-                                             minutes: Self.minutes(duration), location: place,
-                                             allDay: allDay, repeats: repeats,
+                ok = await model.createEvent(title: name, start: start, end: end,
+                                             location: place, allDay: allDay, repeats: repeats,
                                              shareWith: shareWithGroup ? group : nil)
             }
             saving = false
             if ok { dismiss() } else { errorText = "Couldn’t save that. Check your connection and try again." }
         }
-    }
-
-    /// Nearest chip to a real duration, so editing a 90-minute event doesn't
-    /// silently round it away without showing you. Ordered, not a dictionary:
-    /// an exact tie (90 minutes) must always resolve the same way — down.
-    static func label(forMinutes minutes: Int) -> String {
-        let options = [("30m", 30), ("1h", 60), ("2h", 120), ("3h", 180)]
-        var best = options[0]
-        for option in options.dropFirst() where abs(option.1 - minutes) < abs(best.1 - minutes) {
-            best = option
-        }
-        return best.0   // strict <, so a tie keeps the shorter chip
-    }
-
-    /// "30m" → 30 · "2h" → 120.
-    static func minutes(_ label: String) -> Int {
-        let n = Int(label.filter(\.isNumber)) ?? 1
-        return label.hasSuffix("m") ? n : n * 60
     }
 
     private func fieldLabel(_ text: String) -> some View {

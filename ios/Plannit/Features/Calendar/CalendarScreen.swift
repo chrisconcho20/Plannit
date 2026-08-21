@@ -90,6 +90,17 @@ struct CalendarScreen: View {
         return all.filter { $0.start >= cal.startOfDay(for: Date()) }
     }
 
+    /// In Month and Week you already know the day you're looking at, so the time
+    /// alone is enough. A flat upcoming list doesn't tell you that, so the date
+    /// leads.
+    private func timeLabel(for event: PEvent) -> String {
+        guard mode == .list else { return event.time }
+        let f = DateFormatter()
+        f.dateFormat = cal.isDate(event.start, equalTo: Date(), toGranularity: .year)
+            ? "EEE d MMM" : "EEE d MMM yyyy"
+        return "\(f.string(from: event.start)) · \(event.time)"
+    }
+
     private var sectionTitle: String {
         if mode != .list, let selectedDate {
             let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
@@ -142,7 +153,8 @@ struct CalendarScreen: View {
                     LazyVStack(spacing: Space.gapList) {
                         ForEach(events) { event in
                             NavigationLink(value: event) {
-                                EventCard(title: event.title, time: event.time, location: event.location,
+                                EventCard(title: event.title, time: timeLabel(for: event),
+                                          location: event.location,
                                           hue: event.hue, group: event.group, people: event.people,
                                           icon: event.icon, badge: event.badge, badgeTone: event.badgeTone)
                             }

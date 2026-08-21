@@ -7,25 +7,32 @@ import XCTest
 @MainActor
 final class PolishTests: XCTestCase {
 
-    // MARK: duration chips
+    // MARK: start and end
 
-    func testExactDurationsRoundTrip() {
-        for label in ["30m", "1h", "2h", "3h"] {
-            XCTAssertEqual(NewEventSheet.label(forMinutes: NewEventSheet.minutes(label)), label)
-        }
+    func testAnEventKeepsTheTimesYouChose() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let end = start.addingTimeInterval(90 * 60)
+        let span = AppModel.span(start: start, end: end, allDay: false)
+        XCTAssertEqual(span.0, start)
+        XCTAssertEqual(span.1, end, "90 minutes is a perfectly good length")
     }
 
-    func testOffDurationsPickTheNearestChip() {
-        XCTAssertEqual(NewEventSheet.label(forMinutes: 20), "30m")
-        XCTAssertEqual(NewEventSheet.label(forMinutes: 100), "2h")
-        XCTAssertEqual(NewEventSheet.label(forMinutes: 500), "3h", "clamps to the longest")
+    func testAnEndBeforeItsStartIsFloored() {
+        // The picker won't let you choose one, but dragging the start past the
+        // end can produce one. It must never reach the database — the events
+        // table has a check constraint that would reject it.
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let span = AppModel.span(start: start, end: start.addingTimeInterval(-3600),
+                                 allDay: false)
+        XCTAssertGreaterThan(span.1, span.0)
     }
 
-    func testTiesAreDeterministic() {
-        // 90 is equidistant from 1h and 2h — it must resolve the same way every
-        // time, or an unedited event would change duration on reopen.
-        XCTAssertEqual(NewEventSheet.label(forMinutes: 90), "1h")
-        XCTAssertEqual(NewEventSheet.label(forMinutes: 90), NewEventSheet.label(forMinutes: 90))
+    func testAllDayCoversTheWholeDay() {
+        let cal = Calendar.current
+        let noon = cal.date(bySettingHour: 12, minute: 0, second: 0, of: Date())!
+        let span = AppModel.span(start: noon, end: noon.addingTimeInterval(3600), allDay: true)
+        XCTAssertEqual(span.0, cal.startOfDay(for: noon))
+        XCTAssertEqual(span.1, cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: noon)))
     }
 
     // MARK: group colour

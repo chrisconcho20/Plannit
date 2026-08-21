@@ -587,10 +587,13 @@ final class AppModel: ObservableObject {
 
     // MARK: Events
 
-    /// An all-day event covers midnight to midnight; anything else is a
-    /// duration from the chosen time.
-    static func span(start: Date, minutes: Int, allDay: Bool) -> (Date, Date) {
-        guard allDay else { return (start, start.addingTimeInterval(TimeInterval(minutes * 60))) }
+    /// An all-day event covers midnight to midnight whatever times were picked.
+    /// Otherwise the pair is taken as given, with a floor of 15 minutes so a
+    /// mis-drag can't store an event that ends before it starts.
+    static func span(start: Date, end: Date, allDay: Bool) -> (Date, Date) {
+        guard allDay else {
+            return (start, max(end, start.addingTimeInterval(15 * 60)))
+        }
         let cal = Calendar.current
         let dayStart = cal.startOfDay(for: start)
         let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
@@ -599,11 +602,11 @@ final class AppModel: ObservableObject {
 
     /// Change an event you own.
     @discardableResult
-    func updateEvent(_ event: PEvent, title: String, start: Date, minutes: Int,
+    func updateEvent(_ event: PEvent, title: String, start: Date, end: Date,
                      location: String, allDay: Bool = false,
                      repeats: RepeatRule = .never) async -> Bool {
         let place = location.isEmpty ? nil : location
-        let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
+        let (start, end) = Self.span(start: start, end: end, allDay: allDay)
 
         guard Config.isLiveBackend else {
             if let i = events.firstIndex(where: { $0.id == event.rowId }) {
@@ -741,11 +744,11 @@ final class AppModel: ObservableObject {
     /// Create an event on your own calendar. Private unless `shareWith` is set,
     /// which is how an event made from inside a group reaches that group.
     @discardableResult
-    func createEvent(title: String, start: Date, minutes: Int, location: String,
+    func createEvent(title: String, start: Date, end: Date, location: String,
                      allDay: Bool = false, repeats: RepeatRule = .never,
                      shareWith group: PGroup? = nil) async -> Bool {
         let place = location.isEmpty ? nil : location
-        let (start, end) = Self.span(start: start, minutes: minutes, allDay: allDay)
+        let (start, end) = Self.span(start: start, end: end, allDay: allDay)
 
         guard Config.isLiveBackend, let uid = userId else {
             let tf = DateFormatter(); tf.dateFormat = "h:mm a"

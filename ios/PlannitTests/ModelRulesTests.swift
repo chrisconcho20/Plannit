@@ -117,11 +117,4 @@ final class ModelRulesTests: XCTestCase {
         XCTAssertEqual(proposal().total, 3)
     }
 
-    // MARK: event duration chips
-
-    func testEventDurationChips() {
-        XCTAssertEqual(NewEventSheet.minutes("30m"), 30)
-        XCTAssertEqual(NewEventSheet.minutes("1h"), 60)
-        XCTAssertEqual(NewEventSheet.minutes("3h"), 180)
-    }
 }
