@@ -167,6 +167,12 @@ the device-only section** — those eight checks are impossible anywhere else.
 
 - **Profiles expire after 7 days.** The app stops launching with no useful
   message; plug in and re-run from Xcode to get another week.
+- **Developer Mode has to stay on.** It's the switch that lets
+  development-signed apps run at all. Turning it off doesn't uninstall Plannit,
+  but tapping the icon gets you *"requires Developer Mode"* until it's back on
+  — and toggling it restarts the phone each way. TestFlight and App Store
+  builds don't need it; nothing we can install without the paid program
+  qualifies.
 - **No push notifications** (APNs needs the paid program) — not implemented yet
   either, so nothing is lost.
 - **No real Sign in with Apple**, per above.
