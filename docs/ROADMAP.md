@@ -248,8 +248,10 @@ codemagic.yaml      Codemagic → TestFlight (needs Apple Developer account)
 - **GitHub secrets set:** `APPETIZE_API_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.
 - **GitHub repo variables:** `APPETIZE_PUBLIC_KEY` (demo app), `APPETIZE_LIVE_PUBLIC_KEY` (live app).
 - **Appetize preview URLs (stable):**
-  - Demo: `https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi`
-  - Live: `https://appetize.io/app/pf2plhtimqqxqku6kdlwyl7p2y`
+  - Demo: `https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi` (sample data only —
+    safe to share)
+  - Live: not published here on purpose; the repo is public and that link
+    reaches the real database. Take it from the workflow run summary.
 - **Supabase project:** live; migrations 0001–0003 applied. **TODO:** `supabase db
   push` for `0004`, then set Vault secrets `internal_function_secret` and
   `functions_base_url` (see [`backend/setup-runbook.md`](backend/setup-runbook.md)

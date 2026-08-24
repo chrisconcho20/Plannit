@@ -7,10 +7,15 @@
 --
 -- ⚠️  These are REAL, SIGN-IN-ABLE ACCOUNTS on your live project, and they are
 --     auto-friended to everyone and added to every group you own. Anyone who
---     knows an email and the password below can sign in and see whatever those
---     accounts can see — your groups, your shared events, your plans. Set
---     `test_password` to something of your own, and rotate it before the live
---     Appetize preview link goes anywhere public. See docs/security-review.md.
+--     knows an email and the password can sign in and see whatever those
+--     accounts can see — your groups, your shared events, your plans.
+--
+--     THIS REPOSITORY IS PUBLIC. Set `test_password` in your editor, run it,
+--     and never save it back into the file — anything committed here is
+--     published, permanently, including in git history. The script refuses to
+--     run until you've replaced the placeholder, because a comment asking
+--     nicely didn't hold: a real password reached the public repo once already
+--     (docs/security-review.md, "Regression").
 --
 -- It creates:
 --   • 5 test users (auth.users + profiles), password = `test_password` below
@@ -28,10 +33,10 @@
 
 do $$
 declare
-  owner_email   text := 'johnnysilverhands@gmail.com';
-  -- CHANGE THIS. It's a shared password for accounts on a live database, and
-  -- this file is in the repo — anything left here is effectively published.
-  test_password text := 'tp20';
+  -- The account you sign in as. Also published if you commit it.
+  owner_email   text := 'you@example.com';
+  -- Set this in the SQL editor before running. Do NOT save it back to the file.
+  test_password text := 'REPLACE-BEFORE-RUNNING';
   owner_tz      text := 'America/Los_Angeles';
   owner_uid    uuid;
   test_ids     uuid[];
@@ -41,6 +46,18 @@ declare
   sun          date;   -- the next Sunday
   i            int;
 begin
+  -- Refuse to create sign-in-able accounts with a password anyone can read.
+  -- 16 characters isn't security theatre here: these accounts sit inside your
+  -- real groups, and the app is reachable from a public preview link.
+  if test_password = 'REPLACE-BEFORE-RUNNING' or length(test_password) < 16 then
+    raise exception
+      'Set test_password to at least 16 characters you have not committed. %',
+      'See the header of this file.';
+  end if;
+  if owner_email = 'you@example.com' then
+    raise exception 'Set owner_email to the address you sign in with.';
+  end if;
+
   -- pgcrypto lives in `extensions` on hosted projects; reach crypt()/gen_salt().
   perform set_config('search_path', 'public, extensions', true);
 

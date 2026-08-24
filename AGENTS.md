@@ -30,8 +30,11 @@ app locally**. Validate and test entirely through cloud services:
   simulator builds). Two previews, both **stable URLs**:
   - Demo (sample data): `https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi` —
     rebuilds automatically on `ios/**` push.
-  - Live (real Supabase, dev email sign-in): `https://appetize.io/app/pf2plhtimqqxqku6kdlwyl7p2y`
-    — rebuild with `"$GH" workflow run ios-appetize-live.yml -R chrisconcho20/Plannit`.
+  - Live (real Supabase, dev email sign-in): **URL deliberately not recorded
+    here.** This repo is public, and that link is a front door to the real
+    project — pair it with any working credential and a stranger is inside the
+    owner's groups. Rebuild with `"$GH" workflow run ios-appetize-live.yml -R
+    chrisconcho20/Plannit` and take the URL from the run summary.
   - After a build, the run **Summary** prints the URL; the workflow also echoes
     `Appetize URL: …` in the log.
 

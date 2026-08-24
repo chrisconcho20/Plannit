@@ -1,8 +1,9 @@
 # Manual test plan — Phase 1
 
-_Last updated 2026-08-14. Run this against the **live** preview:
-<https://appetize.io/app/pf2plhtimqqxqku6kdlwyl7p2y> (dev email sign-in). The
-demo preview is <https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi>._
+_Last updated 2026-08-14. Run this against the **live** preview (dev email
+sign-in) — its URL is in the `ios-appetize-live` run summary, and is kept out of
+this public repo on purpose. The demo preview, which has no live data behind it,
+is <https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi>._
 
 Phase 1 is "find a date → send it → vote → lock it in → it's on everyone's
 calendar", plus the per-group visibility it rests on. This walks that loop and

@@ -1,6 +1,7 @@
 # Security review — data exposure
 
-_2026-08-15. A read of the whole repo looking for one thing: ways someone could
+_2026-08-15, re-checked 2026-08-23 (see the Regression under finding 1). A read
+of the whole repo looking for one thing: ways someone could
 see data they shouldn't. Not a general audit — no dependency CVEs, no
 availability, no App Store compliance._
 
@@ -30,9 +31,29 @@ So anyone with the preview URL could open it, sign in as `maya@plannit.test`,
 and read your groups, your shared events (titles, places, times), your plans and
 everyone's display names. No exploit required — it's the front door.
 
-**Fixed:** the password is now a `test_password` variable defaulting to
-`change-me-before-sharing`, and re-running the seed rotates it, which is how you
-revoke a leak.
+**Fixed:** the password is now a `test_password` variable, and re-running the
+seed rotates it, which is how you revoke a leak.
+
+### Regression, found 2026-08-23 — the fix above did not hold
+
+A working password (`tp20`, four characters) was set in the file and committed,
+and the seed was run against the live project with it. For some period, the
+public repo contained a valid credential for five accounts sitting inside the
+owner's real groups, next to a published link to a build pointed at the real
+database. Treat `tp20` as burned.
+
+The lesson is about the shape of the mitigation, not the person: a comment
+saying *"CHANGE THIS"* is not a control, because the natural workflow —
+edit the file, paste it into the SQL editor — saves the secret back into the
+file every time. The seed now **refuses to run** unless `test_password` has been
+changed from its placeholder and is at least 16 characters, and the live preview
+URL has been removed from `AGENTS.md`, `ROADMAP.md` and `manual-test-plan.md`.
+Neither control depends on anyone remembering anything.
+
+What still can't be undone: `tp20` is in git history permanently, as is the live
+preview URL. Rotation is the only remedy, and rotation is only complete once the
+seed has been re-run with a new password **and** the live Appetize build has been
+deleted or rebuilt (its old URL keeps working until you do).
 
 **Still yours to do:**
 - Set a private `test_password` and re-run the seed. `plannit123` should be

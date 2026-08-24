@@ -46,9 +46,13 @@ support the Sign in with Apple capability"*) doesn't say what to do about it:
   empty. Sign in with Apple can't be signed by a personal team, and nothing
   calls it yet — live mode signs in with dev email.
 
-Switch both back when there's a paid membership. To stop Xcode asking for the
-team after every `xcodegen generate`, put your 10-character Team ID in
-`project.yml` under `DEVELOPMENT_TEAM`.
+Switch both back when there's a paid membership.
+
+**Don't commit your Team ID.** It isn't a credential — you can't sign anything
+with someone else's — but this repo is public and there's no upside to
+publishing an identifier tied to your Apple ID. Picking the team once per
+`xcodegen generate` costs a click. If that gets old, keep the value in an
+untracked file rather than in `project.yml`.
 
 ## Putting it on the phone
 
