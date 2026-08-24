@@ -50,11 +50,54 @@ Switch both back when there's a paid membership. To stop Xcode asking for the
 team after every `xcodegen generate`, put your 10-character Team ID in
 `project.yml` under `DEVELOPMENT_TEAM`.
 
-Pick your iPhone from the device menu and **⌘R**.
+## Putting it on the phone
 
-The first run fails on the phone with *"Untrusted Developer"*. On the phone:
-**Settings → General → VPN & Device Management → your Apple ID → Trust**. Run
-again.
+1. **On the iPhone, turn on Developer Mode** — *Settings → Privacy & Security →
+   Developer Mode → On*, then restart the phone and unlock it. The row only
+   appears once a Mac has tried to talk to the device, so plug in first if you
+   can't find it. Until this is on, **the phone will not appear in Xcode's
+   device menu at all**, which looks exactly like a broken cable.
+
+2. **Plug the phone into the Mac** and unlock it. Tap **Trust This Computer**
+   and enter the passcode.
+
+3. **Pick the phone from the device menu** in Xcode's toolbar (top left, next to
+   the scheme). It's under *iOS Device*, not *Simulator*.
+
+4. **⌘R.** First build is slow — it compiles the Realtime package too.
+
+5. The run fails on the phone with **"Untrusted Developer"**. On the phone:
+   *Settings → General → VPN & Device Management → your Apple ID → Trust*. Then
+   ⌘R again.
+
+6. It launches. Leave the cable in and Xcode's console open — the `calendar` and
+   `sync` lines are half the point of testing on a real device.
+
+Once it's installed you can unplug and open it from the home screen like any
+app; it keeps working for **7 days** (see Limits below).
+
+### If the phone doesn't show up in the device menu
+
+- **Developer Mode is off** — step 1. This is nearly always it.
+- **The phone is locked**, or you haven't tapped Trust This Computer.
+- **"iPhone is not available" / "unsupported iOS version"** — Xcode only knows
+  how to debug iOS versions up to the one it shipped with, and 16.4 shipped
+  against iOS 18.5. A phone on a newer iOS than that needs a newer Xcode, which
+  this Mac can't take. Options, best first:
+  - use an older spare device still on iOS 17/18;
+  - drop in a community **DeviceSupport** bundle for your iOS version
+    ([iOSDeviceSupport](https://github.com/filsv/iOSDeviceSupport)) — copy it to
+    `/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/`
+    and restart Xcode. Unofficial, and it stops working when the gap gets
+    large;
+  - fall back to the simulator and accept that the calendar work stays
+    unverified — a simulator's calendar is whatever you type into it.
+
+### Wireless, after the first cable run
+
+*Window → Devices and Simulators →* select the phone *→ Connect via network*.
+Handy for testing the background/foreground reconcile without a cable dragging
+the phone off the desk.
 
 ## Live backend vs demo
 
@@ -122,7 +165,8 @@ the device-only section** — those eight checks are impossible anywhere else.
 
 ## Limits of a personal team
 
-- **Profiles expire after 7 days.** The app stops launching; re-run from Xcode.
+- **Profiles expire after 7 days.** The app stops launching with no useful
+  message; plug in and re-run from Xcode to get another week.
 - **No push notifications** (APNs needs the paid program) — not implemented yet
   either, so nothing is lost.
 - **No real Sign in with Apple**, per above.
