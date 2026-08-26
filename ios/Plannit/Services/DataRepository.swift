@@ -30,7 +30,9 @@ struct SampleRepository: DataRepository {
 
 @MainActor
 struct SupabaseRepository: DataRepository {
-    private let client = SupabaseClient.shared
+    private let client: SupabaseClient
+
+    init(client: SupabaseClient = .shared) { self.client = client }
 
     func fetchGroups() async throws -> [PGroup] {
         // Embed memberships → profiles so we get real member names in one query.

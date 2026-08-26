@@ -280,7 +280,19 @@ enum SupabaseError: Error { case notConfigured, http(Int, String), decoding }
 @MainActor
 final class SupabaseClient {
     static let shared = SupabaseClient()
-    private let session = URLSession.shared
+
+    /// Injected so tests can drive the client through a stubbed transport.
+    ///
+    /// This seam is not decoration. Two bugs reached a real phone past a fully
+    /// green suite — a 403 caused by PostgREST re-running the SELECT policy on
+    /// `RETURNING`, and a `returns void` RPC answering with an empty body that
+    /// the generic decoder treated as a failure *after* the write succeeded.
+    /// Both live exactly here, in the shape of the request and the shape of the
+    /// response, and neither was reachable from a test until now.
+    private let session: URLSession
+    /// Overrides for `Config`, which reads Info.plist — empty in a test host.
+    private let urlOverride: String?
+    private let keyOverride: String?
 
     private(set) var accessToken: String?
     private(set) var userId: String?
@@ -290,7 +302,20 @@ final class SupabaseClient {
 
     private static let sessionKey = "supabase.session"
 
-    nonisolated init() {}
+    nonisolated init(session: URLSession = .shared,
+                     url: String? = nil, anonKey: String? = nil) {
+        self.session = session
+        self.urlOverride = url
+        self.keyOverride = anonKey
+    }
+
+    /// Stand in a signed-in session without a round trip. Tests only — the app
+    /// gets its tokens from sign-in or the Keychain.
+    func useSession(accessToken: String, userId: String) {
+        self.accessToken = accessToken
+        self.userId = userId
+        self.expiresAt = Date().addingTimeInterval(3600)
+    }
 
     // MARK: Session persistence
 
@@ -393,9 +418,14 @@ final class SupabaseClient {
         Keychain.delete(Self.sessionKey)
     }
 
-    var isConfigured: Bool { Config.isLiveBackend }
-    private var baseURL: URL? { URL(string: Config.supabaseURL) }
-    private var anonKey: String { Config.supabaseAnonKey }
+    var isConfigured: Bool {
+        if let urlOverride, let keyOverride {
+            return !urlOverride.isEmpty && !keyOverride.isEmpty
+        }
+        return Config.isLiveBackend
+    }
+    private var baseURL: URL? { URL(string: urlOverride ?? Config.supabaseURL) }
+    private var anonKey: String { keyOverride ?? Config.supabaseAnonKey }
 
     // MARK: Auth — exchange an Apple identity token for a Supabase session.
     @discardableResult
