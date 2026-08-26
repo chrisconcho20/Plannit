@@ -106,6 +106,7 @@ struct EventDTO: Decodable, Identifiable {
     let end_at: String
     let all_day: Bool
     let source: String
+    let external_cal_id: String?
     let recurrence_rule: String?
     let event_shares: [EventShareEmbedDTO]?   // only one FK to events — safe to embed
     let event_rsvps: [RsvpEmbedDTO]?
@@ -123,6 +124,15 @@ struct RsvpArgs: Encodable {
     let p_going: Bool
 }
 
+/// Keeping a shared device event in step with the phone. The device owns
+/// these fields (sync-contract, "Sources of truth"), so we push, never pull.
+struct DeviceEventSync: Encodable {
+    let title: String
+    let location: String?
+    let start_at: String
+    let end_at: String
+    let all_day: Bool
+}
 struct EventInsert: Encodable {
     let owner_id: String
     let title: String
@@ -133,6 +143,7 @@ struct EventInsert: Encodable {
     let timezone: String
     let source: String     // "plannit" | "device"
     let recurrence_rule: String?
+    let external_cal_id: String?
 }
 
 /// One busy range on its way to `replace_busy_blocks`. No `user_id`: the

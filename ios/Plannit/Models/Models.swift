@@ -55,6 +55,12 @@ struct PEvent: Identifiable, Hashable {
     var badge: String? = nil
     var badgeTone: BadgeTone = .neutral
     var source: EventSource = .plannit
+    /// Set on a Plannit row that mirrors one of *your own* calendar's events —
+    /// `EKEvent.calendarItemExternalIdentifier`. It exists only because you
+    /// chose to share that event with a group: the device stays the source of
+    /// truth for its title and times, and this is what ties the two together
+    /// (the DB has `unique(owner_id, external_cal_id)`).
+    var externalCalId: String? = nil
     /// An all-day event has no meaningful clock time — real calendars are full
     /// of them (birthdays, trips) and they don't make you busy.
     var isAllDay: Bool = false
@@ -75,6 +81,10 @@ struct PEvent: Identifiable, Hashable {
     var sharedUserIds: [String] = []
 
     var isPrivate: Bool { sharedGroupIds.isEmpty && sharedUserIds.isEmpty }
+
+    /// A copy of something in your own calendar, kept in Plannit so a group can
+    /// see it. Its times follow the device, not us.
+    var isFromDeviceCalendar: Bool { externalCalId != nil }
 
     /// A plan someone made with a group, as opposed to something you put in your
     /// own calendar. Only these get the going/not-going treatment.
@@ -130,8 +140,8 @@ struct PEvent: Identifiable, Hashable {
                     end: occurrenceStart.addingTimeInterval(length),
                     title: title, time: time, location: location, group: group,
                     hue: hue, icon: icon, people: people, badge: badge,
-                    badgeTone: badgeTone, source: source, isAllDay: isAllDay,
-                    ownerId: ownerId,
+                    badgeTone: badgeTone, source: source, externalCalId: externalCalId,
+                    isAllDay: isAllDay, ownerId: ownerId,
                     recurrence: recurrence, seriesId: id, rsvps: rsvps,
                     sharedGroupIds: sharedGroupIds, sharedUserIds: sharedUserIds)
                 return copy

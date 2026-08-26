@@ -86,7 +86,13 @@ struct CalendarScreen: View {
     /// dumped every day under whichever day you'd tapped — invisible on an
     /// empty simulator, a wall of text on a real phone.
     private var deviceEvents: [DeviceEvent] {
-        let all = model.deviceEvents.sorted { $0.start < $1.start }
+        // An event you've shared exists twice — in EventKit, and as the Plannit
+        // copy the group can see. Show the Plannit one: it's the same event, and
+        // it's the one that knows who it's shared with.
+        let sharedExternalIds = Set(calendarEvents.compactMap(\.externalCalId))
+        let all = model.deviceEvents
+            .filter { $0.externalId.map { !sharedExternalIds.contains($0) } ?? true }
+            .sorted { $0.start < $1.start }
         if mode != .list, let selectedDate {
             return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
         }

@@ -177,6 +177,7 @@ struct SupabaseRepository: DataRepository {
                               isMine: d.owner_id == me),
             badgeTone: .neutral,
             source: isDevice ? .device : .plannit,
+            externalCalId: d.external_cal_id,
             isAllDay: d.all_day,
             ownerId: d.owner_id,
             recurrence: Recurrence.rule(from: d.recurrence_rule),

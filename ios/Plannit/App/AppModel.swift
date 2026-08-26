@@ -622,6 +622,136 @@ final class AppModel: ObservableObject {
         events[i] = e
     }
 
+    // MARK: Sharing one of your own calendar's events
+    //
+    // D-17 says the device calendar is never uploaded, and that stands: nothing
+    // here runs unless you tap "Share with a group" on one specific event. The
+    // permission prompt promises event details stay on your device; the API
+    // contract has always carried the exception — "raw events never leave the
+    // phone *unless explicitly shared*". This is that exception, one event at a
+    // time, with the exchange stated on the button.
+    //
+    // The copy is keyed to the phone's event by `external_cal_id`
+    // (`unique(owner_id, external_cal_id)` in 0001), which is what stops a
+    // second tap creating a second row — and what lets `reconcileSharedDeviceEvents`
+    // keep the copy honest afterwards.
+
+    /// Copy a device event into Plannit so it can be shared. Returns the row,
+    /// or nil if we couldn't make one.
+    func shareDeviceEvent(_ device: DeviceEvent) async -> PEvent? {
+        // Already shared once — reuse the row rather than racing the unique index.
+        if let existing = sharedCopy(of: device) { return existing }
+
+        guard Config.isLiveBackend, let uid = userId else {
+            let copy = PEvent(id: UUID().uuidString, start: device.start, end: device.end,
+                              title: device.title, time: "", location: device.location,
+                              source: .device, externalCalId: device.externalId,
+                              isAllDay: device.isAllDay, ownerId: userId)
+            events.append(copy)
+            return copy
+        }
+        guard let externalId = device.externalId else {
+            return failedNil("That event has no stable id — Plannit can't track it.")
+        }
+
+        let iso = ISO8601DateFormatter()
+        do {
+            let created: [EventRefDTO] = try await SupabaseClient.shared.insertReturning(
+                "events", values: EventInsert(
+                    owner_id: uid, title: device.title, location: device.location,
+                    start_at: iso.string(from: device.start),
+                    end_at: iso.string(from: device.end),
+                    all_day: device.isAllDay,
+                    timezone: TimeZone.current.identifier,
+                    // `device` is the truth about this event; we hold a copy.
+                    source: "device", recurrence_rule: nil,
+                    external_cal_id: externalId))
+            guard created.first != nil else {
+                return failedNil("Couldn't share that event. Try again.")
+            }
+            await refreshEvents()
+            return sharedCopy(of: device)
+        } catch {
+            return failedNil("Couldn't share that event. Try again.")
+        }
+    }
+
+    /// The Plannit row standing in for a device event, if you've shared it.
+    func sharedCopy(of device: DeviceEvent) -> PEvent? {
+        guard let externalId = device.externalId else { return nil }
+        return events.first { $0.externalCalId == externalId }
+    }
+
+    /// Keep shared copies in step with the phone. The device owns these events
+    /// (sync-contract, "Sources of truth"), so this only ever pushes: move a
+    /// shared dinner on your phone and the group sees the new time rather than
+    /// the one you shared last week.
+    private func reconcileSharedDeviceEvents() async {
+        guard Config.isLiveBackend, userId != nil else { return }
+        let copies = events.filter { $0.isFromDeviceCalendar && $0.isOwned(by: userId) }
+        guard !copies.isEmpty else { return }
+
+        let byExternalId = Dictionary(
+            deviceEvents.compactMap { d in d.externalId.map { ($0, d) } },
+            uniquingKeysWith: { first, _ in first })
+        let iso = ISO8601DateFormatter()
+        var changed = false
+
+        for copy in copies {
+            guard let externalId = copy.externalCalId else { continue }
+            guard let device = byExternalId[externalId] else {
+                // Missing from the read — only meaningful if the window covered
+                // it. Beyond the window, "absent" says nothing at all, and
+                // tombstoning on that would quietly delete a shared plan.
+                if let deleted = deviceWindowCovers(copy.start), deleted {
+                    await deleteEvent(copy)
+                    changed = true
+                }
+                continue
+            }
+            guard Self.differs(copy, from: device) else { continue }
+            do {
+                try await SupabaseClient.shared.update(
+                    "events",
+                    values: DeviceEventSync(
+                        title: device.title, location: device.location,
+                        start_at: iso.string(from: device.start),
+                        end_at: iso.string(from: device.end),
+                        all_day: device.isAllDay),
+                    match: ["id": "eq.\(copy.rowId)"])
+                changed = true
+            } catch {
+                continue   // next sync tries again
+            }
+        }
+        if changed { await refreshEvents() }
+    }
+
+    /// Is this instant inside the window we actually read from the device?
+    /// Nil when we can't tell.
+    private func deviceWindowCovers(_ date: Date) -> Bool? {
+        let now = Date()
+        guard let end = Calendar.current.date(byAdding: .month, value: deviceWindowMonths,
+                                              to: now) else { return nil }
+        return date >= Calendar.current.date(byAdding: .day, value: -1, to: now)! && date <= end
+    }
+
+    /// Has the phone's version moved since we copied it?
+    static func differs(_ copy: PEvent, from device: DeviceEvent) -> Bool {
+        if copy.title != device.title { return true }
+        if (copy.location ?? "") != (device.location ?? "") { return true }
+        if copy.isAllDay != device.isAllDay { return true }
+        // A second of slop: the two sides round differently in places.
+        if abs(copy.start.timeIntervalSince(device.start)) > 1 { return true }
+        if abs((copy.end ?? copy.start).timeIntervalSince(device.end)) > 1 { return true }
+        return false
+    }
+
+    private func failedNil(_ message: String) -> PEvent? {
+        say(message)
+        return nil
+    }
+
     /// Send a time the finder suggested to a group. The event is yours; sharing
     /// it with the group is what makes it an invitation rather than a private
     /// plan, and everyone else answers going or not.
@@ -643,7 +773,7 @@ final class AppModel: ObservableObject {
                     owner_id: uid, title: title, location: nil,
                     start_at: iso.string(from: start), end_at: iso.string(from: end),
                     all_day: false, timezone: TimeZone.current.identifier,
-                    source: "plannit", recurrence_rule: nil))
+                    source: "plannit", recurrence_rule: nil, external_cal_id: nil))
             guard let event = created.first else {
                 return failed(false, "Couldn't send that to the group.")
             }
@@ -749,7 +879,7 @@ final class AppModel: ObservableObject {
                     start_at: iso.string(from: start), end_at: iso.string(from: end),
                     all_day: allDay,
                     timezone: TimeZone.current.identifier, source: "plannit",
-                    recurrence_rule: Recurrence.rrule(for: repeats)))
+                    recurrence_rule: Recurrence.rrule(for: repeats), external_cal_id: nil))
             if let group, let event = created.first {
                 try await SupabaseClient.shared.insert("event_shares", values: EventShareInsert(
                     event_id: event.id, group_id: group.id))
@@ -1026,6 +1156,7 @@ final class AppModel: ObservableObject {
         guard calendarConnected else { return }
         if pullRemote { await CalendarReader.shared.refreshSources() }
         await refreshCalendar()
+        await reconcileSharedDeviceEvents()
         await uploadBusyBlocksIfLive()
         mirrorToDeviceCalendar()
     }
