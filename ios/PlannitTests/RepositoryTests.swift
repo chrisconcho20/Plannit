@@ -82,7 +82,8 @@ final class RepositoryTests: XCTestCase {
           "all_day": false, "source": "device", "external_cal_id": "ext-99",
           "recurrence_rule": null, "event_shares": [], "event_rsvps": []}]
         """)
-        let event = try XCTUnwrap(try await repo.fetchEvents(groups: []).first)
+        let events = try await repo.fetchEvents(groups: [])
+        let event = try XCTUnwrap(events.first)
 
         XCTAssertEqual(event.externalCalId, "ext-99")
         XCTAssertTrue(event.isFromDeviceCalendar)
@@ -91,7 +92,8 @@ final class RepositoryTests: XCTestCase {
 
     func testAnEventSharedWithYouIsNotLabelledPrivate() async throws {
         StubTransport.on("/events", body: eventJSON)
-        let event = try XCTUnwrap(try await repo.fetchEvents(groups: [soccer]).first)
+        let events = try await repo.fetchEvents(groups: [soccer])
+        let event = try XCTUnwrap(events.first)
         XCTAssertEqual(event.badge, "Shared with you",
                        "it's Maya's event, shared with you — 'Private' was a lie")
     }
@@ -108,7 +110,8 @@ final class RepositoryTests: XCTestCase {
                                              "avatar_hue": null, "avatar_url": null}}
           ]}]
         """)
-        let group = try XCTUnwrap(try await repo.fetchGroups().first)
+        let groups = try await repo.fetchGroups()
+        let group = try XCTUnwrap(groups.first)
 
         XCTAssertEqual(group.members.count, 2)
         XCTAssertEqual(group.members.first?.hue, .sky)
@@ -124,7 +127,8 @@ final class RepositoryTests: XCTestCase {
             {"id": "me", "display_name": "You", "avatar_hue": "chartreuse",
              "avatar_url": null}}]}]
         """)
-        let group = try XCTUnwrap(try await repo.fetchGroups().first)
+        let groups = try await repo.fetchGroups()
+        let group = try XCTUnwrap(groups.first)
         XCTAssertNil(group.members.first?.hue,
                      "a value the app doesn't know must not take the whole query down")
     }

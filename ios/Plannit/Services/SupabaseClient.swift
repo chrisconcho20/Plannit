@@ -129,6 +129,12 @@ struct RsvpEmbedDTO: Decodable {
     let user_id: String
     let response: String       // "going" | "not_going"
 }
+struct RescheduleArgs: Encodable {
+    let p_event: String
+    let p_start: String
+    let p_end: String
+    let p_reset: Bool
+}
 struct RsvpArgs: Encodable {
     let p_event: String
     let p_going: Bool
@@ -210,7 +216,9 @@ struct ActivityDTO: Decodable {
     let title: String?
     let subtitle: String?
     let group_id: String?
-    let proposal_id: String?
+    /// What the row is about, when it's about an event (0015). `proposal_id`
+    /// stood here until proposals retired and it became null on every row.
+    let event_id: String?
 }
 struct ActivityArgs: Encodable { let p_limit: Int }
 

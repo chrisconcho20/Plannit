@@ -381,6 +381,7 @@ struct EventDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showShare = false
     @State private var showEdit = false
+    @State private var showReschedule = false
     @State private var confirmDelete = false
     @State private var confirmDecline = false
     @State private var answering = false
@@ -534,6 +535,11 @@ struct EventDetailView: View {
                 if isOwner {
                     Menu {
                         Button { showEdit = true } label: { Label("Edit event", systemImage: "pencil") }
+                        if live.isGroupEvent {
+                            Button { showReschedule = true } label: {
+                                Label("Move this plan", systemImage: "calendar.badge.clock")
+                            }
+                        }
                         Button { showShare = true } label: { Label("Share to a group", systemImage: "person.2.fill") }
                         Button(role: .destructive) { confirmDelete = true } label: {
                             Label("Delete event", systemImage: "trash")
@@ -561,6 +567,9 @@ struct EventDetailView: View {
         .sheet(isPresented: $showShare) { ShareSheet(event: live).environmentObject(model) }
         .sheet(isPresented: $showEdit) {
             NewEventSheet(date: live.start, editing: live).environmentObject(model)
+        }
+        .sheet(isPresented: $showReschedule) {
+            RescheduleSheet(event: live).environmentObject(model)
         }
         .confirmationDialog("Delete “\(live.title)”?", isPresented: $confirmDelete,
                             titleVisibility: .visible) {

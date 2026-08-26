@@ -80,7 +80,8 @@ struct SupabaseRepository: DataRepository {
                 happenedAt: when,
                 actor: (row.actor_name?.isEmpty == false ? row.actor_name! : "Someone"),
                 title: row.title ?? "a plan",
-                subtitle: row.subtitle)
+                subtitle: row.subtitle,
+                eventId: row.event_id, groupId: row.group_id)
         }
     }
 

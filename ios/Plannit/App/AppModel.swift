@@ -575,8 +575,9 @@ final class AppModel: ObservableObject {
                            time: allDay ? "All day" : tf.string(from: start),
                            location: place, group: e.group,
                            hue: e.hue, icon: e.icon, people: e.people, badge: e.badge,
-                           badgeTone: e.badgeTone, source: e.source, isAllDay: allDay,
-                           ownerId: e.ownerId, recurrence: repeats,
+                           badgeTone: e.badgeTone, source: e.source,
+                           externalCalId: e.externalCalId, isAllDay: allDay,
+                           ownerId: e.ownerId, recurrence: repeats, rsvps: e.rsvps,
                            sharedGroupIds: e.sharedGroupIds, sharedUserIds: e.sharedUserIds)
                 events[i] = e
             }
@@ -675,6 +676,74 @@ final class AppModel: ObservableObject {
             e.sharedUserIds.removeAll { $0 == uid }
         }
         events[i] = e
+    }
+
+    // MARK: Moving a plan
+
+    /// Does moving from `from` to `to` re-open everyone's answer?
+    ///
+    /// The rule, stated once here because the copy in the sheet has to promise
+    /// exactly what the database will do: **a different day re-asks; a different
+    /// time on the same day doesn't.** Keeping a yes across a day change would
+    /// be the stale-yes problem the RSVP design exists to prevent (D-18);
+    /// clearing answers for a fifteen-minute shift would pester six people over
+    /// a detail.
+    static func resetsAnswers(movingFrom from: Date, to: Date) -> Bool {
+        !Calendar.current.isDate(from, inSameDayAs: to)
+    }
+
+    /// Move a group plan you own. Everyone still going gets the new time; if the
+    /// day changed, everyone but you is asked again.
+    @discardableResult
+    func reschedule(_ event: PEvent, to start: Date, end: Date) async -> Bool {
+        guard event.isOwned(by: userId) else {
+            return failed(false, "Only whoever made the plan can move it.")
+        }
+        let (start, end) = Self.span(start: start, end: end, allDay: event.isAllDay)
+        let resets = Self.resetsAnswers(movingFrom: event.start, to: start)
+
+        guard Config.isLiveBackend else {
+            if let i = events.firstIndex(where: { $0.id == event.rowId }) {
+                var e = events[i]
+                e = Self.moved(e, to: start, end: end, clearingAnswers: resets, owner: userId)
+                events[i] = e
+            }
+            return true
+        }
+
+        let iso = ISO8601DateFormatter()
+        do {
+            try await SupabaseClient.shared.rpcVoid(
+                "reschedule_event",
+                args: RescheduleArgs(p_event: event.rowId,
+                                     p_start: iso.string(from: start),
+                                     p_end: iso.string(from: end),
+                                     p_reset: resets))
+            await refreshEvents()
+            return true
+        } catch {
+            return failed(false, "Couldn't move that plan. Try again.")
+        }
+    }
+
+    /// The local half, shared with demo mode — and the thing the tests read.
+    static func moved(_ event: PEvent, to start: Date, end: Date,
+                      clearingAnswers: Bool, owner: String?) -> PEvent {
+        var answers = event.rsvps
+        var shared = event.sharedUserIds
+        if clearingAnswers {
+            let keep = owner ?? event.ownerId
+            answers = answers.filter { $0.key == keep }
+            shared = shared.filter { $0 == keep }
+        }
+        return PEvent(id: event.id, start: start, end: end, title: event.title,
+                      time: event.time, location: event.location, group: event.group,
+                      hue: event.hue, icon: event.icon, people: event.people,
+                      badge: event.badge, badgeTone: event.badgeTone, source: event.source,
+                      externalCalId: event.externalCalId, isAllDay: event.isAllDay,
+                      ownerId: event.ownerId, recurrence: event.recurrence,
+                      seriesId: event.seriesId, rsvps: answers,
+                      sharedGroupIds: event.sharedGroupIds, sharedUserIds: shared)
     }
 
     // MARK: Sharing one of your own calendar's events

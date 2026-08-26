@@ -67,9 +67,11 @@ enum Sample {
 
     static let activity: [PActivity] = [
         PActivity(id: "a1", kind: .rsvp, happenedAt: Date().addingTimeInterval(-900),
-                  actor: "Maya Ellis", title: "Five-a-side", subtitle: "Soccer"),
+                  actor: "Maya Ellis", title: "Five-a-side", subtitle: "Soccer",
+                  eventId: "e1", groupId: "soccer"),
         PActivity(id: "a2", kind: .invited, happenedAt: Date().addingTimeInterval(-7200),
-                  actor: "Theo Sand", title: "Someone's 30th", subtitle: "Family"),
+                  actor: "Theo Sand", title: "Someone's 30th", subtitle: "Family",
+                  eventId: "e6", groupId: "family"),
         PActivity(id: "a3", kind: .eventShared, happenedAt: Date().addingTimeInterval(-90000),
                   actor: "Ada Kim", title: "Film night", subtitle: "Flatmates"),
         PActivity(id: "a4", kind: .friendRequest, happenedAt: Date().addingTimeInterval(-200000),

@@ -176,6 +176,11 @@ struct PActivity: Identifiable, Hashable {
     let actor: String
     let title: String
     let subtitle: String?
+    /// Where the row goes when tapped. Nil is normal and fine — a friend
+    /// request opens the friends screen, and an event you can no longer see
+    /// opens nothing at all.
+    var eventId: String? = nil
+    var groupId: String? = nil
 
     var icon: String {
         switch kind {
