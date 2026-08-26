@@ -136,6 +136,19 @@ section says to upsert every device event into `events` with `source='device'`.
 Implementing the latter would make a promise shown at a system permission dialog
 false — so it loses.
 
+**The one thing D-17 does not forbid** (added 2026-08-25): *you* sharing a
+single event you picked. The permission prompt promises Plannit doesn't upload
+your calendar, and the API contract says raw events stay on the phone "unless
+explicitly shared" — that clause is the feature. Tapping **Share with a group**
+on a device event copies that event's title, time and place into `events` with
+`source='device'` and `external_cal_id` set, and shares it. Nothing else moves,
+nothing happens without the tap, and the button says what it sends.
+
+The phone remains the source of truth for anything it owns: each sync pushes
+device-side edits onto the copy, and a device event deleted inside the read
+window tombstones its copy. Never the other way round — Plannit doesn't write to
+calendars it didn't create.
+
 Consequences, taken deliberately:
 
 - **`events` only ever holds Plannit-origin rows** plus anything you explicitly

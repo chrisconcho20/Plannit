@@ -69,9 +69,30 @@ Google, CalDAV) are pulled before a reconcile.
    **Implemented.**
 4. On foreground/launch, always run a full reconcile. **Implemented.**
 
-Because nothing is uploaded, the device→server half needs no deltas, tombstones
-or `last_synced_at`. Those rules still govern the **export** direction and the
-Plannit-origin rows.
+Because nothing is uploaded *by default*, the device→server half needs no
+deltas, tombstones or `last_synced_at`. Those rules still govern the **export**
+direction and the Plannit-origin rows.
+
+### The exception: an event you explicitly share
+
+One device event at a time, and only on a tap (added 2026-08-25). Sharing copies
+it into `events` with `source='device'` and
+`external_cal_id = calendarItemExternalIdentifier`, which is what the unique
+index `uq_events_owner_extcal` was built for — a second tap finds the existing
+row instead of creating a twin.
+
+After that the two are tied, and **the device still owns it**:
+
+| Happens on the phone | What Plannit does |
+|---|---|
+| Title / time / place / all-day changes | pushes the change onto the copy at the next sync |
+| Event deleted, **inside** the read window | tombstones the copy |
+| Event deleted, **outside** the read window | nothing — "absent" from a window we didn't read says nothing, and acting on it would silently delete a shared plan |
+| Event edited in the Plannit copy | doesn't happen; the copy has no editor |
+
+The calendar screen shows the copy rather than both, since they're the same
+event and only the copy knows who it's shared with. Group members see it the way
+they see any group event — as an invitation they answer (D-18).
 
 ## Export — Plannit → device
 
