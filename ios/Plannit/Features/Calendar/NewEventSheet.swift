@@ -169,7 +169,7 @@ struct NewEventSheet: View {
                 .opacity(saving || title.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                 .padding(Space.gutter)
             }
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
         .background(Color.appBg)
         .presentationDetents([.large])

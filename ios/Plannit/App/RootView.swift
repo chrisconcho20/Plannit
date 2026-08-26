@@ -46,6 +46,11 @@ struct RootView: View {
             }
         }
         .environmentObject(model)
+        // Every colour token is a literal from a light palette, so the app has
+        // to say so: left to follow the system, only the *adaptive* parts
+        // (materials, menus, sheets) flip dark and the result is a dark bar
+        // under warm-grey icons. Remove this the day there's a dark ramp.
+        .preferredColorScheme(.light)
         // Straight back in if the Keychain still has a session.
         .task {
             model.startDemoIdentity()
@@ -183,7 +188,11 @@ struct PlannitTabBar: View {
                 Button { withAnimation(Motion.fast) { selection = item.tab } } label: {
                     VStack(spacing: 3) {
                         ZStack(alignment: .topTrailing) {
-                            PIcon(item.icon, size: 24, color: on ? .actionPrimary : .textFaint, weight: on ? .semibold : .regular)
+                            // .textMuted, not .textFaint: the faint token is ~2.8:1
+                            // on paper, which fails AA for anything you're meant
+                            // to read. This is a tab label, not a hint.
+                            PIcon(item.icon, size: 24, color: on ? .actionPrimary : .textMuted,
+                                  weight: on ? .semibold : .regular)
                             if let badge = item.badge {
                                 Text("\(badge)")
                                     .font(.system(size: 10, weight: .bold))
@@ -195,8 +204,8 @@ struct PlannitTabBar: View {
                             }
                         }
                         Text(item.label)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(on ? Color.actionPrimary : .textFaint)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(on ? Color.actionPrimary : Color.textMuted)
                     }
                     .frame(maxWidth: .infinity, minHeight: Space.tabBarH)
                     .contentShape(Rectangle())
@@ -204,7 +213,7 @@ struct PlannitTabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .background(.ultraThinMaterial)
+        .barSurface()
         .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 1) }
     }
 }

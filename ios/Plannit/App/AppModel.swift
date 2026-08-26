@@ -11,6 +11,11 @@ final class AppModel: ObservableObject {
     @Published var userId: String?
     @Published var userEmail: String?
     @Published var displayName: String = Sample.me
+    /// How you appear to everyone else: a colour behind your initials, or a
+    /// photo. Both optional — the fallback is a hue derived from your name,
+    /// which is what everyone had before they could choose.
+    @Published var avatarHue: GroupHue?
+    @Published var avatarURL: String?
     @Published var calendarConnected = false
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
@@ -261,6 +266,8 @@ final class AppModel: ObservableObject {
         userId = nil
         userEmail = nil
         displayName = Sample.me
+        avatarHue = nil
+        avatarURL = nil
         openGroup = nil
         groups = Config.isLiveBackend ? [] : Sample.groups
         events = Config.isLiveBackend ? [] : Sample.events
@@ -282,7 +289,8 @@ final class AppModel: ObservableObject {
         let fallback = (userEmail?.split(separator: "@").first).map(String.init) ?? "You"
         do {
             let rows: [ProfileDTO] = try await SupabaseClient.shared.select(
-                "profiles", columns: "id,display_name,timezone", query: ["id": "eq.\(uid)"])
+                "profiles", columns: "id,display_name,timezone,avatar_hue,avatar_url",
+                query: ["id": "eq.\(uid)"])
             guard let row = rows.first else {
                 // No profile row (account predates the trigger) — a PATCH would
                 // update nothing, so create it.
@@ -292,6 +300,8 @@ final class AppModel: ObservableObject {
                 displayName = fallback.capitalized
                 return
             }
+            avatarHue = GroupHue(rawValue: row.avatar_hue ?? "")
+            avatarURL = row.avatar_url
             if row.display_name.isEmpty {
                 await updateDisplayName(fallback.capitalized)
             } else {
@@ -320,6 +330,51 @@ final class AppModel: ObservableObject {
             return true
         } catch {
             return false
+        }
+    }
+
+    /// Save the whole profile at once — the sheet edits name and avatar
+    /// together, and two round trips would let one half fail on its own.
+    @discardableResult
+    func updateProfile(name: String, hue: GroupHue?, avatarURL newURL: String?) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        let rollback = (displayName, avatarHue, avatarURL)
+        displayName = trimmed
+        avatarHue = hue
+        avatarURL = newURL
+
+        guard Config.isLiveBackend, let uid = userId else { return true }
+        do {
+            try await SupabaseClient.shared.update(
+                "profiles",
+                values: ProfileUpdate(display_name: trimmed, avatar_hue: hue?.rawValue,
+                                      avatar_url: newURL),
+                match: ["id": "eq.\(uid)"])
+            await refreshGroups()   // member lists carry the name and the face
+            return true
+        } catch {
+            (displayName, avatarHue, avatarURL) = rollback
+            return failed(false, "Couldn't save your profile. Try again.")
+        }
+    }
+
+    /// Put a photo in the avatars bucket and return its URL. The path is fixed
+    /// per user (`<uid>/avatar.jpg`) — that's what the bucket's RLS keys on, and
+    /// it means a new photo replaces the old rather than piling up.
+    func uploadAvatar(_ data: Data) async -> String? {
+        guard Config.isLiveBackend, let uid = userId else { return nil }
+        do {
+            let url = try await SupabaseClient.shared.uploadPublic(
+                bucket: "avatars", path: "\(uid)/avatar.jpg",
+                data: data, contentType: "image/jpeg")
+            // Storage caches hard on a stable path; the query string is what
+            // makes the new face actually show up.
+            return "\(url)?v=\(Int(Date().timeIntervalSince1970))"
+        } catch {
+            say("Couldn't upload that photo. Try again.")
+            return nil
         }
     }
 

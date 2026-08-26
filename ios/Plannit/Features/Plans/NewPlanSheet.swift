@@ -266,7 +266,7 @@ struct NewPlanSheet: View {
                 .padding(Space.gutter)
             }
         }
-        .background(.ultraThinMaterial)
+        .barSurface()
     }
 
     private var sendDisabled: Bool { finding || sending || chosen == nil }

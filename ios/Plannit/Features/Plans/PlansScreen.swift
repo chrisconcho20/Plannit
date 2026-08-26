@@ -229,7 +229,8 @@ struct YouScreen: View {
 
             ScrollView {
                 HStack(spacing: 14) {
-                    Avatar(name: model.displayName, size: 60)
+                    Avatar(name: model.displayName, size: 60,
+                           hue: model.avatarHue, imageURL: model.avatarURL)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(model.displayName).textStyle(.title3, color: .textStrong)
                         Text(model.userEmail ?? (model.isLiveBackend ? "Signed in" : "Demo mode"))
@@ -318,7 +319,7 @@ struct YouScreen: View {
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .sheet(isPresented: $showCalendars) { CalendarPicker().environmentObject(model) }
         .sheet(isPresented: $showRename) {
-            DisplayNameSheet(current: model.displayName).environmentObject(model)
+            ProfileSheet().environmentObject(model)
         }
         .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { model.signOut() }
@@ -440,8 +441,8 @@ struct YouScreen: View {
             HStack(spacing: 12) {
                 PIcon("user", size: 20, color: .textMuted).frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Display name").textStyle(.headline, color: .textStrong)
-                    Text("Everyone in your groups sees this")
+                    Text("Name and avatar").textStyle(.headline, color: .textStrong)
+                    Text("Everyone in your groups sees these")
                         .textStyle(.caption, color: .textMuted)
                 }
                 Spacer()
@@ -468,53 +469,3 @@ struct YouScreen: View {
     }
 }
 
-// Rename yourself. The name is written to `profiles.display_name`, which is what
-// everyone in your groups sees — including the avatars on a found slot.
-struct DisplayNameSheet: View {
-    let current: String
-
-    @EnvironmentObject private var model: AppModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var saving = false
-    @State private var errorText: String?
-
-    init(current: String) {
-        self.current = current
-        _name = State(initialValue: current)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            SheetHeader(title: "Display name") { dismiss() }
-            VStack(alignment: .leading, spacing: 14) {
-                PTextField(placeholder: "Your name", text: $name, icon: "user")
-                Text("This is how you appear to everyone in your groups.")
-                    .textStyle(.footnote, color: .textMuted)
-                if let errorText {
-                    Text(errorText).textStyle(.footnote, color: .statusDanger)
-                }
-                PlannitButton(title: saving ? "Saving…" : "Save", variant: .primary,
-                              size: .lg, fullWidth: true) { save() }
-                    .disabled(saving || trimmed.isEmpty || trimmed == current)
-                    .opacity(saving || trimmed.isEmpty || trimmed == current ? 0.5 : 1)
-            }
-            .padding(Space.gutter)
-            Spacer(minLength: 0)
-        }
-        .background(Color.appBg)
-        .presentationDetents([.height(280)])
-    }
-
-    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    private func save() {
-        saving = true
-        errorText = nil
-        Task {
-            let ok = await model.updateDisplayName(trimmed)
-            saving = false
-            if ok { dismiss() } else { errorText = "Couldn’t save that name. Try again." }
-        }
-    }
-}

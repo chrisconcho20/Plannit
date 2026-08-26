@@ -93,7 +93,7 @@ struct DeviceEventDetail: View {
                 Spacer()
             }
             .padding(.horizontal, Space.gutter).padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
     }
 

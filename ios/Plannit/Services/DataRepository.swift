@@ -35,14 +35,18 @@ struct SupabaseRepository: DataRepository {
     func fetchGroups() async throws -> [PGroup] {
         // Embed memberships → profiles so we get real member names in one query.
         let dtos: [GroupDTO] = try await client.select(
-            "groups", columns: "*,group_memberships(user_id,profiles(id,display_name))")
+            "groups",
+            columns: "*,group_memberships(user_id,profiles(id,display_name,avatar_hue,avatar_url))")
         return dtos.map { dto in
             // A member with no display name still counts — dropping them made
             // groups look empty ("1 of 0 free"). Name them rather than lose them.
             let members = (dto.group_memberships ?? []).compactMap { membership -> PMember? in
                 guard let id = membership.user_id ?? membership.profiles?.id else { return nil }
-                let name = membership.profiles?.display_name ?? ""
-                return PMember(id: id, name: name.isEmpty ? "Member" : name)
+                let profile = membership.profiles
+                let name = profile?.display_name ?? ""
+                return PMember(id: id, name: name.isEmpty ? "Member" : name,
+                               hue: GroupHue(rawValue: profile?.avatar_hue ?? ""),
+                               avatarURL: profile?.avatar_url)
             }
             return PGroup(id: dto.id, name: dto.name,
                           hue: GroupHue.forGroup(id: dto.id, name: dto.name),
@@ -82,7 +86,10 @@ struct SupabaseRepository: DataRepository {
     /// keys to `profiles`, so an embed would be ambiguous.
     func fetchFriends() async throws -> [PMember] {
         let rows: [FriendDTO] = try await client.rpc("my_friends", args: EmptyArgs())
-        return rows.map { PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name) }
+        return rows.map {
+            PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name,
+                    hue: GroupHue(rawValue: $0.avatar_hue ?? ""), avatarURL: $0.avatar_url)
+        }
     }
 
     /// Requests in both directions. Also a function: someone who has only
@@ -111,12 +118,15 @@ struct SupabaseRepository: DataRepository {
     /// share a group with (RLS shows you those profiles anyway).
     func fetchPeople() async throws -> [PMember] {
         let rows: [ProfileDTO] = try await client.select(
-            "profiles", columns: "id,display_name,timezone",
+            "profiles", columns: "id,display_name,timezone,avatar_hue,avatar_url",
             query: ["order": "display_name.asc"])
         let me = client.userId
         return rows
             .filter { $0.id != me }
-            .map { PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name) }
+            .map {
+                PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name,
+                        hue: GroupHue(rawValue: $0.avatar_hue ?? ""), avatarURL: $0.avatar_url)
+            }
     }
 
     func fetchEvents(groups: [PGroup]) async throws -> [PEvent] {
@@ -139,7 +149,9 @@ struct SupabaseRepository: DataRepository {
         let members = (dto.group_memberships ?? []).compactMap { m -> PMember? in
             guard let id = m.user_id ?? m.profiles?.id else { return nil }
             let name = m.profiles?.display_name ?? ""
-            return PMember(id: id, name: name.isEmpty ? "Member" : name)
+            return PMember(id: id, name: name.isEmpty ? "Member" : name,
+                           hue: GroupHue(rawValue: m.profiles?.avatar_hue ?? ""),
+                           avatarURL: m.profiles?.avatar_url)
         }
         return PGroup(id: dto.id, name: dto.name,
                       hue: GroupHue.forGroup(id: dto.id, name: dto.name),

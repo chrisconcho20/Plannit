@@ -10,6 +10,14 @@ enum EventSource: String, Codable { case plannit, device }
 struct PMember: Identifiable, Hashable {
     let id: String
     let name: String
+    /// Chosen colour behind the initials. Nil falls back to one derived from
+    /// the name, which is what everyone had before they could choose.
+    var hue: GroupHue? = nil
+    /// A photo, if they've set one. Public-bucket URL (migration 0013).
+    var avatarURL: String? = nil
+
+    /// What the avatar should actually draw with.
+    var displayHue: GroupHue { hue ?? GroupHue.forName(name) }
 
     /// For sample data, where the name is the only identity there is.
     static func named(_ names: [String]) -> [PMember] { names.map { PMember(id: $0, name: $0) } }

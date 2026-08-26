@@ -206,7 +206,8 @@ struct GroupDetailView: View {
                 VStack(spacing: Space.gapInline) {
                     ForEach(live.members) { member in
                         HStack(spacing: 12) {
-                            Avatar(name: member.name, size: 36)
+                            Avatar(name: member.name, size: 36,
+                                   hue: member.hue, imageURL: member.avatarURL)
                             Text(member.name).textStyle(.body, color: .textBody)
                             if member.id == live.ownerId { Badge(text: "Owner", tone: .neutral) }
                             Spacer()
@@ -289,7 +290,7 @@ struct GroupDetailView: View {
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
         // Tell the shell which group is open, so the ＋ acts in this context.
         .onAppear { model.openGroup = live }
@@ -460,7 +461,8 @@ struct PeoplePicker: View {
             ForEach(people) { person in
                 Button { toggle(person.id) } label: {
                     HStack(spacing: 12) {
-                        Avatar(name: person.name, size: 34)
+                        Avatar(name: person.name, size: 34,
+                               hue: person.hue, imageURL: person.avatarURL)
                         Text(person.name).textStyle(.body, color: .textStrong)
                         Spacer()
                         PIcon(selected.contains(person.id) ? "circle-check" : "circle",

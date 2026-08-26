@@ -44,7 +44,8 @@ struct FriendsScreen: View {
                     VStack(spacing: Space.gapInline) {
                         ForEach(model.friends) { friend in
                             HStack(spacing: 12) {
-                                Avatar(name: friend.name, size: 38)
+                                Avatar(name: friend.name, size: 38,
+                                       hue: friend.hue, imageURL: friend.avatarURL)
                                 Text(friend.name).textStyle(.body, color: .textBody)
                                 Spacer()
                                 IconButton(icon: "x", variant: .ghost, size: 32, iconSize: 15,
@@ -62,7 +63,8 @@ struct FriendsScreen: View {
                     VStack(spacing: Space.gapInline) {
                         ForEach(outgoing) { request in
                             HStack(spacing: 12) {
-                                Avatar(name: request.person.name, size: 34)
+                                Avatar(name: request.person.name, size: 34,
+                                       hue: request.person.hue, imageURL: request.person.avatarURL)
                                 Text(request.person.name).textStyle(.body, color: .textMuted)
                                 Spacer()
                                 Badge(text: "Waiting", tone: .neutral)
@@ -100,7 +102,7 @@ struct FriendsScreen: View {
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
         .sheet(isPresented: $showAdd) { AddFriendSheet().environmentObject(model) }
         .confirmationDialog("Remove \(pendingRemoval?.name ?? "")?",
@@ -122,7 +124,8 @@ struct FriendsScreen: View {
     private func requestRow(_ request: PFriendRequest) -> some View {
         PlannitCard(elevation: 1) {
             HStack(spacing: 12) {
-                Avatar(name: request.person.name, size: 40)
+                Avatar(name: request.person.name, size: 40,
+                       hue: request.person.hue, imageURL: request.person.avatarURL)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(request.person.name).textStyle(.headline, color: .textStrong)
                     Text("Wants to plan with you").textStyle(.caption, color: .textMuted)
@@ -162,7 +165,8 @@ struct AddFriendSheet: View {
 
                 if let found {
                     HStack(spacing: 12) {
-                        Avatar(name: found.name, size: 38)
+                        Avatar(name: found.name, size: 38,
+                               hue: found.hue, imageURL: found.avatarURL)
                         Text(found.name).textStyle(.headline, color: .textStrong)
                         Spacer()
                         PlannitButton(title: "Send request", variant: .primary, size: .sm) {

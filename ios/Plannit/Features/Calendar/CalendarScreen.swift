@@ -464,7 +464,8 @@ struct EventDetailView: View {
                         ForEach(attendees, id: \.member.id) { row in
                             HStack(spacing: 12) {
                                 Avatar(name: row.member.name, size: 36,
-                                       status: row.going == true ? .free : .busy)
+                                       status: row.going == true ? .free : .busy,
+                                       hue: row.member.hue, imageURL: row.member.avatarURL)
                                 Text(row.member.name).textStyle(.body, color: .textBody)
                                 Spacer()
                                 switch row.going {
@@ -555,7 +556,7 @@ struct EventDetailView: View {
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
         .sheet(isPresented: $showShare) { ShareSheet(event: live).environmentObject(model) }
         .sheet(isPresented: $showEdit) {
@@ -728,7 +729,8 @@ struct ShareSheet: View {
                         ForEach(model.friends) { friend in
                             Button { togglePerson(friend.id) } label: {
                                 HStack(spacing: 12) {
-                                    Avatar(name: friend.name, size: 34)
+                                    Avatar(name: friend.name, size: 34,
+                                           hue: friend.hue, imageURL: friend.avatarURL)
                                     Text(friend.name).textStyle(.headline, color: .textStrong)
                                     Spacer()
                                     PIcon(sharedPeople.contains(friend.id) ? "circle-check" : "circle",

@@ -52,6 +52,14 @@ struct ProfileDTO: Decodable {
     let id: String
     let display_name: String
     let timezone: String?
+    let avatar_hue: String?
+    let avatar_url: String?
+}
+/// Your profile, as the app reads it back.
+struct ProfileUpdate: Encodable {
+    let display_name: String
+    let avatar_hue: String?
+    let avatar_url: String?
 }
 struct DisplayNameUpdate: Encodable { let display_name: String }
 struct SignUpMetadata: Encodable {
@@ -83,6 +91,8 @@ struct MembershipEmbedDTO: Decodable {
 struct ProfileEmbedDTO: Decodable {
     let id: String?
     let display_name: String?
+    let avatar_hue: String?
+    let avatar_url: String?
 }
 
 struct NewGroupInsert: Encodable {
@@ -208,6 +218,8 @@ struct ActivityArgs: Encodable { let p_limit: Int }
 struct FriendDTO: Decodable {
     let id: String
     let display_name: String
+    let avatar_hue: String?
+    let avatar_url: String?
 }
 struct FriendRequestDTO: Decodable {
     let id: String
@@ -555,6 +567,28 @@ final class SupabaseClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(args)
         _ = try await sendRaw(req)
+    }
+
+    // MARK: Storage
+
+    /// Upload bytes and return the public URL.
+    ///
+    /// `upsert` matters here: an avatar lives at a fixed path per user
+    /// (`<uid>/avatar.jpg`, which is what the bucket's RLS keys on), so the
+    /// second photo you pick has to replace the first rather than 409.
+    func uploadPublic(bucket: String, path: String, data: Data,
+                      contentType: String) async throws -> String {
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("storage/v1/object/\(bucket)/\(path)"))
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        req.setValue("true", forHTTPHeaderField: "x-upsert")
+        req.httpBody = data
+        _ = try await sendRaw(req)
+        return baseURL.appendingPathComponent("storage/v1/object/public/\(bucket)/\(path)")
+            .absoluteString
     }
 
     // MARK: Edge Functions

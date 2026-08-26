@@ -42,7 +42,7 @@ struct ActivityScreen: View {
             }
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
+            .barSurface()
         }
         .refreshable { await model.refreshActivity() }
         .liveRefresh(every: 30) { await model.refreshActivity() }
