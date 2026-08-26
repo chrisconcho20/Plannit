@@ -27,7 +27,14 @@ to be friends, someone joined your group.
    - [ ] You do **not** see anyone's *declines*. Only "going" reaches the feed —
          a feed that announces every no makes saying no expensive.
 
-4. **Go back to Plans.**
+4. **Tap a row about a plan.**
+   - [ ] Rows that can go somewhere have a chevron; rows that can't don't.
+   - [ ] It opens that event. A "wants to be friends" row opens Friends; a
+         "joined" row opens the group.
+   - [ ] A row about a plan that has since been deleted is plain text, not a
+         link that goes nowhere.
+
+5. **Go back to Plans.**
    - [ ] The orange dot is **gone**. Opening the screen is what marks it seen.
 
 5. **Have something happen.** Sign in as `maya@plannit.test` in a second

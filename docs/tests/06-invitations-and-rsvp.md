@@ -73,6 +73,32 @@ if you only have one and note that they were skipped.
     - [ ] It's gone from your calendar, from Plans, and from the group.
     - [ ] **[2 accounts]** It disappears from the other account's calendar too.
 
+## Moving the plan
+
+The rule: **a different time on the same day keeps everyone's answers; a
+different day asks them again.** The sheet says which before you commit.
+
+11. **As the organiser, open the plan → ⋯ → Move this plan.**
+    - [ ] Two pickers, starting at the plan's current time.
+    - [ ] Change the time but keep the same day. The panel turns green:
+          *"Same day — nobody has to answer again"*, and names how many people
+          stay going.
+
+12. **Tap "Move it".**
+    - [ ] Your calendar shows the new time.
+    - [ ] **[2 accounts]** So does theirs, without them doing anything, and
+          they're still down as going.
+
+13. **Move it again, this time to a different day.**
+    - [ ] The panel turns amber: *"A different day, so everyone will be asked
+          again"*, and says it comes off their calendar.
+    - [ ] After moving: **[2 accounts]** the other account's calendar no longer
+          has it, and it's back under **"Are you in?"** with the new date.
+    - [ ] You are still going — you don't re-invite yourself.
+
+14. **From the other account, try to move it** (⋯ menu).
+    - [ ] There's no "Move this plan" — only whoever made it can.
+
 ---
 
 ## Verify in the database

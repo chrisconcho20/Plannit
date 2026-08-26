@@ -24,7 +24,10 @@ supabase/
 │  ├─ 0009_select_policy_selfreference.sql  # the 403: RETURNING re-runs SELECT
 │  ├─ 0010_group_events_rsvp.sql    # going / not-going replaces voting (D-18)
 │  ├─ 0011_activity_rsvp.sql        # my_activity() follows it
-│  └─ 0012_replace_busy_blocks.sql  # atomic availability upload (D-19)
+│  ├─ 0012_replace_busy_blocks.sql  # atomic availability upload (D-19)
+│  ├─ 0013_profile_avatars.sql     # avatar_hue + the avatars storage bucket
+│  ├─ 0014_reschedule_event.sql    # the organiser moves a plan
+│  └─ 0015_activity_targets.sql    # my_activity() returns event_id, so rows open
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder
