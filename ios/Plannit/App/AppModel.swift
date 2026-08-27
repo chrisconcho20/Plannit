@@ -142,6 +142,18 @@ final class AppModel: ObservableObject {
 
     var isLiveBackend: Bool { Config.isLiveBackend }
 
+    /// How often a screen should poll.
+    ///
+    /// Polling was the whole update mechanism before Broadcast (D-16) and is now
+    /// the safety net for a socket that didn't connect. Running both at full
+    /// speed means every user costs a request every 20 seconds all day whether
+    /// anything changed or not — the kind of load that's invisible with six
+    /// users and the main line item with six thousand.
+    ///
+    /// So: poll properly when we have no socket, and drop to a slow heartbeat
+    /// when we do.
+    var pollSeconds: Double { realtime.isConnected ? 120 : 20 }
+
     /// Load screen data. Demo mode keeps the sample seed; live mode pulls from
     /// Supabase and reports failure rather than swallowing it.
     func loadData() async {

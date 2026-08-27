@@ -132,12 +132,41 @@ struct SupabaseRepository: DataRepository {
             }
     }
 
+    /// How much of the past and future a load actually asks for.
+    ///
+    /// This query used to have no bound at all: every event you could see, ever,
+    /// on every load *and* on every refresh — and refreshes fire on a realtime
+    /// hint and on a 20-second poll. One user with a few hundred shared events
+    /// was a quarter-megabyte per refresh, forever, which is the shape of an
+    /// egress bill rather than a feature.
+    ///
+    /// The bounds come from what the app can actually display: the calendar
+    /// pages a few months back, and the date-finder looks at most 12 months
+    /// ahead.
+    static let pastWindowMonths = 3
+    static let futureWindowMonths = 13
+
     func fetchEvents(groups: [PGroup]) async throws -> [PEvent] {
+        let cal = Calendar.current
+        let now = Date()
+        let iso = ISO8601DateFormatter()
+        let from = iso.string(from: cal.date(byAdding: .month,
+                                             value: -Self.pastWindowMonths, to: now) ?? now)
+        let to = iso.string(from: cal.date(byAdding: .month,
+                                           value: Self.futureWindowMonths, to: now) ?? now)
+
         // Embedding the shares tells us, in the same round trip, which groups
         // can see each event — that's what makes an event "shared" in the UI.
+        //
+        // Repeating events are kept whatever their start: one row from two years
+        // ago can still be every Tuesday this month, and the client expands it.
+        // Filtering those out by start_at would silently empty the calendar of
+        // exactly the events people rely on most.
         let dtos: [EventDTO] = try await client.select(
             "events", columns: "*,event_shares(group_id,shared_user_id),event_rsvps(user_id,response)",
-            query: ["deleted_at": "is.null", "order": "start_at.asc"])
+            query: ["deleted_at": "is.null",
+                    "or": "(recurrence_rule.not.is.null,and(start_at.gte.\(from),start_at.lte.\(to)))",
+                    "order": "start_at.asc"])
         let names = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
         let me = client.userId
         return dtos.map { Self.map($0, groups: names, me: me) }

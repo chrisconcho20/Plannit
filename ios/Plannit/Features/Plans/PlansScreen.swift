@@ -81,7 +81,7 @@ struct PlansScreen: View {
         }
         .background(Color.appBg)
         .navigationBarHidden(true)
-        .liveRefresh(every: 20) { await model.refreshEvents() }
+        .liveRefresh(every: model.pollSeconds) { await model.refreshEvents() }
         .navigationDestination(for: PEvent.self) { EventDetailView(event: $0) }
         .navigationDestination(for: PlansRoute.self) { _ in ActivityScreen() }
     }

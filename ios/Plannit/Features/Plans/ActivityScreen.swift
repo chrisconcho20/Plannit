@@ -65,7 +65,7 @@ struct ActivityScreen: View {
         .navigationDestination(for: PGroup.self) { GroupDetailView(group: $0) }
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .refreshable { await model.refreshActivity() }
-        .liveRefresh(every: 30) { await model.refreshActivity() }
+        .liveRefresh(every: model.pollSeconds) { await model.refreshActivity() }
         // Opening the screen is what "seen" means — no separate dismiss button.
         .onAppear { model.markActivitySeen() }
     }

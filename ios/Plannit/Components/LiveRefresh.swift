@@ -17,6 +17,11 @@ extension View {
     }
 }
 
+private struct Restart: Equatable {
+    let phase: ScenePhase
+    let seconds: Double
+}
+
 private struct LiveRefreshModifier: ViewModifier {
     let seconds: Double
     let action: () async -> Void
@@ -24,7 +29,10 @@ private struct LiveRefreshModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
 
     func body(content: Content) -> some View {
-        content.task(id: scenePhase) {
+        // The interval is part of the task's identity: when the socket connects
+        // and the caller slows the poll down, the loop has to be restarted to
+        // pick it up.
+        content.task(id: Restart(phase: scenePhase, seconds: seconds)) {
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
