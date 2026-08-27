@@ -27,7 +27,8 @@ supabase/
 │  ├─ 0012_replace_busy_blocks.sql  # atomic availability upload (D-19)
 │  ├─ 0013_profile_avatars.sql     # avatar_hue + the avatars storage bucket
 │  ├─ 0014_reschedule_event.sql    # the organiser moves a plan
-│  └─ 0015_activity_targets.sql    # my_activity() returns event_id, so rows open
+│  ├─ 0015_activity_targets.sql    # my_activity() returns event_id, so rows open
+│  └─ 0016_scale_indexes.sql       # indexes for the queries that run on a timer
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder
