@@ -1,6 +1,6 @@
 import Foundation
 
-// A dependency-free Supabase client over URLSession — auth (Sign in with Apple),
+// A dependency-free Supabase client over URLSession — auth (Apple, Google, email),
 // PostgREST select/insert, and Edge Function invoke. Matches the REST contracts
 // in docs/backend/api-contract.md. No SPM package needed.
 
@@ -506,6 +506,98 @@ final class SupabaseClient {
         return .needsEmailConfirmation
     }
 
+    // MARK: Auth — emailed codes
+    //
+    // Confirming a new account and resetting a password both prove you own the
+    // address with a code typed into the app rather than a link: `site_url` is a
+    // deep link, so there is no web page for a link to land on.
+
+    enum CodePurpose {
+        case signUp
+        case passwordReset
+
+        /// `email` checks the confirmation token (auth server, verify.go), which
+        /// is what a sign-up sends; `recovery` checks the reset token.
+        var verifyType: String { self == .signUp ? "email" : "recovery" }
+    }
+
+    /// Trade an emailed code for a session.
+    @discardableResult
+    func verifyCode(_ code: String, email: String, purpose: CodePurpose) async throws -> String {
+        let s: SupabaseSession = try await send(authRequest(
+            "auth/v1/verify", body: ["type": purpose.verifyType, "email": email, "token": code]))
+        store(s)
+        return s.user.id
+    }
+
+    /// Send a fresh confirmation code to an account that hasn't confirmed yet.
+    func resendSignUpCode(email: String) async throws {
+        try await sendRaw(authRequest("auth/v1/resend", body: ["type": "signup", "email": email]))
+    }
+
+    /// Email a password-reset code. The server answers the same whether or not
+    /// the account exists, so this can't be used to find out who has one.
+    func sendPasswordReset(email: String) async throws {
+        try await sendRaw(authRequest("auth/v1/recover", body: ["email": email]))
+    }
+
+    /// Replace the signed-in account's password — the last step of a reset.
+    func updatePassword(_ password: String) async throws {
+        guard let token = await authorized() else { throw SupabaseError.notConfigured }
+        var req = try authRequest("auth/v1/user", body: ["password": password])
+        req.httpMethod = "PUT"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        try await sendRaw(req)
+    }
+
+    // MARK: Auth — OAuth with PKCE (Google)
+    //
+    // The provider's page runs in ASWebAuthenticationSession and redirects back to
+    // plannit://auth-callback?code=…. The code is useless without the verifier,
+    // which never leaves the phone — that's what makes a custom URL scheme safe
+    // to receive it on.
+
+    /// The page that starts a provider's sign-in.
+    func authorizeURL(provider: String, redirectTo: String, codeChallenge: String) -> URL? {
+        guard let baseURL,
+              var comps = URLComponents(url: baseURL.appendingPathComponent("auth/v1/authorize"),
+                                        resolvingAgainstBaseURL: false) else { return nil }
+        comps.queryItems = [
+            URLQueryItem(name: "provider", value: provider),
+            URLQueryItem(name: "redirect_to", value: redirectTo),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "s256"),
+        ]
+        return comps.url
+    }
+
+    /// Swap the redirect's code for a session. Valid once, for five minutes.
+    @discardableResult
+    func exchangeAuthCode(_ code: String, verifier: String) async throws -> String {
+        let s: SupabaseSession = try await send(authRequest(
+            "auth/v1/token", query: [URLQueryItem(name: "grant_type", value: "pkce")],
+            body: ["auth_code": code, "code_verifier": verifier]))
+        store(s)
+        return s.user.id
+    }
+
+    private func authRequest(_ path: String, query: [URLQueryItem] = [],
+                             body: [String: String]) throws -> URLRequest {
+        guard let baseURL,
+              var comps = URLComponents(url: baseURL.appendingPathComponent(path),
+                                        resolvingAgainstBaseURL: false) else {
+            throw SupabaseError.notConfigured
+        }
+        if !query.isEmpty { comps.queryItems = query }
+        guard let url = comps.url else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(body)
+        return req
+    }
+
     var isSignedIn: Bool { accessToken != nil }
 
     func signOut() { clearSession() }
@@ -678,7 +770,10 @@ final class SupabaseClient {
             // The request payload too, on failure only. A rejected write is
             // almost always a mismatch between what we sent and what the policy
             // expected, which the response alone never shows.
-            let sent = req.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            // Auth bodies carry passwords and codes, so those never reach the log.
+            let isAuth = req.url?.path.contains("/auth/v1/") == true
+            let sent = isAuth ? "[auth request withheld]"
+                : req.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             Log.sync("HTTP \(http.statusCode) \(req.httpMethod ?? "") \(req.url?.path ?? "")"
                      + " | app thinks: \(userId ?? "nobody")"
                      + " | token says: \(tokenClaims())"

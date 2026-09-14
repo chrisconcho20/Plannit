@@ -30,30 +30,50 @@ additional_redirect_urls = ["plannit://auth-callback"]
 jwt_expiry = 3600
 enable_signup = true
 
-# Beta: no email confirmation. The confirmation link points at `site_url`, which
-# is a deep link into the app rather than a web page — so a new account can't
-# actually be confirmed, and sign-up would dead-end.
+# Email accounts confirm with a 6-digit code typed into the app, not a link:
+# `site_url` is a deep link with no web page behind it, so an emailed link would
+# dead-end. The templates below print `{{ .Token }}` instead of a URL. Signing in
+# after confirmation needs only the password; a reset uses a code the same way.
 #
 # NOTE: this governs `supabase start` locally. The hosted project reads its auth
-# settings from the dashboard, so it has to be turned off there too:
-# Authentication → Sign In / Providers → Email → Confirm email.
+# settings, templates and SMTP from the dashboard — see
+# docs/backend/auth-setup.md for the order to change them in. Confirmation only
+# works on the hosted project once custom SMTP is set up: the built-in sender
+# delivers only to the project's own team members.
 #
-# Do NOT use `supabase config push` to sync it: that pushes this whole file,
-# including [auth.external.apple], whose client_id/secret come from env vars
-# that aren't set on this machine — it would reconfigure the live Apple
-# provider as a side effect of a one-line change.
-#
-# Turn confirmations back on before anyone who isn't a tester can sign up —
-# tracked with the rest of the beta-only settings in docs/beta-to-production.md.
+# Do NOT use `supabase config push` to sync any of this: it pushes this whole
+# file, including provider client_id/secret values that come from env vars not
+# set on this machine — it would reconfigure the live providers as a side effect.
 [auth.email]
-enable_confirmations = false
+enable_confirmations = true
+otp_length = 6
+otp_expiry = 3600
+# The auth server's own floor between two emails to one address.
+max_frequency = "60s"
 
-# Sign in with Apple — the primary auth method for Plannit (see docs/decisions.md D-03).
-# Secrets are provided via env, never committed.
+[auth.email.template.confirmation]
+subject = "Your Plannit code"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Your Plannit password reset code"
+content_path = "./supabase/templates/recovery.html"
+
+# Sign in with Apple, native: the app sends Apple's identity token to the
+# id_token grant, which checks its audience against client_id — the app's
+# bundle id. Secrets are provided via env, never committed.
 [auth.external.apple]
 enabled = true
 client_id = "env(APPLE_CLIENT_ID)"
 secret = "env(APPLE_SECRET)"
+
+# Google, through Supabase's web OAuth page (no Google SDK in the app). The
+# client is a Google Cloud "Web application" OAuth client whose authorised
+# redirect URI is <project>/auth/v1/callback.
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_SECRET)"
 
 [functions.find-slots]
 verify_jwt = true

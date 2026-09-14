@@ -21,6 +21,59 @@ struct PTextField: View {
     }
 }
 
+/// A password entry with a show/hide toggle. Revealing swaps the secure field
+/// for a plain one in place and keeps the keyboard up, so checking what you
+/// typed doesn't cost you your place.
+struct PasswordField: View {
+    let placeholder: String
+    @Binding var text: String
+    /// `.newPassword` lets iOS offer a strong password; `.password` offers the saved one.
+    var contentType: UITextContentType = .password
+    /// Red outline — the confirmation doesn't match.
+    var invalid: Bool = false
+
+    @State private var revealed = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            PIcon("lock", size: 18, color: .textFaint)
+            Group {
+                if revealed {
+                    TextField(placeholder, text: $text)
+                } else {
+                    SecureField(placeholder, text: $text)
+                }
+            }
+            .textStyle(.body, color: .textStrong)
+            .textContentType(contentType)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .focused($focused)
+
+            Button {
+                let wasFocused = focused
+                revealed.toggle()
+                // The swapped-in field is a new view; hand focus back to it.
+                if wasFocused { DispatchQueue.main.async { focused = true } }
+            } label: {
+                PIcon(revealed ? "eye-off" : "eye", size: 18, color: .textMuted)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(revealed ? "Hide password" : "Show password")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 2)
+        .frame(minHeight: 48)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+            .strokeBorder(invalid ? Color.statusDanger : Color.lineStrong, lineWidth: 1))
+    }
+}
+
 struct HuePicker: View {
     @Binding var selection: GroupHue
 

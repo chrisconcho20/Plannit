@@ -1,9 +1,10 @@
+import AuthenticationServices
 import EventKit
 import SwiftUI
 
 // App-wide state. In demo mode (no Supabase config) the app runs entirely on
-// sample data. In live mode it signs in with Apple and uploads privacy-safe
-// busy blocks so the date-finder can run over real availability.
+// sample data. In live mode it signs in (Apple, Google or email) and uploads
+// privacy-safe busy blocks so the date-finder can run over real availability.
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -100,7 +101,6 @@ final class AppModel: ObservableObject {
 
     private let calendar = CalendarService()
     private let realtime = RealtimeService()
-    private var appleCoordinator: AppleSignInCoordinator?
     private var calendarChangeTask: Task<Void, Never>?
     private var calendarObserver: NSObjectProtocol?
 
@@ -1063,79 +1063,232 @@ final class AppModel: ObservableObject {
     }
 
     // MARK: Auth
-    /// Real Sign in with Apple → Supabase session. Returns false on cancel/failure.
-    func signInWithApple() async -> Bool {
-        let coordinator = AppleSignInCoordinator()
-        appleCoordinator = coordinator  // retain for the duration of the flow
-        do {
-            let result = try await coordinator.signIn()
-            let uid = try await SupabaseClient.shared.signInWithApple(idToken: result.idToken, nonce: result.nonce)
-            userId = uid
-            signedIn = true
-            await loadProfile()
-            await loadData()
-            return true
-        } catch {
-            return false
+    //
+    // Three ways in — Apple, Google, email — and one way out of each: a stored
+    // session, then the same profile + data load. Screens get an AuthOutcome
+    // back rather than a Bool, because "check your email for a code" is neither
+    // success nor failure.
+
+    enum AuthOutcome: Equatable {
+        case signedIn
+        /// The email isn't confirmed yet and a code is on its way.
+        case needsCode
+        /// The person backed out of Apple's or Google's sheet. Not an error.
+        case cancelled
+        case failed(String)
+    }
+
+    private var auth: SupabaseClient { SupabaseClient.shared }
+
+    /// Everything that happens once a session exists, whichever way it came.
+    /// `name` is a provider's name for someone new (Apple sends it only once).
+    private func finishSignIn(name: String? = nil) async {
+        userId = auth.userId
+        userEmail = auth.userEmail
+        signedIn = true
+        await loadProfile()
+        if let name, !name.isEmpty, name != displayName { await updateDisplayName(name) }
+        await loadData()
+    }
+
+    /// Sign in with Apple. `nonce` is the raw value whose hash went into the request.
+    func signInWithApple(_ result: Result<ASAuthorization, Error>, nonce: String) async -> AuthOutcome {
+        switch result {
+        case .failure(let error):
+            if let apple = error as? ASAuthorizationError, apple.code == .canceled { return .cancelled }
+            // Unsigned and free-account builds have no Sign in with Apple
+            // entitlement, and Apple reports that as an unknown error.
+            return .failed("Sign in with Apple isn't available in this build. Use email for now.")
+        case .success(let authorization):
+            guard let credential = AppleSignIn.credential(from: authorization) else {
+                return .failed("Apple didn't send what Plannit needs. Try again.")
+            }
+            do {
+                try await auth.signInWithApple(idToken: credential.idToken, nonce: nonce)
+                await finishSignIn(name: credential.fullName)
+                return .signedIn
+            } catch {
+                return .failed("Couldn't sign in with Apple. Try again.")
+            }
         }
     }
 
-    /// Create an account. Returns nil on success, or a message to show.
+    /// Sign in with Google through Supabase's web page. Creates the account on
+    /// first use, named from the Google profile (migration 0018).
+    func signInWithGoogle() async -> AuthOutcome {
+        let verifier = PKCE.makeVerifier()
+        guard let url = auth.authorizeURL(provider: "google", redirectTo: WebSignIn.redirectURL,
+                                          codeChallenge: PKCE.challenge(for: verifier)) else {
+            return .failed("You're offline or Plannit isn't set up for sign-in.")
+        }
+        do {
+            let code = try await WebSignIn().authorize(url: url)
+            try await auth.exchangeAuthCode(code, verifier: verifier)
+            await finishSignIn()
+            return .signedIn
+        } catch WebSignIn.Failure.cancelled {
+            return .cancelled
+        } catch WebSignIn.Failure.refused(let reason) {
+            Log.sync("google sign-in refused: \(reason ?? "no reason given")")
+            return .failed("Google sign-in didn't go through. Try again, or use email.")
+        } catch {
+            return .failed("Couldn't sign in with Google. Try again.")
+        }
+    }
+
+    /// Create an account with email and password.
     ///
-    /// The profile is created by the DB trigger from the metadata we send, so a
-    /// new account is named and auto-friended before it ever reaches a screen.
-    func signUp(email: String, password: String, name: String) async -> String? {
+    /// With confirmation on, nothing is signed in yet: the server emails a code
+    /// and the screen asks for it. The profile is created by a DB trigger from
+    /// the metadata sent here, so the account is already named either way.
+    func signUp(email: String, password: String, confirm: String, name: String) async -> AuthOutcome {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return "Tell us your name first." }
-        guard password.count >= 6 else { return "Use at least 6 characters for the password." }
+        guard !trimmedName.isEmpty else { return .failed("Tell us your name first.") }
+        if let problem = PasswordRules.problem(password, confirm: confirm) { return .failed(problem) }
 
         do {
-            let result = try await SupabaseClient.shared.signUp(
-                email: email.trimmingCharacters(in: .whitespaces),
-                password: password, displayName: trimmedName)
-            switch result {
+            switch try await auth.signUp(email: Self.clean(email), password: password,
+                                         displayName: trimmedName) {
             case .signedIn:
-                userId = SupabaseClient.shared.userId
-                userEmail = SupabaseClient.shared.userEmail
                 displayName = trimmedName
-                signedIn = true
-                await loadProfile()
-                await loadData()
-                await startRealtime()
-                return nil
+                await finishSignIn()
+                return .signedIn
             case .needsEmailConfirmation:
-                return "Check \(email) for a confirmation link, then sign in."
+                return .needsCode
             }
-        } catch let SupabaseError.http(_, body) {
-            // GoTrue's messages are decent; surface the useful ones plainly.
-            if body.localizedCaseInsensitiveContains("already registered")
-                || body.localizedCaseInsensitiveContains("already been registered") {
-                return "That email already has an account — sign in instead."
+        } catch let SupabaseError.http(status, body) {
+            return .failed(Self.signUpMessage(status: status, body: body))
+        } catch {
+            return .failed("Couldn't reach Plannit. Check your connection.")
+        }
+    }
+
+    /// Sign in with email and password. An unconfirmed account gets a fresh code
+    /// and goes to the code screen instead of a dead end.
+    func signIn(email: String, password: String) async -> AuthOutcome {
+        let address = Self.clean(email)
+        do {
+            try await auth.signInWithEmail(address, password: password)
+            await finishSignIn()
+            return .signedIn
+        } catch let SupabaseError.http(status, body) {
+            if Self.isUnconfirmed(body) {
+                try? await auth.resendSignUpCode(email: address)
+                return .needsCode
             }
-            if body.localizedCaseInsensitiveContains("invalid email") {
-                return "That doesn't look like an email address."
-            }
-            if body.localizedCaseInsensitiveContains("password") {
-                return "That password is too weak — try a longer one."
-            }
-            return "Couldn't create that account. Try again."
+            if status == 429 { return .failed("Too many tries. Wait a minute and try again.") }
+            return .failed("That email and password don't match.")
+        } catch {
+            return .failed("Couldn't reach Plannit. Check your connection.")
+        }
+    }
+
+    /// Finish creating an account with the code from the email.
+    func confirmSignUp(email: String, code: String) async -> AuthOutcome {
+        do {
+            try await auth.verifyCode(Self.digits(code), email: Self.clean(email), purpose: .signUp)
+            await finishSignIn()
+            return .signedIn
+        } catch let SupabaseError.http(status, _) {
+            return .failed(Self.codeMessage(status: status))
+        } catch {
+            return .failed("Couldn't reach Plannit. Check your connection.")
+        }
+    }
+
+    /// Send another confirmation code. Nil when it's on its way.
+    func resendSignUpCode(email: String) async -> String? {
+        do {
+            try await auth.resendSignUpCode(email: Self.clean(email))
+            return nil
+        } catch SupabaseError.http(429, _) {
+            return "A code was sent a moment ago. Wait a minute before asking again."
+        } catch {
+            return "Couldn't send a new code. Try again."
+        }
+    }
+
+    /// Email a password-reset code. Nil when it's sent — which is also the
+    /// answer for an address with no account, on purpose.
+    func requestPasswordReset(email: String) async -> String? {
+        let address = Self.clean(email)
+        guard address.contains("@") else { return "Enter the email you signed up with." }
+        do {
+            try await auth.sendPasswordReset(email: address)
+            return nil
+        } catch SupabaseError.http(429, _) {
+            return "A code was sent a moment ago. Wait a minute before asking again."
+        } catch {
+            return "Couldn't send a reset code. Try again."
+        }
+    }
+
+    /// Check a reset code. Leaves a session behind but doesn't enter the app:
+    /// that waits for the new password.
+    func verifyResetCode(email: String, code: String) async -> String? {
+        do {
+            try await auth.verifyCode(Self.digits(code), email: Self.clean(email),
+                                      purpose: .passwordReset)
+            return nil
+        } catch let SupabaseError.http(status, _) {
+            return Self.codeMessage(status: status)
         } catch {
             return "Couldn't reach Plannit. Check your connection."
         }
     }
 
-    /// Dev email/password sign-in (for browser/simulator live testing).
-    func signInWithEmail(_ email: String, _ password: String) async -> Bool {
+    /// Set the new password after a reset code, then go in.
+    func setNewPassword(_ password: String, confirm: String) async -> AuthOutcome {
+        if let problem = PasswordRules.problem(password, confirm: confirm) { return .failed(problem) }
         do {
-            let uid = try await SupabaseClient.shared.signInWithEmail(email, password: password)
-            userId = uid
-            signedIn = true
-            await loadProfile()
-            await loadData()
-            return true
+            try await auth.updatePassword(password)
+            await finishSignIn()
+            return .signedIn
+        } catch let SupabaseError.http(_, body) {
+            if body.contains("same_password") {
+                return .failed("That's your current password. Choose a different one.")
+            }
+            if body.contains("weak_password") {
+                return .failed("That password is too weak. Try a longer one.")
+            }
+            return .failed("Couldn't save the new password. Try again.")
         } catch {
-            return false
+            return .failed("Couldn't reach Plannit. Check your connection.")
         }
+    }
+
+    // Pure helpers, kept static so the tests can read them.
+
+    static func clean(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func digits(_ code: String) -> String { code.filter(\.isNumber) }
+
+    /// The auth server's `email_not_confirmed` (token.go).
+    static func isUnconfirmed(_ body: String) -> Bool {
+        body.contains("email_not_confirmed") || body.localizedCaseInsensitiveContains("email not confirmed")
+    }
+
+    static func codeMessage(status: Int) -> String {
+        status == 429 ? "Too many tries. Wait a minute and try again."
+                      : "That code is wrong or has expired. Check the latest email, or send a new one."
+    }
+
+    static func signUpMessage(status: Int, body: String) -> String {
+        if status == 429 { return "Too many sign-ups from here. Wait a minute and try again." }
+        if body.localizedCaseInsensitiveContains("already registered")
+            || body.localizedCaseInsensitiveContains("already been registered") {
+            return "That email already has an account. Sign in instead."
+        }
+        if body.localizedCaseInsensitiveContains("invalid email")
+            || body.contains("email_address_invalid") {
+            return "That doesn't look like an email address."
+        }
+        if body.contains("weak_password") || body.localizedCaseInsensitiveContains("password") {
+            return "That password is too weak. Try a longer one."
+        }
+        return "Couldn't create that account. Try again."
     }
 
     /// Create a group with its starting members. Persists to Supabase in live

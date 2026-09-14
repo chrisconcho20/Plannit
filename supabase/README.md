@@ -29,7 +29,8 @@ supabase/
 │  ├─ 0014_reschedule_event.sql    # the organiser moves a plan
 │  ├─ 0015_activity_targets.sql    # my_activity() returns event_id, so rows open
 │  ├─ 0016_scale_indexes.sql       # indexes for the queries that run on a timer
-│  └─ 0017_group_hue_activity_bounds.sql  # groups.hue, a 90-day feed, declines for organisers
+│  ├─ 0017_group_hue_activity_bounds.sql  # groups.hue, a 90-day feed, declines for organisers
+│  └─ 0018_provider_display_names.sql     # Google/Apple accounts get a display name
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder

@@ -1,0 +1,8 @@
+<!-- Reset password. Source of truth for Authentication → Emails → "Reset password"
+     in the Supabase dashboard; subject: "Your Plannit password reset code". -->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; padding: 24px; color: #1f1a17;">
+  <h2 style="margin: 0 0 12px;">Reset your Plannit password</h2>
+  <p style="margin: 0 0 20px;">Enter this code in the app, then choose a new password:</p>
+  <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 0 0 20px;">{{ .Token }}</p>
+  <p style="margin: 0; color: #6b625c; font-size: 14px;">If you didn't ask to reset your password, you can ignore this email. Your password hasn't changed.</p>
+</div>
