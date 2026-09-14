@@ -41,7 +41,7 @@ closing before open sign-up.
 - **A web presence.** The invite page's "get the app" fallback needs a real page. Password reset and email confirmation no longer do: both use codes entered in the app.
 - **Custom SMTP.** Supabase's built-in sender delivers only to the project's team members, 2 emails an hour. Confirmation and password reset can't reach real users without it. [`backend/auth-setup.md`](backend/auth-setup.md) §2.
 - **Sign in with Apple and Google.** Both are on the sign-in screen. Apple needs the $99 account, the entitlement switched back (§3) and the provider's Client IDs set; Google needs a Google Cloud OAuth client. Google must not reach the App Store without Apple alongside it (guideline 4.8).
-- **Push notifications.** The whole server half is built (`send-push`, 0004's triggers, the APNs signer). Needs the paid account, an APNs key, and the two Vault secrets (`internal_function_secret`, `functions_base_url`) — without them `notify_push()` silently no-ops.
+- **Push notifications.** The whole server half is built (`send-push`, 0004's triggers, the APNs signer). Needs the paid account, an APNs key, and the two Vault secrets (`internal_function_secret`, `functions_base_url`) — without them `notify_push()` silently no-ops. The You tab's "A date was found", "Invites & requests" and "Share availability" toggles are placeholders that control nothing; wire them up in the same change (roadmap Phase 4, item 8).
 - **Privacy nutrition labels.** Calendar data is sensitive and this app reads it. Be precise: event details never leave the device (decision D-17); only opaque busy ranges are uploaded.
 - **Crash reporting** (Sentry, per the proposal) — nothing today.
 

@@ -1,7 +1,8 @@
 # 05 — The date-finder
 
 **Tests:** the wedge. Constraint building, the everyone-free preference, the
-best-turnout fallback, the search window, picking a date, error handling.
+minimum-turnout setting, hours you're never free, the search window, picking a
+date, error handling.
 **Needs:** 02 (so availability exists) and 03.
 **Time:** 15 minutes.
 
@@ -30,9 +31,16 @@ busy the next two Saturdays. Jo is busy every Sunday for six months.**
    - [ ] The header shows the constraint with a green tick, no warning.
 
 4. **Go back, set days to Sunday only.** Find times.
-   - [ ] An **amber** line: "No time works for all 6 in the next 6 months,
-         here's the best turnout."
+   - [ ] With **You → Date finder → Plans need at least** on **All** (the
+         default): "No times work", saying no time works for all 6, and
+         suggesting fewer people in You → Date finder.
+
+4b. **Set "Plans need at least" to Half.** Repeat step 4.
+   - [ ] Step 2's sentence adds "or failing that at least 3 of 6".
+   - [ ] An **amber** line: "No time works for all 6 in the next 6 months — here
+         are the best times for at least 3 of 6."
    - [ ] Cards read **5 of 6**, and Jo is missing from the faces.
+   - [ ] Set it to **All** again afterwards.
 
 5. **Go to You, Date finder, set the window to 1 month.** Repeat step 3.
    - [ ] Fewer results, or none. The preference is genuinely used.
@@ -82,6 +90,31 @@ select count(*) from public.proposals;
 - [ ] One event, at the time you chose, shared with the group you picked.
 - [ ] The proposal count is whatever it was before — the finder stopped writing
       to those tables.
+
+## Hours you're never free
+
+Needs calendar access (02), and a second account in the same group to run the
+search, since your own availability is what changes.
+
+1. **You → Date finder → Hours you're never free.** Turn on **Use these hours**,
+   set free between **10:00 AM** and **6:00 PM**, tap **S** (Sunday), Save.
+   - [ ] The row now reads "Not before 10:00 AM or after 6:00 PM · never on Sun".
+   - [ ] Console shows `busy: uploaded N blocks` shortly after saving.
+2. **As the other account**, find a time for the shared group: every day,
+   Morning, 1h.
+   - [ ] No result starts before 10:00 AM, and none falls on a Sunday — unless
+         "Plans need at least" allows a time without you.
+3. **Verify in SQL** that nothing but ranges went up:
+
+   ```sql
+   select start_at, end_at from public.busy_blocks
+    where user_id = '<your id>' order by start_at limit 5;
+   ```
+
+   - [ ] Overnight blocks run from 18:00 to 10:00 local time the next day, and
+         Sundays are one block. No titles or labels exist to leak.
+4. **Turn the rule off, Save.**
+   - [ ] The row reads "Off", and the next upload no longer contains the blocks.
 
 ## If it fails
 

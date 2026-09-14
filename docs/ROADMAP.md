@@ -137,6 +137,13 @@ account. See §6 for URLs/creds.
    Server side already exists (`send-push` + triggers). Contract:
    [`backend/push-notifications.md`](backend/push-notifications.md). Requires the
    Apple Developer account + APNs key.
+   **Wire up the You tab's placeholder toggles in the same change.** "A date was
+   found", "Invites & requests" and "Share availability" (`YouScreen`,
+   `Features/Plans/PlansScreen.swift`) are `@State` bools that nothing reads and
+   that reset on every reload. The two notification toggles need persisting and
+   to gate which pushes a device receives; "Share availability" needs to stop
+   `AvailabilityUploader` (and clear the uploaded blocks) when off. Until then
+   they look like settings and control nothing.
 
 ### Phase 5 — Robustness & finalization
 9. ~~**Session persistence**~~ ✅ **done (2026-08-14).** Keychain-backed session
@@ -216,6 +223,12 @@ to become. Individually sensible, collectively a security incident.
   Codes are 6 characters of Crockford base32: 1,073,741,824 possible values.
 
 ## 4. Small backlog
+- **Per-group minimum turnout.** "Plans need at least" (You → Date finder) is
+  one setting for every group today; a group-level override would let a
+  five-a-side need ten while a family dinner needs everyone. Would live on
+  `groups` rather than on the phone.
+- **Never-free hours without calendar access.** The rule rides on the
+  availability upload, which only runs with calendar read access.
 - Avatar images (initials only today); group avatars; timezone-aware display for
   a plan made in another zone; haptics; a "who can see this" list of names on an
   event; sharing to a single person from the *event* side is done, but there's no

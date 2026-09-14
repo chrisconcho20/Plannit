@@ -124,6 +124,10 @@ Needs the Apple Developer Program membership.
    Services ID and no secret key
    ([Supabase docs](https://supabase.com/docs/guides/auth/social-login/auth-apple)).
 
+Once the account exists, push notifications become possible too. The You tab's
+three placeholder toggles are to be wired up then — see
+[`../ROADMAP.md`](../ROADMAP.md) Phase 4, item 8.
+
 Builds without the entitlement — Appetize, and free-Apple-ID device builds —
 show the Apple button, and tapping it reports that Sign in with Apple isn't
 available in this build.
