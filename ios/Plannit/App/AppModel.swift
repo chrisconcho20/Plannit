@@ -1431,6 +1431,14 @@ final class AppModel: ObservableObject {
     /// The calendars we could read, for the picker in You.
     func selectableCalendars() -> [EKCalendar] { calendar.selectableCalendars() }
 
+    /// Save the hours you're never free and push availability again, so the
+    /// next search anyone runs already respects them.
+    func setNeverFreeHours(_ rule: NeverFreeHours) {
+        NeverFreeHours.current = rule
+        objectWillChange.send()
+        Task { await syncCalendar() }
+    }
+
     /// Turn one on or off and re-read straight away, so the list and the
     /// availability both move at the moment you tap.
     func setCalendar(_ ekCalendar: EKCalendar, enabled: Bool) {

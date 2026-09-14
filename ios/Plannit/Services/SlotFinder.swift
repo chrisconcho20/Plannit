@@ -66,8 +66,11 @@ enum SlotFinder {
     static let maxDates = 4
     static let stepMinutes = 30
 
+    /// `quorum` is the smallest turnout to offer when no time suits everyone
+    /// (MinimumAttendance); nil leaves the scheduler's majority default.
     static func constraints(days: Set<Int>, timeOfDay: String, duration: String,
                             months: Int = SearchWindow.months,
+                            quorum: Int? = nil,
                             now: Date = Date()) -> SlotConstraintsDTO {
         let tz = TimeZone.current
         var cal = Calendar(identifier: .gregorian)
@@ -87,9 +90,9 @@ enum SlotFinder {
             durationMinutes: minutes(from: duration),
             stepMinutes: stepMinutes,
             timezone: tz.identifier,
-            // No quorum: the scheduler holds out for a date the whole group can
-            // make and only drops to the best turnout if the window has none.
-            quorum: nil)
+            // The scheduler holds out for a date the whole group can make and
+            // only drops to a turnout of at least `quorum` if the window has none.
+            quorum: quorum)
     }
 
     /// "2h" → 120.

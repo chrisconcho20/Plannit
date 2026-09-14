@@ -27,6 +27,7 @@ struct NewPlanSheet: View {
     @State private var everyoneFree = true
     @State private var errorText: String?
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
+    @AppStorage(MinimumAttendance.key) private var minimum = MinimumAttendance.defaultValue
 
     private let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
     private let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -167,7 +168,7 @@ struct NewPlanSheet: View {
                 PIcon("wand-sparkles", size: 16, color: Palette.teal600)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(constraintSummary).textStyle(.footnote, color: Palette.teal700)
-                    Text("Searching \(SearchWindow.phrase(searchMonths)) for a time everyone can make.")
+                    Text(searchPromise)
                         .textStyle(.caption, color: Palette.teal600)
                 }
             }
@@ -176,6 +177,16 @@ struct NewPlanSheet: View {
             .background(Palette.teal50)
             .clipShape(RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
         }
+    }
+
+    /// What the search will hold out for, in the terms of the minimum setting.
+    private var searchPromise: String {
+        let window = SearchWindow.phrase(searchMonths)
+        guard total > 0, minimum.floor(groupSize: total) < total else {
+            return "Searching \(window) for a time everyone can make."
+        }
+        return "Searching \(window) for a time everyone can make, or failing that "
+            + "\(minimum.phrase(groupSize: total))."
     }
 
     private var constraintSummary: String {
@@ -200,7 +211,7 @@ struct NewPlanSheet: View {
                     .frame(maxWidth: .infinity)
             } else if slots.isEmpty {
                 EmptyState(icon: "calendar-x", title: "No times work",
-                           message: "Not enough of the group is free for \(duration) \(timeOfDay.lowercased()) in \(SearchWindow.phrase(searchMonths)). Try more days, a shorter plan, or a longer window in You → Date finder.",
+                           message: "No \(duration) \(timeOfDay.lowercased()) in \(SearchWindow.phrase(searchMonths)) works for \(minimum.phrase(groupSize: total)). Try more days, a shorter plan, or a longer window or fewer people in You → Date finder.",
                            actionTitle: "Change the plan") {
                     withAnimation(Motion.base) { step = 1 }
                 }
@@ -211,7 +222,7 @@ struct NewPlanSheet: View {
                           color: everyoneFree ? .statusFree : .statusWarning)
                     Text(everyoneFree
                          ? constraintSummary
-                         : "No time works for all \(total) in \(SearchWindow.phrase(searchMonths)) — here’s the best turnout.")
+                         : "No time works for all \(total) in \(SearchWindow.phrase(searchMonths)) — here are the best times for \(minimum.phrase(groupSize: total)).")
                         .textStyle(.footnote, color: .textMuted)
                 }
                 // One decision to make: which date. At most two times per
@@ -303,7 +314,8 @@ struct NewPlanSheet: View {
 
         guard isLive, let selected = group else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                slots = sampleSlots
+                let floor = minimum.floor(groupSize: total)
+                slots = sampleSlots.filter { $0.free >= floor }
                 chosen = slots.first
                 everyoneFree = true
                 withAnimation(Motion.base) { finding = false }
@@ -353,7 +365,8 @@ struct NewPlanSheet: View {
             groupId: group.id,
             title: planTitle,
             constraints: SlotFinder.constraints(days: days, timeOfDay: timeOfDay,
-                                                duration: duration, months: searchMonths),
+                                                duration: duration, months: searchMonths,
+                                                quorum: minimum.quorum(groupSize: group.members.count)),
             maxResults: SlotFinder.maxResults,
             persist: persist)
         return try await SupabaseClient.shared.invokeFunction("find-slots", body: body)

@@ -26,7 +26,7 @@ final class SlotFinderTests: XCTestCase {
         XCTAssertEqual(c.durationMinutes, 120)
         XCTAssertEqual(c.stepMinutes, 30)
         XCTAssertEqual(c.timezone, TimeZone.current.identifier)
-        XCTAssertNil(c.quorum, "the scheduler decides — everyone first, majority as fallback")
+        XCTAssertNil(c.quorum, "no quorum given: the scheduler's everyone-then-majority default")
     }
 
     func testWindowStartsOnTheNextWholeHour() {

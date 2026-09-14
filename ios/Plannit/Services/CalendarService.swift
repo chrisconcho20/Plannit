@@ -181,8 +181,11 @@ final class CalendarService {
         let now = Date()
         let all = matching(from: now, to: horizon)
         let busy = all.filter { Self.isBusy($0) }
+        // Hours you're never free count as busy too — merged here, so the
+        // server only ever sees ranges, never the rule behind them.
+        let rule = NeverFreeHours.current.blocks(from: now, to: horizon)
         let merged = Availability.prepare(
-            busy.map { BusyInterval(start: $0.startDate, end: $0.endDate) },
+            busy.map { BusyInterval(start: $0.startDate, end: $0.endDate) } + rule,
             from: now, to: horizon)
         let days = Calendar.current.dateComponents([.day], from: now, to: horizon).day ?? 0
         Log.cal("busy: \(busy.count) of \(all.count) events in \(days)d → \(merged.count) merged blocks")

@@ -218,6 +218,8 @@ struct YouScreen: View {
     @State private var pushDateFound = true
     @State private var pushInvites = true
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
+    @AppStorage(MinimumAttendance.key) private var minimumAttendance = MinimumAttendance.defaultValue
+    @State private var showNeverFree = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -285,6 +287,39 @@ struct YouScreen: View {
                         .padding(.leading, 34)
                     }
                     .padding(.vertical, 12)
+                    divider
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            PIcon("users", size: 20, color: .textMuted).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Plans need at least").textStyle(.headline, color: .textStrong)
+                                Text("If no time suits the whole group, only offer times this many can make.")
+                                    .textStyle(.caption, color: .textMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        SegmentedControl(options: MinimumAttendance.allCases,
+                                         selection: $minimumAttendance) { $0.label }
+                            .padding(.leading, 34)
+                    }
+                    .padding(.vertical, 12)
+                    divider
+                    Button { showNeverFree = true } label: {
+                        HStack(spacing: 12) {
+                            PIcon("clock", size: 20, color: .textMuted).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Hours you're never free").textStyle(.headline, color: .textStrong)
+                                Text(NeverFreeHours.current.summary)
+                                    .textStyle(.caption, color: .textMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            PIcon("chevron-right", size: 16, color: .textFaint)
+                        }
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 SectionLabel("Calendar")
@@ -318,6 +353,7 @@ struct YouScreen: View {
         .navigationBarHidden(true)
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .sheet(isPresented: $showCalendars) { CalendarPicker().environmentObject(model) }
+        .sheet(isPresented: $showNeverFree) { NeverFreeSheet().environmentObject(model) }
         .sheet(isPresented: $showRename) {
             ProfileSheet().environmentObject(model)
         }
