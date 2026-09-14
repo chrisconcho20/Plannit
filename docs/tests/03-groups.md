@@ -36,7 +36,9 @@ recolour, delete vs leave, search.
 7. **Tap "Rename or recolour".** Change the name to `Renamed Group`, pick a
    different colour, Save.
    - [ ] The header, the list, and the group's dot all show the new name and colour.
-   - [ ] The sheet says the colour is saved on this device only.
+   - [ ] The sheet says everyone in the group sees this colour.
+   - [ ] Sign in as another member of the group (or ask one to look): they see
+         the new colour too, without reinstalling.
 
 8. **Go back to the Groups list. Swipe a group card from right to left.**
    - [ ] A red action is revealed: **Delete** on a group you own.

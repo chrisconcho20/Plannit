@@ -1,13 +1,14 @@
 # 12 — Activity feed
 
 **Tests:** the feed, the unread dot, and what it does and doesn't show you.
-**Needs:** 06. Also `supabase db push` (0008 and 0011).
+**Needs:** 06. Also `supabase db push` (0008, 0011, 0015 and 0017).
 **Time:** 5 minutes.
 
-The rule the feed follows: **it never tells you what you just did.** Five things
+The rule the feed follows: **it never tells you what you just did.** Six things
 can reach it — someone invited your group to a date, someone said they're going
-to a plan of yours, someone shared an event with you personally, someone wants
-to be friends, someone joined your group.
+to a plan of yours, someone can't make a plan **you organised**, someone shared
+an event with you personally, someone wants to be friends, someone joined your
+group. Everything except a pending friend request drops out after 90 days.
 
 ---
 
@@ -24,8 +25,9 @@ to be friends, someone joined your group.
    - [ ] You see "<someone> wants to plan <title>" for invitations from other
          people, and "<someone> is going to <title>" for answers to your plans.
    - [ ] You do **not** see your own invitations or your own answers echoed back.
-   - [ ] You do **not** see anyone's *declines*. Only "going" reaches the feed —
-         a feed that announces every no makes saying no expensive.
+   - [ ] "<someone> can't make <title>" appears only for plans **you** made. A
+         decline on someone else's plan never reaches your feed — a feed that
+         announces every no makes saying no expensive.
 
 4. **Tap a row about a plan.**
    - [ ] Rows that can go somewhere have a chevron; rows that can't don't.
@@ -42,8 +44,10 @@ to be friends, someone joined your group.
    then return to your own account.
    - [ ] "Maya is going to <plan>" appears in your feed.
    - [ ] The bell's dot is back.
-   - [ ] Have Maya **decline** a different plan: nothing appears. That's
-         deliberate.
+   - [ ] Have Maya tap **Can't make it** on a plan **you** made: "Maya can't make
+         <plan>" appears, and tapping it opens the plan.
+   - [ ] Have Maya decline a plan someone **else** made in the same group:
+         nothing appears in your feed. That's deliberate.
 
 6. **Pull the activity list down to refresh.**
    - [ ] It reloads without emptying the screen first.

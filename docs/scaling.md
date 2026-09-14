@@ -105,7 +105,7 @@ select relname, n_live_tup, n_dead_tup, last_autovacuum
   from pg_stat_user_tables where relname = 'busy_blocks';
 ```
 
-### 5. `my_activity()` scans all of history 🟡 — proposed
+### 5. `my_activity()` scans all of history 🟡 — **fixed (0017)**
 
 Five branches, `UNION ALL`, `order by happened_at desc limit 50`. The limit is
 applied *after* the union, so every branch produces all its rows on every call —
@@ -113,9 +113,10 @@ and the feed refreshes on a timer. Today that's a handful of rows; in a year of
 use, the `invited` branch alone walks every share ever made to any of your
 groups.
 
-One-line fix per branch: `and <timestamp> > now() - interval '90 days'`. Nobody
-scrolls a 50-row feed back further than that, and the limit already truncates it.
-Bundled with the RLS work since it's the same file and the same test pass.
+Each branch now carries `and <timestamp> > now() - interval '90 days'`. A
+50-row feed never reaches further back, and the limit already truncated it.
+Pending friend requests are exempt: they stay actionable, and `status =
+'pending'` already keeps that branch small.
 
 ### 6. Indexes for the queries that run on a timer 🟡 — **fixed (0016)**
 

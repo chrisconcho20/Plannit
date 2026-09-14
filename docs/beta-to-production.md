@@ -48,5 +48,3 @@ closing before open sign-up.
 
 - **Rate limits.** Nothing throttles sign-up, invite redemption or the date-finder. `find-slots` is now clamped for size, not frequency.
 - **Activity feed** has no pagination and tracks "seen" only on-device.
-- **A locked plan can't be reopened** — cancel and re-run is the workaround.
-- **Group colour is device-local** until `groups` gets a `hue` column.

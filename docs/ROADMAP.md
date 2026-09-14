@@ -1,6 +1,6 @@
 # Plannit — Roadmap & Finalization Plan
 
-_Last updated 2026-08-21. Audience: a future Claude agent (or dev) resuming this
+_Last updated 2026-09-14. Audience: a future Claude agent (or dev) resuming this
 project. Read [`../AGENTS.md`](../AGENTS.md) first for how to build/test without a
 Mac, then this for what's left._
 
@@ -56,8 +56,8 @@ account. See §6 for URLs/creds.
    and only falls back to the best turnout when there are none — the results
    header says which. The window is a personal preference (You → Date finder,
    1/3/6/12 months, default 6) stored under `SearchWindow.key`.
-   _Follow-up:_ slot avatars still show the first N group members rather than the
-   real `availableUserIds` (needs member ids on `PGroup`).
+   Slot cards show the members the scheduler found free (`availableUserIds`),
+   drawn with each person's chosen colour or photo.
 2. ~~**Live proposals + voting**~~ → **replaced by invitations + RSVP**
    ✅ **done (2026-08-21), decision D-18.** Voting between slots is gone. The
    organiser picks one date; it becomes a real event they own, shared with the
@@ -73,8 +73,9 @@ account. See §6 for URLs/creds.
 
    `proposals` / `proposal_slots` / `votes` are retired: still in the schema,
    never written, no longer read. `PProposal` and the voting UI are deleted.
-   _Next here:_ the organiser can't move a plan's time once sent (delete and
-   re-run); nobody is notified of a decline except by the count going down.
+   Moving a sent plan is `reschedule_event()` (0014): same-day moves keep
+   answers, a different day asks again. A decline reaches the **organiser only**,
+   as a "can't make" row in the activity feed (0017); push for it waits on APNs.
 3. ~~**Event sharing to groups (live)**~~ ✅ **done (2026-08-14).** `ShareSheet`
    lists your real groups pre-ticked with the event's current shares and diffs
    the selection on save (insert added / delete removed `event_shares`).
@@ -126,9 +127,9 @@ account. See §6 for URLs/creds.
    _Still to do:_ invite links (D-14 territory), blocking, and a friends-only
    privacy option for sharing (`event_shares.shared_user_id` is still unused).
 7. ~~**Group management**~~ ✅ **done (2026-08-14).** Add / remove members,
-   delete, leave, and rename + recolour. The hue is stored **on-device** per
-   group (no `hue` column yet) and falls back to the name-derived colour —
-   a migration would make it shared.
+   delete, leave, and rename + recolour. The colour is `groups.hue` (0017),
+   shared with every member; null falls back to the name-derived colour. Picks
+   made on-device before 0017 are uploaded once by the owner.
 
 ### Phase 4 — Notifications
 8. **APNs client** — request permission, register the device token into
@@ -145,10 +146,11 @@ account. See §6 for URLs/creds.
    an app with no entitlements.
 10. **Offline cache** — decision **D-02 chose GRDB**; none yet. Add an offline-first
     local store so the app works without network and syncs deltas.
-11. **Error & loading states** — ✅ live mode no longer starts on sample data, a
-    failed load shows a banner with Retry, and every list pulls to refresh.
-    _Still to do:_ skeletons while first loading, and per-action toasts for the
-    writes that currently fail quietly (add/remove member, share).
+11. ~~**Error & loading states**~~ ✅ **done (2026-09-14).** Live mode no longer
+    starts on sample data, a failed load shows a banner with Retry, and every
+    list pulls to refresh. Calendar, Groups, Plans, Activity and Friends show
+    skeletons on first load. Failed writes report themselves: inline in the
+    sheet that made them, or as a toast from the app shell.
 12. **Empty-state copy** — friendly "nothing yet / here's what to do" states.
 13. ~~**Wire or hide placeholder buttons**~~ ✅ **done (2026-08-14).** Search
     filters groups by name or member; ⋯ on an event is Edit/Share/Delete; the
@@ -195,23 +197,17 @@ to become. Individually sensible, collectively a security incident.
   refresh only what they touched, and `LiveRefresh` polling stays as the safety
   net. Research and the local-first fallback: [`realtime-research.md`](realtime-research.md).
   _Unverified:_ needs two live sessions to confirm end to end.
-- **Group hue is device-local** — the picker works, but the colour lives in
-  UserDefaults, so teammates see the name-derived one. Needs a `hue` column.
 - **No password reset**, and **email confirmation must stay off** — both need a
   real web page for the emailed link to land on. `site_url` is a deep link.
 - **No offline support** — a failed load shows a banner with Retry (live mode no
   longer falls back to sample data), but there's no local store. D-02 chose GRDB;
   D-16 notes PowerSync would supersede it.
-- **A locked plan can't be reopened** — cancel and re-run is the workaround.
 - **Recurrence is a closed set** — never/daily/weekly/fortnightly/monthly, with
   no end date, no count, and no per-occurrence exceptions.
-- **Activity has no pagination and no server-side read state** — a limit only,
-  and "seen" is tracked on-device.
-- **Activity rows aren't tappable** — deep-linking into the plan is the next step.
+- **Activity has no pagination and no server-side read state** — a limit and a
+  90-day horizon (0017), and "seen" is tracked on-device.
 - **The invite page has no App Store fallback** — if the app isn't installed the
   button does nothing. Needs a listing to link to.
-- **`plan_locked` re-floats in the feed** on any proposal update; it keys on
-  `updated_at`.
 - **RLS helper functions answer about anyone** — `are_friends(a, b)` and friends
   take arbitrary ids and are executable by any authenticated user. Fix needs a
   careful rewrite of 0002's policies: [`security-review.md`](security-review.md) §4.
@@ -252,8 +248,8 @@ codemagic.yaml      Codemagic → TestFlight (needs Apple Developer account)
     safe to share)
   - Live: not published here on purpose; the repo is public and that link
     reaches the real database. Take it from the workflow run summary.
-- **Supabase project:** live; migrations 0001–0003 applied. **TODO:** `supabase db
-  push` for `0004`, then set Vault secrets `internal_function_secret` and
+- **Supabase project:** live. **TODO:** `supabase db push` for anything not yet
+  applied (latest is `0017`), then set Vault secrets `internal_function_secret` and
   `functions_base_url` (see [`backend/setup-runbook.md`](backend/setup-runbook.md)
   §5b) to activate push triggers. Also configure Auth → Apple provider for
   on-device Sign in with Apple.
