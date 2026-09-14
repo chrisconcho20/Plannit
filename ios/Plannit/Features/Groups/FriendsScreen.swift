@@ -145,8 +145,8 @@ struct FriendsScreen: View {
     }
 }
 
-// Add someone by their handle: the username they chose plus the 6-digit code
-// from their You tab, e.g. `maya#482913`. Both halves must match — the lookup
+// Add someone by their handle: the username they chose plus the 6-character
+// code from their You tab, e.g. `maya#K7M2QX`. Both halves must match — the lookup
 // won't search by name alone, so nobody can browse who's on Plannit.
 struct AddFriendSheet: View {
     @EnvironmentObject private var model: AppModel
@@ -164,7 +164,7 @@ struct AddFriendSheet: View {
             SheetHeader(title: "Add a friend") { dismiss() }
             VStack(alignment: .leading, spacing: 14) {
                 Text("THEIR USERNAME AND CODE").textStyle(.overline, color: .textFaint)
-                PTextField(placeholder: "username#123456", text: $handle, icon: "user")
+                PTextField(placeholder: "username#K7M2QX", text: $handle, icon: "user")
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -192,7 +192,7 @@ struct AddFriendSheet: View {
                     .disabled(searching || handle.trimmingCharacters(in: .whitespaces).isEmpty)
                     .opacity(searching || handle.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
 
-                Text("Ask for their username and the 6-digit code shown next to it on their You tab.")
+                Text("Ask for their username and the 6-character code shown next to it on their You tab. Capitals don't matter.")
                     .textStyle(.caption, color: .textFaint)
             }
             .padding(Space.gutter)
@@ -205,7 +205,7 @@ struct AddFriendSheet: View {
     private func lookUp() {
         found = nil
         guard let parsed else {
-            message = "Add the # and their 6-digit code, like maya#482913."
+            message = "Add the # and their 6-character code, like maya#K7M2QX."
             return
         }
         searching = true

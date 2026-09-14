@@ -117,9 +117,9 @@ doing deliberately, not as a footnote to a review.
 a Plannit account, with no rate limit, and returned the display name.
 
 _2026-09-14:_ dropped. Friends are found by `find_profile_by_handle`, which needs
-a username and that account's permanent 6-digit code together, so an email
+a username and that account's permanent 6-character code together, so an email
 address reveals nothing. What remains is guessing a code for a known username —
-up to a million tries, still unthrottled; see
+about a billion possibilities, still unthrottled; see
 [`beta-to-production.md`](beta-to-production.md) §2.
 
 ## 6. Invite tokens travel in a query string — LOW → mitigated

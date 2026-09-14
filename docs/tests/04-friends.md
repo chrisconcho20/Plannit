@@ -2,7 +2,7 @@
 
 **Tests:** the friends list, your friend code, adding by `username#code`,
 requests, removing.
-**Needs:** 01, and `supabase db push` (0019).
+**Needs:** 01, and `supabase db push` (0019 and 0020).
 **Time:** 5 minutes.
 
 Seeded users' codes are random. Look them up first:
@@ -18,13 +18,14 @@ path. Remember to turn it back on.
 ---
 
 1. **Launch the app and go to the You tab.**
-   - [ ] Your username is shown with `#` and six digits right after it, in a
+   - [ ] Your username is shown with `#` and six characters (digits and capital
+         letters) right after it, in a
          smaller, greyer style than the name.
    - [ ] The code appears nowhere else: not in group member lists, the Friends
          list, or the profile editing sheet.
 
 2. **Tap Edit, change your username, save.**
-   - [ ] The You tab shows the new username with the **same** six digits.
+   - [ ] The You tab shows the new username with the **same** code.
    - [ ] Typing `#` in the username field does nothing, and the field stops at
          32 characters.
 
@@ -33,13 +34,14 @@ path. Remember to turn it back on.
    - [ ] A note at the bottom explains everyone who joins is added automatically.
 
 4. **Tap "Add a friend".** Type `Maya Ellis` with no code, tap **Find them**.
-   - [ ] "Add the # and their 6-digit code, like maya#482913." No lookup happens.
+   - [ ] "Add the # and their 6-character code, like maya#K7M2QX." No lookup happens.
 
-5. **Type `Maya Ellis#000000`** (a wrong code), Find them.
+5. **Type `Maya Ellis#ZZZZZZ`** (a wrong code), Find them.
    - [ ] "Nobody on Plannit has that username and code."
 
-6. **Type Maya's real handle**, e.g. `maya ellis#` followed by her code from the
-   query above (capitals don't matter), Find them.
+6. **Type Maya's real handle** in lowercase, e.g. `maya ellis#` followed by her
+   code from the query above, Find them. If her code contains a `0` or `1`,
+   also try typing it as `o` or `l`.
    - [ ] "You're already friends."
 
 7. **Close the sheet. Tap the X next to Sam Roe, choose Remove friend.**

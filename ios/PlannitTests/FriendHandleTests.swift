@@ -10,35 +10,44 @@ final class FriendHandleTests: XCTestCase {
     // MARK: - Parsing what someone typed
 
     func testAHandleSplitsIntoUsernameAndCode() throws {
-        let handle = try XCTUnwrap(FriendHandle.parse("Maya#482913"))
+        let handle = try XCTUnwrap(FriendHandle.parse("Maya#K7M2QX"))
         XCTAssertEqual(handle.username, "Maya")
-        XCTAssertEqual(handle.code, "482913")
+        XCTAssertEqual(handle.code, "K7M2QX")
     }
 
-    func testSpacesAroundThePiecesAreForgiven() throws {
-        let handle = try XCTUnwrap(FriendHandle.parse("  Maya Ellis #482 913 "))
+    func testCapitalsAndSpacesAreForgiven() throws {
+        let handle = try XCTUnwrap(FriendHandle.parse("  Maya Ellis #k7m 2qx "))
         XCTAssertEqual(handle.username, "Maya Ellis", "a username can contain spaces")
-        XCTAssertEqual(handle.code, "482913", "a code read aloud often gets typed in pairs")
+        XCTAssertEqual(handle.code, "K7M2QX", "codes are stored uppercase")
     }
 
-    func testACodeStartingWithZeroKeepsItsZeros() throws {
-        XCTAssertEqual(FriendHandle.parse("sam#004210")?.code, "004210")
+    func testLookAlikeLettersReadAsTheDigitsTheyResemble() {
+        XCTAssertEqual(FriendHandle.normalizedCode("O1LI00"), "011100")
+        XCTAssertEqual(FriendHandle.normalizedCode("oil9zz"), "0119ZZ")
     }
 
-    func testIncompleteHandlesAreRefusedBeforeAnyLookup() {
+    func testIncompleteOrImpossibleHandlesAreRefusedBeforeAnyLookup() {
         XCTAssertNil(FriendHandle.parse("Maya"), "no code")
-        XCTAssertNil(FriendHandle.parse("#482913"), "no username")
-        XCTAssertNil(FriendHandle.parse("Maya#48291"), "five digits")
-        XCTAssertNil(FriendHandle.parse("Maya#4829130"), "seven digits")
-        XCTAssertNil(FriendHandle.parse("Maya#48a913"), "not all digits")
+        XCTAssertNil(FriendHandle.parse("#K7M2QX"), "no username")
+        XCTAssertNil(FriendHandle.parse("Maya#K7M2Q"), "five characters")
+        XCTAssertNil(FriendHandle.parse("Maya#K7M2QXA"), "seven characters")
+        XCTAssertNil(FriendHandle.parse("Maya#K7M2QU"), "U is not in the alphabet")
+        XCTAssertNil(FriendHandle.parse("Maya#K7-2QX"), "punctuation")
         XCTAssertNil(FriendHandle.parse("maya@example.com"),
                      "an email is no longer a way to find someone")
     }
 
+    func testTheAlphabetIsThirtyTwoUnambiguousCharacters() {
+        let alphabet = FriendHandle.alphabet
+        XCTAssertEqual(alphabet.count, 32)
+        XCTAssertEqual(Set(alphabet).count, 32)
+        for missing in "ILOU" { XCTAssertFalse(alphabet.contains(missing)) }
+    }
+
     func testFormattingRoundTrips() throws {
-        let text = FriendHandle.format(username: "Theo", code: "000123")
-        XCTAssertEqual(text, "Theo#000123")
-        XCTAssertEqual(FriendHandle.parse(text)?.code, "000123")
+        let text = FriendHandle.format(username: "Theo", code: "0A1B2C")
+        XCTAssertEqual(text, "Theo#0A1B2C")
+        XCTAssertEqual(FriendHandle.parse(text)?.code, "0A1B2C")
     }
 
     // MARK: - Usernames
@@ -71,13 +80,13 @@ final class FriendHandleTests: XCTestCase {
         """)
         let repo = SupabaseRepository(client: StubTransport.client())
 
-        let person = try await repo.findPerson(username: "Maya", code: "482913")
+        let person = try await repo.findPerson(username: "Maya", code: "K7M2QX")
 
         XCTAssertEqual(person?.id, "maya")
         XCTAssertEqual(person?.hue, .rose, "the result shows their chosen face before you add them")
         let body = try XCTUnwrap(StubTransport.sent(to: "find_profile_by_handle"))
         XCTAssertTrue(body.contains("\"p_username\":\"Maya\""), body)
-        XCTAssertTrue(body.contains("\"p_code\":\"482913\""), body)
+        XCTAssertTrue(body.contains("\"p_code\":\"K7M2QX\""), body)
     }
 
     func testNobodyMatchingIsNotAnError() async throws {
@@ -86,7 +95,7 @@ final class FriendHandleTests: XCTestCase {
         StubTransport.on("/rpc/find_profile_by_handle", body: "[]")
         let repo = SupabaseRepository(client: StubTransport.client())
 
-        let person = try await repo.findPerson(username: "Nobody", code: "000000")
+        let person = try await repo.findPerson(username: "Nobody", code: "ZZZZZZ")
         XCTAssertNil(person)
     }
 }

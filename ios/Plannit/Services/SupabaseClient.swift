@@ -54,7 +54,7 @@ struct ProfileDTO: Decodable {
     let timezone: String?
     let avatar_hue: String?
     let avatar_url: String?
-    /// Permanent 6-digit code (0019). Only ever selected for your own profile.
+    /// Permanent 6-character code (0019). Only ever selected for your own profile.
     let friend_code: String?
 }
 /// Your profile, as the app reads it back.

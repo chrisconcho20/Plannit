@@ -8,7 +8,7 @@ enum Sample {
     /// Demo mode still needs an identity: RSVPs, ownership and "is this on my
     /// calendar" are all answers about *someone*.
     static let meId = "demo-me"
-    static let meFriendCode = "482913"
+    static let meFriendCode = "K7M2QX"
 
     static let people = PMember.named(
         ["Maya Ellis", "Theo Sand", "Ada Kim", "Sam Roe", "Rae Loft", "Jo Vane"])

@@ -213,7 +213,7 @@ to become. Individually sensible, collectively a security incident.
   careful rewrite of 0002's policies: [`security-review.md`](security-review.md) §4.
 - **Reaching a stranger needs their `username#code`** — by design; the code is
   shown only on their own You tab, and invite links are the other way in.
-  Codes are unique across 1,000,000 values; a longer code is the path past that.
+  Codes are 6 characters of Crockford base32: 1,073,741,824 possible values.
 
 ## 4. Small backlog
 - Avatar images (initials only today); group avatars; timezone-aware display for

@@ -109,7 +109,7 @@ struct SupabaseRepository: DataRepository {
     }
 
     /// Look someone up to befriend them by `username#code`. Both halves have to
-    /// match (0019): the code alone is only six digits, so it can't be the key.
+    /// match (0019), so a handle has to be given, not guessed from a name.
     func findPerson(username: String, code: String) async throws -> PMember? {
         let rows: [FriendDTO] = try await client.rpc(
             "find_profile_by_handle", args: HandleLookup(p_username: username, p_code: code))
