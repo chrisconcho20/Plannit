@@ -179,6 +179,7 @@ final class AppModel: ObservableObject {
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
             await realtime.sync(groupIds: g.map(\.id))
+            await uploadDeviceHues()
             Log.sync("loaded: \(g.count) groups, \(e.count) events, \(mates.count) friends")
         } catch {
             loadError = Self.message(for: error)
@@ -230,10 +231,43 @@ final class AppModel: ObservableObject {
         guard Config.isLiveBackend, signedIn else { return }
         let repo = SupabaseRepository()
         if let fresh = try? await repo.fetchGroups() {
+            let looksChanged = Self.appearanceChanged(from: groups, to: fresh)
             groups = fresh
             loadError = nil
+            // Events take their group's name and colour when mapped, so a
+            // rename or recolour elsewhere is stale on the calendar until re-read.
+            if looksChanged { await refreshEvents() }
         }
         if let who = try? await repo.fetchPeople() { people = who }
+    }
+
+    /// Did any group's name or colour change? Membership changes don't count:
+    /// events don't draw anything from members.
+    static func appearanceChanged(from old: [PGroup], to new: [PGroup]) -> Bool {
+        let before = Dictionary(old.map { ($0.id, ($0.name, $0.hue)) }, uniquingKeysWith: { a, _ in a })
+        return new.contains { group in
+            guard let was = before[group.id] else { return false }
+            return was.0 != group.name || was.1 != group.hue
+        }
+    }
+
+    /// Upload colours picked on this device before `groups.hue` existed (0017).
+    /// Only the owner can write a group, and a colour already on the server
+    /// wins — it's the newer choice, made after the column arrived.
+    private func uploadDeviceHues() async {
+        guard Config.isLiveBackend, let uid = userId else { return }
+        var uploaded = false
+        for group in groups where group.ownerId == uid {
+            guard let local = GroupHue.legacyPick(for: group.id) else { continue }
+            if !group.hueIsChosen {
+                guard (try? await SupabaseClient.shared.update(
+                    "groups", values: GroupHueUpdate(hue: local.rawValue),
+                    match: ["id": "eq.\(group.id)"])) != nil else { continue }
+                uploaded = true
+            }
+            GroupHue.forgetLegacyPick(for: group.id)
+        }
+        if uploaded { await refreshGroups() }
     }
 
     func refreshFriends() async {
@@ -636,18 +670,19 @@ final class AppModel: ObservableObject {
     func renameGroup(_ group: PGroup, to name: String, hue: GroupHue? = nil) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        if let hue { GroupHue.pick(hue, for: group.id) }
 
         guard Config.isLiveBackend else {
             replaceGroup(group.id) {
                 PGroup(id: $0.id, name: trimmed, hue: hue ?? $0.hue, members: $0.members,
-                       note: $0.note, ownerId: $0.ownerId)
+                       note: $0.note, ownerId: $0.ownerId,
+                       hueIsChosen: hue != nil || $0.hueIsChosen)
             }
             return true
         }
         do {
-            try await SupabaseClient.shared.update("groups", values: GroupRename(name: trimmed),
-                                                   match: ["id": "eq.\(group.id)"])
+            try await SupabaseClient.shared.update(
+                "groups", values: GroupRename(name: trimmed, hue: hue?.rawValue),
+                match: ["id": "eq.\(group.id)"])
             await refreshGroups()
             return true
         } catch {
@@ -1111,18 +1146,16 @@ final class AppModel: ObservableObject {
         guard !trimmed.isEmpty else { return false }
 
         guard Config.isLiveBackend, let uid = userId else {
-            let id = UUID().uuidString
-            if let hue { GroupHue.pick(hue, for: id) }
-            groups.append(PGroup(id: id, name: trimmed,
-                                 hue: hue ?? GroupHue.forName(trimmed), members: members, note: ""))
+            groups.append(PGroup(id: UUID().uuidString, name: trimmed,
+                                 hue: hue ?? GroupHue.forName(trimmed), members: members, note: "",
+                                 hueIsChosen: hue != nil))
             return true
         }
 
         do {
             // Read the row back for its generated id — the memberships need it.
             let created: [GroupRefDTO] = try await SupabaseClient.shared.insertReturning(
-                "groups", values: NewGroupInsert(name: trimmed, owner_id: uid))
-            if let group = created.first, let hue { GroupHue.pick(hue, for: group.id) }
+                "groups", values: NewGroupInsert(name: trimmed, owner_id: uid, hue: hue?.rawValue))
             if let group = created.first, !members.isEmpty {
                 try await SupabaseClient.shared.insert("group_memberships", values: members.map {
                     MembershipInsert(group_id: group.id, user_id: $0.id, role: "member")
@@ -1142,7 +1175,7 @@ final class AppModel: ObservableObject {
         guard Config.isLiveBackend else {
             replaceGroup(group.id) { PGroup(id: $0.id, name: $0.name, hue: $0.hue,
                                             members: $0.members + members, note: $0.note,
-                                            ownerId: $0.ownerId) }
+                                            ownerId: $0.ownerId, hueIsChosen: $0.hueIsChosen) }
             return true
         }
         do {
@@ -1162,7 +1195,8 @@ final class AppModel: ObservableObject {
         guard Config.isLiveBackend else {
             replaceGroup(group.id) { PGroup(id: $0.id, name: $0.name, hue: $0.hue,
                                             members: $0.members.filter { $0.id != member.id },
-                                            note: $0.note, ownerId: $0.ownerId) }
+                                            note: $0.note, ownerId: $0.ownerId,
+                                            hueIsChosen: $0.hueIsChosen) }
             return true
         }
         do {

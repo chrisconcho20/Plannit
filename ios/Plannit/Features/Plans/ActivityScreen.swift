@@ -1,7 +1,7 @@
 import SwiftUI
 
-// ActivityScreen — what everyone else has been doing. Votes, plans, shares,
-// friend requests and joins, in one list.
+// ActivityScreen — what everyone else has been doing. Invitations, answers to
+// your plans, shares, friend requests and joins, in one list.
 //
 // Built from `my_activity()`, which derives the feed from rows we already have
 // rather than writing an events table.
@@ -22,7 +22,7 @@ struct ActivityScreen: View {
                     SkeletonList(count: 4).padding(.horizontal, Space.gutter)
                 } else if model.activity.isEmpty {
                     EmptyState(icon: "bell", title: "All quiet",
-                               message: "Votes, new plans and shared events land here as your groups get going.")
+                               message: "Invitations, answers to your plans and shared events land here as your groups get going.")
                 } else {
                     VStack(spacing: Space.gapInline) {
                         ForEach(model.activity) { item in

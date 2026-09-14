@@ -62,25 +62,37 @@ struct Avatar: View {
 }
 
 struct AvatarStack: View {
-    let names: [String]
+    let people: [PMember]
     var size: CGFloat = 32
     var max: Int = 4
 
+    /// Real people: each face uses the colour or photo they chose.
+    init(members: [PMember], size: CGFloat = 32, max: Int = 4) {
+        self.people = members
+        self.size = size
+        self.max = max
+    }
+
+    /// Names only, for sample rows with no profile behind them.
+    init(names: [String], size: CGFloat = 32, max: Int = 4) {
+        self.init(members: PMember.named(names), size: size, max: max)
+    }
+
     /// "Maya, Theo and 4 others" — VoiceOver would otherwise read initials.
     private var spoken: String {
-        guard !names.isEmpty else { return "" }
-        let shown = Array(names.prefix(2))
-        let extra = names.count - shown.count
+        guard !people.isEmpty else { return "" }
+        let shown = people.prefix(2).map(\.name)
+        let extra = people.count - shown.count
         if extra <= 0 { return shown.joined(separator: " and ") }
         return "\(shown.joined(separator: ", ")) and \(extra) other\(extra == 1 ? "" : "s")"
     }
 
     var body: some View {
-        let shown = Array(names.prefix(max))
-        let extra = names.count - shown.count
+        let shown = Array(people.prefix(max))
+        let extra = people.count - shown.count
         HStack(spacing: -size * 0.3) {
-            ForEach(Array(shown.enumerated()), id: \.offset) { _, n in
-                Avatar(name: n, size: size)
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, person in
+                Avatar(name: person.name, size: size, hue: person.hue, imageURL: person.avatarURL)
                     .overlay(Circle().strokeBorder(Color.surface, lineWidth: 2))
             }
             if extra > 0 {

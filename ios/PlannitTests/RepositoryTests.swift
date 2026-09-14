@@ -133,7 +133,58 @@ final class RepositoryTests: XCTestCase {
                      "a value the app doesn't know must not take the whole query down")
     }
 
+    func testAGroupCarriesTheColourItsOwnerChose() async throws {
+        StubTransport.on("/groups", body: """
+        [{"id": "g1", "name": "Soccer", "owner_id": "me", "avatar_url": null, "hue": "rose",
+          "group_memberships": []},
+         {"id": "g2", "name": "Family", "owner_id": "me", "avatar_url": null, "hue": null,
+          "group_memberships": []}]
+        """)
+        let groups = try await repo.fetchGroups()
+
+        XCTAssertEqual(groups.first?.hue, .rose)
+        XCTAssertEqual(groups.first?.hueIsChosen, true)
+        XCTAssertEqual(groups.last?.hue, GroupHue.forName("Family"))
+        XCTAssertEqual(groups.last?.hueIsChosen, false,
+                       "a derived colour must not be mistaken for a choice, or the "
+                       + "one-time upload of device picks would never run")
+    }
+
+    func testTheFeedReadsADecline() async throws {
+        StubTransport.on("/rpc/my_activity", body: """
+        [{"kind": "declined", "happened_at": "2026-09-05T13:00:00+00:00",
+          "actor_name": "Sam", "title": "Five-a-side", "subtitle": null,
+          "group_id": null, "event_id": "e1"}]
+        """)
+        let feed = try await repo.fetchActivity(limit: 50)
+
+        let row = try XCTUnwrap(feed.first, "an unknown kind is dropped, so this is the whole test")
+        XCTAssertEqual(row.kind, .declined)
+        XCTAssertEqual(row.sentence, "Sam can't make Five-a-side")
+        XCTAssertEqual(row.eventId, "e1", "the organiser can open the plan from the row")
+    }
+
     // MARK: - Writes: the request we actually send
+
+    func testRenamingWithoutANewColourLeavesTheColourAlone() async throws {
+        StubTransport.on("/groups", body: "")
+        try await client.update("groups", values: GroupRename(name: "Football"),
+                                match: ["id": "eq.g1"])
+
+        let body = try XCTUnwrap(StubTransport.sent(to: "/groups"))
+        XCTAssertTrue(body.contains("\"name\":\"Football\""), body)
+        XCTAssertFalse(body.contains("hue"),
+                       "a null hue in the PATCH would wipe the owner's choice: \(body)")
+    }
+
+    func testANewGroupSendsItsColour() async throws {
+        StubTransport.on("/groups", body: "")
+        try await client.insert("groups", values: NewGroupInsert(name: "Soccer", owner_id: "me",
+                                                                hue: "teal"))
+
+        let body = try XCTUnwrap(StubTransport.sent(to: "/groups"))
+        XCTAssertTrue(body.contains("\"hue\":\"teal\""), body)
+    }
 
     func testCreatingAnEventAsksForTheRowBack() async throws {
         StubTransport.on("/events", body: "[{\"id\": \"new-1\"}]")

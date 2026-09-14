@@ -70,7 +70,7 @@ struct GroupsScreen: View {
                         } content: {
                             NavigationLink(value: group) {
                                 GroupCard(name: group.name, note: group.note, hue: group.hue,
-                                          members: group.memberNames)
+                                          members: group.members)
                             }
                             .buttonStyle(CardPressStyle())
                         }
@@ -156,14 +156,14 @@ struct GroupDetailView: View {
                     RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                         .fill(Color.white.opacity(0.25)).frame(width: 52, height: 52)
                         .overlay(PIcon("users", size: 26, color: .white, weight: .semibold))
-                    Text(group.name).textStyle(.title1, color: .white)
-                    Text(group.note).textStyle(.subhead, color: .white.opacity(0.9))
-                    AvatarStack(names: live.memberNames, size: 30, max: 6)
+                    Text(live.name).textStyle(.title1, color: .white)
+                    Text(live.note).textStyle(.subhead, color: .white.opacity(0.9))
+                    AvatarStack(members: live.members, size: 30, max: 6)
                 }
                 .padding(Space.gutter)
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(group.hue.color)
+                .background(live.hue.color)
 
                 PlannitButton(title: "Find a date for this group", variant: .free, size: .lg,
                               icon: "wand-sparkles", fullWidth: true) { showNewPlan = true }
@@ -484,8 +484,8 @@ struct PeoplePicker: View {
 }
 
 
-// Rename a group and pick its colour. The name is stored server-side; the hue
-// is remembered on this device until `groups` grows a column for it.
+// Rename a group and pick its colour. Both live on the `groups` row, so every
+// member sees the change.
 struct RenameGroupSheet: View {
     let group: PGroup
 
@@ -516,7 +516,7 @@ struct RenameGroupSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("COLOUR").textStyle(.overline, color: .textFaint)
                     HuePicker(selection: $hue)
-                    Text("The colour is saved on this device for now.")
+                    Text("Everyone in the group sees this colour.")
                         .textStyle(.caption, color: .textMuted)
                 }
                 if let errorText {
@@ -538,7 +538,9 @@ struct RenameGroupSheet: View {
         saving = true
         errorText = nil
         Task {
-            let ok = await model.renameGroup(group, to: trimmed, hue: hue)
+            // Unchanged means unsent: a group still on its name-derived colour
+            // should keep following its name.
+            let ok = await model.renameGroup(group, to: trimmed, hue: hue == group.hue ? nil : hue)
             saving = false
             if ok { dismiss() } else { errorText = "Couldn't save that. Only the owner can rename a group." }
         }

@@ -111,25 +111,27 @@ enum GroupHue: String, CaseIterable, Codable {
 
     // MARK: Chosen hues
     //
-    // `groups` has no hue column, so a picked colour is remembered on this
-    // device and falls back to the name-derived one. That keeps the picker
-    // honest without a migration; add the column and this store goes away.
+    // A group's colour is stored on `groups.hue` (migration 0017). Before that
+    // column existed, a picked colour lived in UserDefaults on the device that
+    // picked it. What remains of that store is read once, uploaded by the
+    // group's owner, and forgotten — see AppModel.uploadDeviceHues.
 
-    private static let pickedKey = "plannit.groupHues"
+    static let legacyPickedKey = "plannit.groupHues"
 
-    static func picked(for groupId: String) -> GroupHue? {
-        let map = UserDefaults.standard.dictionary(forKey: pickedKey) as? [String: String] ?? [:]
+    /// A colour picked on this device before it could be saved to the group.
+    static func legacyPick(for groupId: String) -> GroupHue? {
+        let map = UserDefaults.standard.dictionary(forKey: legacyPickedKey) as? [String: String] ?? [:]
         return map[groupId].flatMap(GroupHue.init(rawValue:))
     }
 
-    static func pick(_ hue: GroupHue, for groupId: String) {
-        var map = UserDefaults.standard.dictionary(forKey: pickedKey) as? [String: String] ?? [:]
-        map[groupId] = hue.rawValue
-        UserDefaults.standard.set(map, forKey: pickedKey)
+    static func forgetLegacyPick(for groupId: String) {
+        var map = UserDefaults.standard.dictionary(forKey: legacyPickedKey) as? [String: String] ?? [:]
+        map[groupId] = nil
+        UserDefaults.standard.set(map, forKey: legacyPickedKey)
     }
 
-    /// The hue to draw a group in: your choice, else derived from the name.
-    static func forGroup(id: String, name: String) -> GroupHue {
-        picked(for: id) ?? forName(name)
+    /// The hue to draw a group in: the owner's choice, else derived from the name.
+    static func forGroup(stored: String?, name: String) -> GroupHue {
+        GroupHue(rawValue: stored ?? "") ?? forName(name)
     }
 }

@@ -9,7 +9,8 @@ struct SlotCard: View {
     let time: String
     let freeCount: Int
     let total: Int
-    var people: [String] = []
+    /// Who's free then, from the scheduler's `availableUserIds`.
+    var people: [PMember] = []
     var best: Bool = false
     var selected: Bool = false
 
@@ -50,7 +51,7 @@ struct SlotCard: View {
                               tone: allFree ? .free : .neutral,
                               icon: allFree ? "check" : nil)
                         Spacer(minLength: 0)
-                        if !people.isEmpty { AvatarStack(names: people, size: 24, max: 4) }
+                        if !people.isEmpty { AvatarStack(members: people, size: 24, max: 4) }
                     }
                 }
                 // A pick-one list, not a drill-down: the trailing mark says

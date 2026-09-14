@@ -38,6 +38,8 @@ struct PGroup: Identifiable, Hashable {
     let note: String
     /// nil in demo mode, where there's nobody to check against.
     var ownerId: String? = nil
+    /// False when `hue` is only derived from the name — nobody has picked one.
+    var hueIsChosen: Bool = false
 
     var memberNames: [String] { members.map(\.name) }
     func isOwned(by userId: String?) -> Bool {
@@ -165,6 +167,9 @@ struct PActivity: Identifiable, Hashable {
         case invited
         /// Someone said they're going to a plan of yours.
         case rsvp
+        /// Someone can't make a plan you organised. Only the organiser is told
+        /// (0017) — everyone else still just sees the count.
+        case declined
         case eventShared = "event_shared"
         case friendRequest = "friend_request"
         case joinedGroup = "joined_group"
@@ -186,6 +191,7 @@ struct PActivity: Identifiable, Hashable {
         switch kind {
         case .invited:       return "wand-sparkles"
         case .rsvp:          return "calendar-check"
+        case .declined:      return "calendar-x"
         case .eventShared:   return "share-2"
         case .friendRequest: return "user-plus"
         case .joinedGroup:   return "users"
@@ -196,6 +202,7 @@ struct PActivity: Identifiable, Hashable {
         switch kind {
         case .invited:       return .teal
         case .rsvp:          return .indigo
+        case .declined:      return .amber
         case .eventShared:   return .coral
         case .friendRequest: return .rose
         case .joinedGroup:   return .sky
@@ -206,6 +213,7 @@ struct PActivity: Identifiable, Hashable {
         switch kind {
         case .invited:       return "\(actor) wants to plan \(title)"
         case .rsvp:          return "\(actor) is going to \(title)"
+        case .declined:      return "\(actor) can't make \(title)"
         case .eventShared:   return "\(actor) shared \(title)"
         case .friendRequest: return "\(actor) wants to be friends"
         case .joinedGroup:   return "\(actor) joined \(title)"

@@ -82,6 +82,8 @@ struct GroupDTO: Decodable, Identifiable {
     let name: String
     let owner_id: String
     let avatar_url: String?
+    /// The owner's chosen colour (0017). Nil means derive it from the name.
+    var hue: String? = nil
     let group_memberships: [MembershipEmbedDTO]?   // PostgREST embedded resource
 }
 struct MembershipEmbedDTO: Decodable {
@@ -98,6 +100,7 @@ struct ProfileEmbedDTO: Decodable {
 struct NewGroupInsert: Encodable {
     let name: String
     let owner_id: String
+    var hue: String? = nil
 }
 struct GroupRefDTO: Decodable { let id: String }
 struct MembershipInsert: Encodable {
@@ -182,7 +185,12 @@ struct EventUpdate: Encodable {
 }
 /// Soft delete — the sync contract wants a tombstone, not a vanished row.
 struct EventTombstone: Encodable { let deleted_at: String }
-struct GroupRename: Encodable { let name: String }
+/// A nil hue is omitted from the PATCH, so renaming leaves the colour alone.
+struct GroupRename: Encodable {
+    let name: String
+    var hue: String? = nil
+}
+struct GroupHueUpdate: Encodable { let hue: String }
 struct EventShareInsert: Encodable {
     let event_id: String
     let group_id: String

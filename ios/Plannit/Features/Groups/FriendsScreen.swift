@@ -36,7 +36,9 @@ struct FriendsScreen: View {
                 SectionLabel("Friends") {
                     Text("\(model.friends.count)").textStyle(.caption, color: .textFaint)
                 }
-                if model.friends.isEmpty {
+                if model.firstLoad(of: model.friends) {
+                    SkeletonList(count: 3).padding(.horizontal, Space.gutter)
+                } else if model.friends.isEmpty {
                     EmptyState(icon: "user-plus", title: "No friends yet",
                                message: "Add someone by the email they signed up with — or send a group invite link, which makes you friends automatically.",
                                actionTitle: "Add a friend") { showAdd = true }

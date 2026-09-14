@@ -51,8 +51,9 @@ struct SupabaseRepository: DataRepository {
                                avatarURL: profile?.avatar_url)
             }
             return PGroup(id: dto.id, name: dto.name,
-                          hue: GroupHue.forGroup(id: dto.id, name: dto.name),
-                          members: members, note: "", ownerId: dto.owner_id)
+                          hue: GroupHue.forGroup(stored: dto.hue, name: dto.name),
+                          members: members, note: "", ownerId: dto.owner_id,
+                          hueIsChosen: GroupHue(rawValue: dto.hue ?? "") != nil)
         }
     }
 
@@ -186,8 +187,9 @@ struct SupabaseRepository: DataRepository {
                            avatarURL: m.profiles?.avatar_url)
         }
         return PGroup(id: dto.id, name: dto.name,
-                      hue: GroupHue.forGroup(id: dto.id, name: dto.name),
-                      members: members, note: "", ownerId: dto.owner_id)
+                      hue: GroupHue.forGroup(stored: dto.hue, name: dto.name),
+                      members: members, note: "", ownerId: dto.owner_id,
+                      hueIsChosen: GroupHue(rawValue: dto.hue ?? "") != nil)
     }
 
     /// "Private" is only true of your own unshared events. Something shared

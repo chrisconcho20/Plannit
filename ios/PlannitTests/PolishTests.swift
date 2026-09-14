@@ -37,24 +37,42 @@ final class PolishTests: XCTestCase {
 
     // MARK: group colour
 
-    func testAPickedHueWinsOverTheDerivedOne() {
-        let id = "group-\(UUID().uuidString)"
+    func testAStoredHueWinsOverTheDerivedOne() {
         let derived = GroupHue.forName("Soccer")
         let other = GroupHue.allCases.first { $0 != derived }!
 
-        XCTAssertEqual(GroupHue.forGroup(id: id, name: "Soccer"), derived, "no choice yet")
-        GroupHue.pick(other, for: id)
-        XCTAssertEqual(GroupHue.forGroup(id: id, name: "Soccer"), other)
-        XCTAssertEqual(GroupHue.picked(for: id), other)
+        XCTAssertEqual(GroupHue.forGroup(stored: nil, name: "Soccer"), derived, "no choice yet")
+        XCTAssertEqual(GroupHue.forGroup(stored: other.rawValue, name: "Soccer"), other)
+        XCTAssertEqual(GroupHue.forGroup(stored: "chartreuse", name: "Soccer"), derived,
+                       "a value the app doesn't know falls back rather than failing")
     }
 
-    func testHuesAreRememberedPerGroup() {
-        let a = "group-a-\(UUID().uuidString)", b = "group-b-\(UUID().uuidString)"
-        GroupHue.pick(.teal, for: a)
-        GroupHue.pick(.rose, for: b)
-        XCTAssertEqual(GroupHue.picked(for: a), .teal)
-        XCTAssertEqual(GroupHue.picked(for: b), .rose)
-        XCTAssertNil(GroupHue.picked(for: "group-never-picked"))
+    func testALegacyDevicePickIsReadOnceThenForgotten() {
+        let id = "group-\(UUID().uuidString)"
+        var map = UserDefaults.standard.dictionary(forKey: GroupHue.legacyPickedKey)
+            as? [String: String] ?? [:]
+        map[id] = GroupHue.rose.rawValue
+        UserDefaults.standard.set(map, forKey: GroupHue.legacyPickedKey)
+
+        XCTAssertEqual(GroupHue.legacyPick(for: id), .rose)
+        GroupHue.forgetLegacyPick(for: id)
+        XCTAssertNil(GroupHue.legacyPick(for: id))
+    }
+
+    func testOnlyANameOrColourChangeCountsAsAppearance() {
+        let before = [PGroup(id: "g1", name: "Soccer", hue: .teal, members: [], note: "")]
+        let renamed = [PGroup(id: "g1", name: "Football", hue: .teal, members: [], note: "")]
+        let recoloured = [PGroup(id: "g1", name: "Soccer", hue: .rose, members: [], note: "")]
+        let joined = [PGroup(id: "g1", name: "Soccer", hue: .teal,
+                             members: [PMember(id: "kit", name: "Kit")], note: "")]
+        let added = before + [PGroup(id: "g2", name: "Family", hue: .sky, members: [], note: "")]
+
+        XCTAssertTrue(AppModel.appearanceChanged(from: before, to: renamed))
+        XCTAssertTrue(AppModel.appearanceChanged(from: before, to: recoloured))
+        XCTAssertFalse(AppModel.appearanceChanged(from: before, to: joined),
+                       "a membership change doesn't touch how events are drawn")
+        XCTAssertFalse(AppModel.appearanceChanged(from: before, to: added),
+                       "a new group has no events mapped against an old name yet")
     }
 
     func testDerivedHueIsStableForAName() {

@@ -6,7 +6,7 @@ struct GroupCard: View {
     let name: String
     var note: String? = nil
     var hue: GroupHue = .coral
-    var members: [String] = []
+    var members: [PMember] = []
     var icon: String = "users"
 
     var body: some View {
@@ -22,7 +22,7 @@ struct GroupCard: View {
                     if let note { Text(note).textStyle(.footnote, color: .textMuted).lineLimit(1) }
                 }
                 Spacer(minLength: 0)
-                if !members.isEmpty { AvatarStack(names: members, size: 26, max: 3) }
+                if !members.isEmpty { AvatarStack(members: members, size: 26, max: 3) }
                 PIcon("chevron-right", size: 18, color: .textFaint)
             }
             .padding(.horizontal, 14)

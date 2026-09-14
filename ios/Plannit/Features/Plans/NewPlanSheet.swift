@@ -41,6 +41,13 @@ struct NewPlanSheet: View {
     }
 
     private var total: Int { group?.members.count ?? 0 }
+
+    /// Demo turnout: the best slot has everyone, the rest are missing the last
+    /// member — so the cards show who's actually missing, as they do live.
+    private func sampleFree(everyone: Bool) -> [String] {
+        let ids = group?.members.map(\.id) ?? []
+        return everyone ? ids : Array(ids.dropLast())
+    }
     private var isLive: Bool { Config.isLiveBackend }
 
     /// Demo-mode stand-in for the scheduler's output: this weekend and the
@@ -61,7 +68,7 @@ struct NewPlanSheet: View {
                 from: FoundSlotDTO(start: Int64(start.timeIntervalSince1970 * 1000),
                                    end: Int64(end.timeIntervalSince1970 * 1000),
                                    score: i == 0 ? total : max(0, total - 1),
-                                   availableUserIds: []),
+                                   availableUserIds: sampleFree(everyone: i == 0)),
                 best: i == 0)
         }
     }
@@ -183,7 +190,7 @@ struct NewPlanSheet: View {
                 VStack(spacing: 14) {
                     PIcon("hourglass", size: 30, color: .statusFree)
                     Text("Checking everyone’s calendars…").textStyle(.headline, color: .textStrong)
-                    AvatarStack(names: group?.memberNames ?? [], size: 30, max: 6)
+                    AvatarStack(members: group?.members ?? [], size: 30, max: 6)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 30)
@@ -280,12 +287,9 @@ struct NewPlanSheet: View {
 
     /// The members actually free then — the scheduler tells us who, so show
     /// their faces rather than the first N people in the group.
-    private func people(for slot: PSlot) -> [String] {
+    private func people(for slot: PSlot) -> [PMember] {
         guard let group else { return [] }
-        guard !slot.availableIds.isEmpty else {
-            return Array(group.memberNames.prefix(slot.free))     // demo fallback
-        }
-        return group.members.filter { slot.availableIds.contains($0.id) }.map(\.name)
+        return SlotFinder.freeMembers(for: slot, in: group)
     }
 
     // MARK: Actions

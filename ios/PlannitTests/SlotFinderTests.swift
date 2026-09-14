@@ -91,6 +91,21 @@ final class SlotFinderTests: XCTestCase {
         XCTAssertFalse(slot.best)
     }
 
+    func testTheFacesOnASlotAreTheMembersWhoAreFree() {
+        let group = PGroup(id: "g1", name: "Soccer", hue: .teal,
+                           members: [PMember(id: "a", name: "Ada"), PMember(id: "b", name: "Ben"),
+                                     PMember(id: "c", name: "Cy")],
+                           note: "")
+        let slot = PSlot(day: "SAT", date: 5, time: "2:00 – 4:00 PM", free: 2,
+                         availableIds: ["c", "a", "gone"])
+
+        XCTAssertEqual(SlotFinder.freeMembers(for: slot, in: group).map(\.id), ["a", "c"],
+                       "the members free, in group order — not the first two in the group, "
+                       + "and nobody who has since left")
+        XCTAssertTrue(SlotFinder.freeMembers(
+            for: PSlot(day: "SUN", date: 6, time: "", free: 0), in: group).isEmpty)
+    }
+
     // MARK: the search window preference
 
     func testSearchWindowFallsBackWhenUnsetOrJunk() {

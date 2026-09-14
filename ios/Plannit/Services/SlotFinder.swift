@@ -111,6 +111,13 @@ enum SlotFinder {
                      endsAt: end)
     }
 
+    /// The group's members the scheduler found free for this slot, in the
+    /// group's own order. Anyone free who has since left the group is dropped.
+    static func freeMembers(for slot: PSlot, in group: PGroup) -> [PMember] {
+        let free = Set(slot.availableIds)
+        return group.members.filter { free.contains($0.id) }
+    }
+
     /// "2:00 – 4:00 PM" — the meridiem is only repeated when it changes.
     private static func timeRange(_ start: Date, _ end: Date) -> String {
         let full = DateFormatter(); full.dateFormat = "h:mm a"
