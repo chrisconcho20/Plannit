@@ -118,9 +118,9 @@ account. See §6 for URLs/creds.
 6. ~~**Friends**~~ ✅ **structure done (2026-08-14).** `0005_friends_beta.sql`
    adds `app_config` (runtime switches), the `auto_friend_everyone` trigger and
    backfill, and three SECURITY DEFINER functions — `my_friends`,
-   `my_friend_requests`, `find_profile_by_email` — for the things RLS correctly
+   `my_friend_requests`, `find_profile_by_handle` (0019, replacing the email lookup) — for the things RLS correctly
    hides. You → **Friends**: accept/decline incoming, remove a friend, see
-   outgoing, add by exact email. Group pickers draw from friends, falling back
+   outgoing, add by `username#code`. Group pickers draw from friends, falling back
    to visible co-members.
    **Beta behaviour:** every new account is auto-friended to everyone, so
    testing needs no request dance. Switching it off is an UPDATE on `app_config`.
@@ -211,8 +211,9 @@ to become. Individually sensible, collectively a security incident.
 - **RLS helper functions answer about anyone** — `are_friends(a, b)` and friends
   take arbitrary ids and are executable by any authenticated user. Fix needs a
   careful rewrite of 0002's policies: [`security-review.md`](security-review.md) §4.
-- **Reaching a stranger needs their exact email** — by design; invite links are
-  the way around it.
+- **Reaching a stranger needs their `username#code`** — by design; the code is
+  shown only on their own You tab, and invite links are the other way in.
+  Codes are unique across 1,000,000 values; a longer code is the path past that.
 
 ## 4. Small backlog
 - Avatar images (initials only today); group avatars; timezone-aware display for

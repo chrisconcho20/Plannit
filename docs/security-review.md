@@ -111,13 +111,16 @@ means rewriting the policies in 0002 and updating `find-slots`, which calls
 against a database from here, and a mistake in it locks everyone out. Worth
 doing deliberately, not as a footnote to a review.
 
-## 5. Email existence oracle — LOW, accepted
+## 5. Email existence oracle — LOW → resolved (0019)
 
-`find_profile_by_email` tells any authenticated caller whether a given email has
-a Plannit account, with no rate limit, and returns the display name. That's the
-deliberate trade for being able to add a friend at all, and it's what most apps
-do — but it does mean the account list is testable if you can guess emails.
-Invite links (0007) reduce how often anyone needs it.
+`find_profile_by_email` told any authenticated caller whether a given email had
+a Plannit account, with no rate limit, and returned the display name.
+
+_2026-09-14:_ dropped. Friends are found by `find_profile_by_handle`, which needs
+a username and that account's permanent 6-digit code together, so an email
+address reveals nothing. What remains is guessing a code for a known username —
+up to a million tries, still unthrottled; see
+[`beta-to-production.md`](beta-to-production.md) §2.
 
 ## 6. Invite tokens travel in a query string — LOW → mitigated
 

@@ -196,7 +196,7 @@ exist because RLS deliberately hides what the client would otherwise need:
 |---|---|
 | `my_friends()` | `friendships` has two FKs to `profiles`, so an embed is ambiguous |
 | `my_friend_requests()` | a *pending* requester isn't a friend yet, so `profiles` RLS hides their name — you'd be judging a request from "Member" |
-| `find_profile_by_email(p_email)` | you can't see a stranger's profile at all. Exact, case-insensitive match, returns `id` + `display_name` only, so the directory can't be enumerated |
+| `find_profile_by_handle(p_username, p_code)` | you can't see a stranger's profile at all. Needs the username (case-insensitive) **and** the permanent 6-digit friend code (0019); returns `id`, `display_name`, `avatar_hue`, `avatar_url`. Replaces `find_profile_by_email` |
 
 Writes are plain table operations: insert a `pending` row to ask (RLS enforces
 `requester_id = auth.uid()`), update it to `accepted` to agree, delete to

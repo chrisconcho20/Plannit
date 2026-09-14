@@ -27,7 +27,7 @@ closing before open sign-up.
 
 - **Narrow the RLS helper signatures.** `are_friends(a, b)`, `is_group_member(group, user)` and friends are `SECURITY DEFINER`, take arbitrary ids and are executable by any authenticated user, so they answer "are these two people friends?" about anyone. The fix is one-argument versions using `auth.uid()` internally, which means rewriting 0002's policies and `find-slots`. Needs a database to test against — don't do it blind.
 - **Invite tokens ride in a query string**, so they land in Edge Function logs. Fine at beta scale given 14-day expiry, use caps and revocation; worth a POST exchange if invites ever carry more.
-- **`find_profile_by_email` has no rate limit** — it confirms whether an email has an account. Standard, but pair it with sign-up throttling eventually.
+- **`find_profile_by_handle` has no rate limit.** A lookup needs a username and a 6-digit code, so guessing someone takes up to a million tries per name. Add throttling before the user base makes common names worth enumerating.
 
 ## 3. Client build
 

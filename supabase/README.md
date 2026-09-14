@@ -30,7 +30,8 @@ supabase/
 │  ├─ 0015_activity_targets.sql    # my_activity() returns event_id, so rows open
 │  ├─ 0016_scale_indexes.sql       # indexes for the queries that run on a timer
 │  ├─ 0017_group_hue_activity_bounds.sql  # groups.hue, a 90-day feed, declines for organisers
-│  └─ 0018_provider_display_names.sql     # Google/Apple accounts get a display name
+│  ├─ 0018_provider_display_names.sql     # Google/Apple accounts get a display name
+│  └─ 0019_friend_codes.sql               # permanent 6-digit friend codes; find by username#code
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder
