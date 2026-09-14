@@ -132,9 +132,10 @@ available in this build.
 
 ## Known gaps
 
-- **Google button branding.** Google's guidelines expect the Google "G" mark on
-  the button; it is text-only today. Add the official asset before App Store
-  review.
+- **Google button font.** The button follows Google's light theme and uses the
+  official "G" (cropped from Google's `signin-assets.zip` at its native 20pt,
+  `Assets.xcassets/GoogleG.imageset`), but sets its label in the system font
+  rather than Google Sans Medium, which isn't bundled.
 - **The Google sheet names `supabase.co`.** iOS asks "Plannit wants to use
   supabase.co to sign in" because that is where the OAuth page lives. A Supabase
   custom domain changes it.

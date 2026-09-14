@@ -200,20 +200,16 @@ struct LiveSignInView: View {
 
     @ViewBuilder
     private var form: some View {
-        SignInWithAppleButton(.continue) { request in
+        AppleSignInButton { request in
             appleNonce = AppleSignIn.makeNonce()
             request.requestedScopes = [.fullName, .email]
             request.nonce = AppleSignIn.sha256(appleNonce)
         } onCompletion: { result in
             run { await model.signInWithApple(result, nonce: appleNonce) }
         }
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 50)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .disabled(busy)
 
-        PlannitButton(title: "Continue with Google", variant: .outline, size: .lg,
-                      fullWidth: true) {
+        GoogleSignInButton {
             run { await model.signInWithGoogle() }
         }
         .disabled(busy)
