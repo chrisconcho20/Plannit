@@ -25,7 +25,7 @@ Each has a recommendation marked ★. All are now **Accepted** as of 2026-08-13.
 |---|---|---|---|---|
 | D-01 | Backend approach | Supabase / Firebase / Custom Node·Go | **Supabase** (Postgres + RLS fits per-group visibility; predictable cost; open-source escape hatch) | **Accepted** |
 | D-02 | Local persistence | GRDB / Core Data / SwiftData | **GRDB** (battle-tested SQLite) | Accepted |
-| D-03 | Auth methods | Apple first / Apple+email / Apple+phone | **Apple first**, add email later | Accepted |
+| D-03 | Auth methods | Apple first / Apple+email / Apple+phone | **Apple first**, add email later. _Revised 2026-09-14: Apple, Google and email + password; email confirmed once with a 6-digit code. Google is paired with Apple to satisfy App Store guideline 4.8. See [`backend/auth-setup.md`](backend/auth-setup.md)._ | Accepted |
 | D-04 | Cross-platform timing | iOS-first / iOS+Android now | **iOS-first**, keep backend platform-agnostic | Accepted |
 
 ### Sync & privacy

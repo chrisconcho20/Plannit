@@ -13,7 +13,7 @@ you know. Work top-down: the first section is what actually exposes data.
 
 | Setting | Beta | Production | Why |
 |---|---|---|---|
-| **Email confirmation** | Off (dashboard → Auth → Sign In / Providers → Email) | **On** | Off, anyone can register any address, including someone else's. Blocked on §4: the confirmation link points at `site_url` = `plannit://auth-callback`, a deep link with no web page behind it. Needs a real landing page first. |
+| **Email confirmation** | Off (dashboard → Auth → Sign In / Providers → Email) | **On** | Off, anyone can register any address, including someone else's. No longer blocked on a web page: the app confirms with a 6-digit code. Needs custom SMTP and the code templates first — order in [`backend/auth-setup.md`](backend/auth-setup.md). |
 | **`auto_friend_everyone`** | `true` | **`false`** — `update public.app_config set value = 'false' where key = 'auto_friend_everyone';` | Every new account is instantly friends with every existing one, so a stranger's first screen lists every user's name. Existing friendships survive the flip. |
 | **Test accounts** | 5 × `@plannit.test`, shared password, in your groups | **Delete them** | They're real, sign-in-able accounts auto-friended to everyone. `delete from auth.users where email like '%@plannit.test';` cascades to profiles, memberships and busy blocks. |
 | **`seed-test-users.sql`** | Run against the live project | **Never run** | It writes directly into `auth.users`. Point it at a staging project or retire it. |
@@ -38,8 +38,9 @@ closing before open sign-up.
 
 ## 4. Not built, and needed before launch
 
-- **A web presence.** Password reset, email confirmation and the invite page's "get the app" fallback all need a real page. Currently `site_url` is a deep link, which is why §1's first row is blocked.
-- **Sign in with Apple.** The entitlement exists and `AppModel.signInWithApple()` is written, but no view calls it and the Supabase Apple provider isn't configured. Requires the $99 account. Apple *requires* it if you offer other social logins — worth checking against review guidelines before submitting.
+- **A web presence.** The invite page's "get the app" fallback needs a real page. Password reset and email confirmation no longer do: both use codes entered in the app.
+- **Custom SMTP.** Supabase's built-in sender delivers only to the project's team members, 2 emails an hour. Confirmation and password reset can't reach real users without it. [`backend/auth-setup.md`](backend/auth-setup.md) §2.
+- **Sign in with Apple and Google.** Both are on the sign-in screen. Apple needs the $99 account, the entitlement switched back (§3) and the provider's Client IDs set; Google needs a Google Cloud OAuth client. Google must not reach the App Store without Apple alongside it (guideline 4.8).
 - **Push notifications.** The whole server half is built (`send-push`, 0004's triggers, the APNs signer). Needs the paid account, an APNs key, and the two Vault secrets (`internal_function_secret`, `functions_base_url`) — without them `notify_push()` silently no-ops.
 - **Privacy nutrition labels.** Calendar data is sensitive and this app reads it. Be precise: event details never leave the device (decision D-17); only opaque busy ranges are uploaded.
 - **Crash reporting** (Sentry, per the proposal) — nothing today.

@@ -89,12 +89,10 @@ select vault.create_secret('https://<PROJECT_REF>.supabase.co/functions/v1', 'fu
 
 Needs the $99/yr program.
 
-**Sign in with Apple**
-- App ID with "Sign in with Apple" capability.
-- A **Services ID** → this is your `APPLE_CLIENT_ID`.
-- A **Sign in with Apple key** → used to generate `APPLE_SECRET`.
-- In Supabase: Auth → Providers → **Apple** → enable, paste client id + secret.
-- Redirect / deep link: `plannit://auth-callback` (already in `config.toml`).
+**Sign in with Apple** — the app uses the native identity-token flow, which
+needs the App ID capability and the bundle id under the Apple provider's
+**Client IDs**, and no Services ID or secret. Full steps, with Google and email
+confirmation: [`auth-setup.md`](auth-setup.md).
 
 **APNs (push)**
 - Create an **APNs Auth Key (.p8)** in Certificates, Identifiers & Profiles.
