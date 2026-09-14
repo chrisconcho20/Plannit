@@ -228,8 +228,13 @@ struct LiveSignInView: View {
         .onChange(of: creating) { _, _ in message = nil; confirm = "" }
 
         if creating {
-            PTextField(placeholder: "Your name", text: $name, icon: "user")
-                .textContentType(.name)
+            PTextField(placeholder: "Username", text: $name, icon: "user")
+                .textContentType(.nickname)
+                .autocorrectionDisabled()
+                .onChange(of: name) { _, typed in
+                    let allowed = UsernameRules.limitTyping(typed)
+                    if allowed != typed { name = allowed }
+                }
         }
         emailField
 
@@ -252,7 +257,7 @@ struct LiveSignInView: View {
         .opacity(busy || !formReady ? 0.5 : 1)
 
         if creating {
-            Text("Your name is what your groups see. You can change it later.")
+            Text("Your username is what your groups see. You can change it later.")
                 .textStyle(.caption, color: .textFaint)
                 .multilineTextAlignment(.center)
         } else {

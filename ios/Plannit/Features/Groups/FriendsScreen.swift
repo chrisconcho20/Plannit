@@ -1,7 +1,7 @@
 import SwiftUI
 
 // FriendsScreen — who you can plan with. Requests in, requests out, and adding
-// someone by email.
+// someone by their username and friend code.
 //
 // While the beta's `auto_friend_everyone` switch is on, every new account is
 // friends with everyone automatically, so this list fills itself and the
@@ -40,7 +40,7 @@ struct FriendsScreen: View {
                     SkeletonList(count: 3).padding(.horizontal, Space.gutter)
                 } else if model.friends.isEmpty {
                     EmptyState(icon: "user-plus", title: "No friends yet",
-                               message: "Add someone by the email they signed up with — or send a group invite link, which makes you friends automatically.",
+                               message: "Add someone with their username and friend code — or send a group invite link, which makes you friends automatically.",
                                actionTitle: "Add a friend") { showAdd = true }
                 } else {
                     VStack(spacing: Space.gapInline) {
@@ -145,25 +145,30 @@ struct FriendsScreen: View {
     }
 }
 
-// Add someone by the email they signed up with. Exact match only — the lookup
-// can't be used to browse who else is on Plannit.
+// Add someone by their handle: the username they chose plus the 6-digit code
+// from their You tab, e.g. `maya#482913`. Both halves must match — the lookup
+// won't search by name alone, so nobody can browse who's on Plannit.
 struct AddFriendSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var email = ""
+    @State private var handle = ""
     @State private var searching = false
     @State private var found: PMember?
     @State private var message: String?
+
+    private var parsed: (username: String, code: String)? { FriendHandle.parse(handle) }
 
     var body: some View {
         VStack(spacing: 0) {
             SheetHeader(title: "Add a friend") { dismiss() }
             VStack(alignment: .leading, spacing: 14) {
-                Text("THEIR EMAIL").textStyle(.overline, color: .textFaint)
-                PTextField(placeholder: "name@example.com", text: $email, icon: "user")
+                Text("THEIR USERNAME AND CODE").textStyle(.overline, color: .textFaint)
+                PTextField(placeholder: "username#123456", text: $handle, icon: "user")
                     .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .onSubmit { if parsed != nil { lookUp() } }
 
                 if let found {
                     HStack(spacing: 12) {
@@ -184,10 +189,10 @@ struct AddFriendSheet: View {
 
                 PlannitButton(title: searching ? "Looking…" : "Find them", variant: .secondary,
                               size: .lg, icon: "search", fullWidth: true) { lookUp() }
-                    .disabled(searching || email.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .opacity(searching || email.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+                    .disabled(searching || handle.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(searching || handle.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
 
-                Text("You need the exact address they signed up with — Plannit won't list who else is on it.")
+                Text("Ask for their username and the 6-digit code shown next to it on their You tab.")
                     .textStyle(.caption, color: .textFaint)
             }
             .padding(Space.gutter)
@@ -198,15 +203,19 @@ struct AddFriendSheet: View {
     }
 
     private func lookUp() {
+        found = nil
+        guard let parsed else {
+            message = "Add the # and their 6-digit code, like maya#482913."
+            return
+        }
         searching = true
         message = nil
-        found = nil
         Task {
-            let person = await model.findPerson(email: email)
+            let person = await model.findPerson(username: parsed.username, code: parsed.code)
             searching = false
             found = person
             if person == nil {
-                message = "No Plannit account with that email."
+                message = "Nobody on Plannit has that username and code."
             } else if model.friends.contains(where: { $0.id == person?.id }) {
                 found = nil
                 message = "You're already friends."
@@ -218,7 +227,7 @@ struct AddFriendSheet: View {
         Task {
             let ok = await model.sendFriendRequest(to: person)
             message = ok ? "Request sent to \(person.name)." : "Couldn't send that request."
-            if ok { found = nil; email = "" }
+            if ok { found = nil; handle = "" }
         }
     }
 }

@@ -232,7 +232,7 @@ struct YouScreen: View {
                     Avatar(name: model.displayName, size: 60,
                            hue: model.avatarHue, imageURL: model.avatarURL)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(model.displayName).textStyle(.title3, color: .textStrong)
+                        handle
                         Text(model.userEmail ?? (model.isLiveBackend ? "Signed in" : "Demo mode"))
                             .textStyle(.footnote, color: .textMuted)
                     }
@@ -436,12 +436,32 @@ struct YouScreen: View {
             : "\(off) switched off"
     }
 
+    /// Your username, and — only here — the code that makes it findable. The
+    /// code is quieter on purpose: it's for handing to someone who wants to add
+    /// you, not part of the name.
+    private var handle: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text(model.displayName).textStyle(.title3, color: .textStrong)
+            if let code = model.friendCode {
+                Text("#\(code)")
+                    .textStyle(.subhead, color: .textMuted)
+                    .opacity(0.75)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(model.friendCode.map {
+            "\(model.displayName), friend code \($0.map(String.init).joined(separator: " "))"
+        } ?? model.displayName)
+    }
+
     private func nameRow() -> some View {
         Button { showRename = true } label: {
             HStack(spacing: 12) {
                 PIcon("user", size: 20, color: .textMuted).frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Name and avatar").textStyle(.headline, color: .textStrong)
+                    Text("Username and avatar").textStyle(.headline, color: .textStrong)
                     Text("Everyone in your groups sees these")
                         .textStyle(.caption, color: .textMuted)
                 }

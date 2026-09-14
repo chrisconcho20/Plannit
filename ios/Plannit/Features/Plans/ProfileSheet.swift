@@ -32,9 +32,14 @@ struct ProfileSheet: View {
                 VStack(alignment: .leading, spacing: 20) {
                     preview
 
-                    fieldLabel("Name")
-                    PTextField(placeholder: "Your name", text: $name, icon: "user")
-                    Text("This is how you appear to everyone in your groups.")
+                    fieldLabel("Username")
+                    PTextField(placeholder: "Your username", text: $name, icon: "user")
+                        .autocorrectionDisabled()
+                        .onChange(of: name) { _, typed in
+                            let allowed = UsernameRules.limitTyping(typed)
+                            if allowed != typed { name = allowed }
+                        }
+                    Text("This is how you appear to everyone in your groups. Your friend code stays the same when you change it.")
                         .textStyle(.footnote, color: .textMuted)
 
                     fieldLabel("Colour")
@@ -72,7 +77,7 @@ struct ProfileSheet: View {
             Avatar(name: trimmed.isEmpty ? model.displayName : trimmed,
                    size: 72, hue: hue, imageURL: avatarURL)
             VStack(alignment: .leading, spacing: 2) {
-                Text(trimmed.isEmpty ? "Your name" : trimmed)
+                Text(trimmed.isEmpty ? "Your username" : trimmed)
                     .textStyle(.headline, color: .textStrong)
                 Text(avatarURL == nil ? "Initials on a colour" : "Your photo")
                     .textStyle(.caption, color: .textMuted)

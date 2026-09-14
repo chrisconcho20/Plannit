@@ -17,6 +17,9 @@ final class AppModel: ObservableObject {
     /// which is what everyone had before they could choose.
     @Published var avatarHue: GroupHue?
     @Published var avatarURL: String?
+    /// The permanent half of your handle (`username#code`). Shown only on the
+    /// You tab — it's what you give someone so they can add you.
+    @Published var friendCode: String?
     @Published var calendarConnected = false
     @Published var calendarDenied = false
     @Published var deviceEvents: [DeviceEvent] = []
@@ -111,6 +114,7 @@ final class AppModel: ObservableObject {
     func startDemoIdentity() {
         guard !Config.isLiveBackend else { return }
         userId = Sample.meId
+        friendCode = Sample.meFriendCode
     }
 
     /// EKEventStoreChanged only fires while we're running — the foreground
@@ -314,6 +318,7 @@ final class AppModel: ObservableObject {
         displayName = Sample.me
         avatarHue = nil
         avatarURL = nil
+        friendCode = nil
         openGroup = nil
         groups = Config.isLiveBackend ? [] : Sample.groups
         events = Config.isLiveBackend ? [] : Sample.events
@@ -332,10 +337,12 @@ final class AppModel: ObservableObject {
     func loadProfile() async {
         guard Config.isLiveBackend, let uid = userId else { return }
         userEmail = SupabaseClient.shared.userEmail
-        let fallback = (userEmail?.split(separator: "@").first).map(String.init) ?? "You"
+        let emailName = (userEmail?.split(separator: "@").first).map(String.init) ?? ""
+        let fallback = UsernameRules.sanitized(emailName).isEmpty
+            ? "You" : UsernameRules.sanitized(emailName)
         do {
             let rows: [ProfileDTO] = try await SupabaseClient.shared.select(
-                "profiles", columns: "id,display_name,timezone,avatar_hue,avatar_url",
+                "profiles", columns: "id,display_name,timezone,avatar_hue,avatar_url,friend_code",
                 query: ["id": "eq.\(uid)"])
             guard let row = rows.first else {
                 // No profile row (account predates the trigger) — a PATCH would
@@ -348,6 +355,7 @@ final class AppModel: ObservableObject {
             }
             avatarHue = GroupHue(rawValue: row.avatar_hue ?? "")
             avatarURL = row.avatar_url
+            friendCode = row.friend_code
             if row.display_name.isEmpty {
                 await updateDisplayName(fallback.capitalized)
             } else {
@@ -362,7 +370,7 @@ final class AppModel: ObservableObject {
     @discardableResult
     func updateDisplayName(_ name: String) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
+        guard UsernameRules.problem(trimmed) == nil else { return false }
         guard Config.isLiveBackend, let uid = userId else {
             displayName = trimmed          // demo mode: local only
             return true
@@ -384,7 +392,7 @@ final class AppModel: ObservableObject {
     @discardableResult
     func updateProfile(name: String, hue: GroupHue?, avatarURL newURL: String?) async -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
+        if let problem = UsernameRules.problem(trimmed) { return failed(false, problem) }
 
         let rollback = (displayName, avatarHue, avatarURL)
         displayName = trimmed
@@ -513,16 +521,15 @@ final class AppModel: ObservableObject {
         return friends + people.filter { seen.insert($0.id).inserted }
     }
 
-    /// Find someone by their exact email, so you can send them a request.
-    /// Returns nil when there's no such account — deliberately indistinguishable
-    /// from "exists but hidden", because the lookup can't be used to fish.
-    func findPerson(email: String) async -> PMember? {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+    /// Find someone by `username#code`, so you can send them a request.
+    /// Nil when nobody matches — deliberately the same answer as "exists but
+    /// hidden", so the lookup can't be used to fish. Callers parse first, so a
+    /// malformed handle never reaches the server.
+    func findPerson(username: String, code: String) async -> PMember? {
         guard Config.isLiveBackend else {
-            return Sample.people.first { $0.name.lowercased().hasPrefix(trimmed.lowercased().prefix(3)) }
+            return Sample.people.first { $0.name.lowercased() == username.lowercased() }
         }
-        return try? await SupabaseRepository().findPerson(email: trimmed)
+        return try? await SupabaseRepository().findPerson(username: username, code: code)
     }
 
     @discardableResult
@@ -1087,7 +1094,9 @@ final class AppModel: ObservableObject {
         userEmail = auth.userEmail
         signedIn = true
         await loadProfile()
-        if let name, !name.isEmpty, name != displayName { await updateDisplayName(name) }
+        if let name = name.map(UsernameRules.sanitized), !name.isEmpty, name != displayName {
+            await updateDisplayName(name)
+        }
         await loadData()
     }
 
@@ -1143,7 +1152,7 @@ final class AppModel: ObservableObject {
     /// the metadata sent here, so the account is already named either way.
     func signUp(email: String, password: String, confirm: String, name: String) async -> AuthOutcome {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return .failed("Tell us your name first.") }
+        if let problem = UsernameRules.problem(trimmedName) { return .failed(problem) }
         if let problem = PasswordRules.problem(password, confirm: confirm) { return .failed(problem) }
 
         do {

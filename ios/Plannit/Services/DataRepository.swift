@@ -108,13 +108,14 @@ struct SupabaseRepository: DataRepository {
         }
     }
 
-    /// Look someone up to befriend them. Exact email only — the function
-    /// deliberately won't do prefix search, so the directory isn't enumerable.
-    func findPerson(email: String) async throws -> PMember? {
-        let rows: [FriendDTO] = try await client.rpc("find_profile_by_email",
-                                                     args: EmailLookup(p_email: email))
+    /// Look someone up to befriend them by `username#code`. Both halves have to
+    /// match (0019): the code alone is only six digits, so it can't be the key.
+    func findPerson(username: String, code: String) async throws -> PMember? {
+        let rows: [FriendDTO] = try await client.rpc(
+            "find_profile_by_handle", args: HandleLookup(p_username: username, p_code: code))
         return rows.first.map {
-            PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name)
+            PMember(id: $0.id, name: $0.display_name.isEmpty ? "Member" : $0.display_name,
+                    hue: GroupHue(rawValue: $0.avatar_hue ?? ""), avatarURL: $0.avatar_url)
         }
     }
 

@@ -54,6 +54,8 @@ struct ProfileDTO: Decodable {
     let timezone: String?
     let avatar_hue: String?
     let avatar_url: String?
+    /// Permanent 6-digit code (0019). Only ever selected for your own profile.
+    let friend_code: String?
 }
 /// Your profile, as the app reads it back.
 struct ProfileUpdate: Encodable {
@@ -249,7 +251,7 @@ struct FriendshipInsert: Encodable {
     let status: String     // "pending" | "accepted" | "blocked"
 }
 struct FriendshipStatusUpdate: Encodable { let status: String }
-struct EmailLookup: Encodable { let p_email: String }
+struct HandleLookup: Encodable { let p_username: String; let p_code: String }
 struct ConfigRowDTO: Decodable { let key: String; let value: Bool }
 struct EmptyArgs: Encodable {}
 
