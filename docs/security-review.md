@@ -91,7 +91,19 @@ what a plan being made needs.
 the window to ~13 months, server-side, before the scheduler sees them. Also
 caps the CPU one request can burn.
 
-## 4. Relationship oracles on the RLS helpers — LOW, not fixed
+## 4. Relationship oracles on the RLS helpers — LOW → fixed (0022)
+
+_2026-09-14:_ worse than described below when checked on the live project: the
+helpers were EXECUTE-able by `PUBLIC`, which includes `anon`, so the questions
+could be asked with only the publishable key. Migration 0022 moves the checks
+into caller-scoped functions in `private` (not exposed by the Data API), drops
+`are_friends`, `shares_group`, `can_view_event`, `is_group_owner` and
+`is_proposal_group_member`, and narrows `is_group_member`, `is_event_owner` and
+`is_event_invitee` to answer only about the caller, callable by `authenticated`
+only. Rehearsed on the live project before applying: every table, as seen by
+every user, hashed identically under the old and new policies.
+
+The original finding, for the record:
 
 `are_friends(a, b)`, `shares_group(a, b)`, `is_group_member(group, user)`,
 `can_view_event(event, user)`, `is_event_owner(event, user)` and

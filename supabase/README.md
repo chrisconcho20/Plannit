@@ -32,7 +32,10 @@ supabase/
 │  ├─ 0017_group_hue_activity_bounds.sql  # groups.hue, a 90-day feed, declines for organisers
 │  ├─ 0018_provider_display_names.sql     # Google/Apple accounts get a display name
 │  ├─ 0019_friend_codes.sql               # permanent friend codes; find by username#code
-│  └─ 0020_friend_codes_base32.sql        # friend codes use Crockford base32 (1.07B codes)
+│  ├─ 0020_friend_codes_base32.sql        # friend codes use Crockford base32 (1.07B codes)
+│  ├─ 0021_fix_rsvp_cast.sql              # rsvp_to_event() saves (enum cast)
+│  ├─ 0022_rls_rewrite.sql                # set-based RLS; helpers only answer about the caller
+│  └─ 0023_rate_limits.sql                # per-user limits, HTTP 429
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder

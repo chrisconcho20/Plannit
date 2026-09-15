@@ -62,9 +62,14 @@ push, real Sign in with Apple) still needs the paid program + Codemagic
   ad-hoc colors/spacing. Icons map lucide→SF Symbols in `Theme/Icon.swift`.
 - **Backend contracts** live in `docs/backend/` (api-contract, sync-contract,
   push-notifications) — implement clients against them.
-- The backend client is intentionally **dependency-free** (URLSession) — no SPM
-  packages, which keeps CI/Appetize builds simple. Keep it that way unless there's
-  a strong reason.
+- The backend client is intentionally **dependency-free** (URLSession). The only
+  SPM packages are Supabase's `Realtime` product (D-16) and `Sentry` for crash
+  reporting, both pinned exactly in `ios/project.yml`. Keep it that way unless
+  there's a strong reason.
+- **Migrations touching RLS or definer functions get rehearsed first:** run them
+  against the linked project inside `begin … rollback`, compare what each user
+  can see before and after, and exercise the writes. 0021 was found that way — an
+  RSVP bug no client test could reach.
 - After any iOS change: push, confirm **iOS Build is green** via `gh`, then (if
   relevant) point the user at the demo Appetize preview.
 

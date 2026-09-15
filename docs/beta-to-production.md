@@ -25,9 +25,9 @@ you know. Work top-down: the first section is what actually exposes data.
 From [`security-review.md`](security-review.md) — none blocking a beta, all worth
 closing before open sign-up.
 
-- **Narrow the RLS helper signatures.** `are_friends(a, b)`, `is_group_member(group, user)` and friends are `SECURITY DEFINER`, take arbitrary ids and are executable by any authenticated user, so they answer "are these two people friends?" about anyone. The fix is one-argument versions using `auth.uid()` internally, which means rewriting 0002's policies and `find-slots`. Needs a database to test against — don't do it blind.
+- ✅ **RLS helper signatures narrowed (0022, 2026-09-14).** The two-id helpers that answered about anyone — callable even by `anon` — are dropped or only answer about the caller. See [`security-review.md`](security-review.md) §4.
 - **Invite tokens ride in a query string**, so they land in Edge Function logs. Fine at beta scale given 14-day expiry, use caps and revocation; worth a POST exchange if invites ever carry more.
-- **`find_profile_by_handle` has no rate limit.** A lookup needs a username and a 6-character code (32^6 ≈ 1.07 billion possibilities), so guessing someone by name is impractical without throttling, but not impossible. Add throttling before the user base makes common names worth enumerating.
+- ✅ **`find_profile_by_handle` is rate limited (0023):** 30 lookups per person per 10 minutes, on top of the 32^6 code space.
 
 ## 3. Client build
 
@@ -43,9 +43,9 @@ closing before open sign-up.
 - **Sign in with Apple and Google.** Both are on the sign-in screen. Apple needs the $99 account, the entitlement switched back (§3) and the provider's Client IDs set; Google needs a Google Cloud OAuth client. Google must not reach the App Store without Apple alongside it (guideline 4.8).
 - **Push notifications.** The whole server half is built (`send-push`, 0004's triggers, the APNs signer). Needs the paid account, an APNs key, and the two Vault secrets (`internal_function_secret`, `functions_base_url`) — without them `notify_push()` silently no-ops. The You tab's "A date was found", "Invites & requests" and "Share availability" toggles are placeholders that control nothing; wire them up in the same change (roadmap Phase 4, item 8).
 - **Privacy nutrition labels.** Calendar data is sensitive and this app reads it. Be precise: event details never leave the device (decision D-17); only opaque busy ranges are uploaded.
-- **Crash reporting** (Sentry, per the proposal) — nothing today.
+- **Crash reporting** — built (Sentry 9.28.0, `Services/CrashReporting.swift`), off until a DSN exists. To turn on: create a Sentry project (iOS), add `SENTRY_DSN` to Codemagic's `plannit_release` group ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)). Privacy label: declare **Crash Data**, not linked to the user, not used for tracking — screenshots, view hierarchy, network breadcrumbs and PII are all disabled.
 
 ## 5. Known behaviours to re-check with real users
 
-- **Rate limits.** Nothing throttles sign-up, invite redemption or the date-finder. `find-slots` is now clamped for size, not frequency.
+- **Rate limits** (0023): per person, friend lookup 30/10 min, friend requests 30/h, invite creation 30/h, invite redemption 20/h, date searches 60/h — answered as HTTP 429. Sign-up and sign-in rely on Supabase Auth's per-IP defaults (30 per 5 minutes; Authentication → Rate Limits). Watch whether real use trips any of them.
 - **Activity feed** has no pagination and tracks "seen" only on-device.

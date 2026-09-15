@@ -44,6 +44,11 @@ path. Remember to turn it back on.
    also try typing it as `o` or `l`.
    - [ ] "You're already friends."
 
+6b. **Look up a wrong code 31 times** in a row (any handle that doesn't exist).
+   - [ ] The first 30 say "Nobody on Plannit has that username and code."
+   - [ ] The 31st says "That's a lot of lookups in a short time" (0023's limit:
+         30 per 10 minutes). It clears on its own within 10 minutes.
+
 7. **Close the sheet. Tap the X next to Sam Roe, choose Remove friend.**
    - [ ] Sam disappears from the list.
    - [ ] The confirmation said they stay in any groups you share.

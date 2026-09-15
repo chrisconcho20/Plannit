@@ -31,7 +31,17 @@ generate a key with the **App Manager** role. Download the `.p8` and note the
    `.p8`, Key ID, and Issuer ID. Name it **`CodemagicAppStoreKey`** (must match
    the `integrations.app_store_connect` value in `codemagic.yaml`; change either
    to match).
-3. Open the Plannit app in Codemagic → it detects `codemagic.yaml` → **Start new
+3. **App settings → Environment variables**: create a group named
+   **`plannit_release`** with these variables, each marked **Secure**:
+   - `SUPABASE_URL` — `https://<project-ref>.supabase.co`
+   - `SUPABASE_ANON_KEY` — Supabase dashboard → Settings → API
+   - `SENTRY_DSN` — optional; Sentry → your iOS project → Client Keys (DSN).
+     Empty leaves crash reporting off.
+
+   The build writes them into `Info.plist` for that build only. Without the two
+   Supabase values the build stops, because an app without them opens in demo
+   mode.
+4. Open the Plannit app in Codemagic → it detects `codemagic.yaml` → **Start new
    build** on the `ios-testflight` workflow (or just push to `main`).
 
 ## 5. Install on your iPhone

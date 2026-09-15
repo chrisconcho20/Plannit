@@ -56,7 +56,15 @@ heartbeat whenever the socket is up.
 At 1,000 daily users that's the difference between ~50 requests/second of pure
 polling and ~8.
 
-### 3. `events_select` calls a function per row 🔴 — **not fixed, the real work**
+### 3. `events_select` calls a function per row 🔴 — **fixed (0022)**
+
+_2026-09-14:_ every policy now uses `(select auth.uid())` and
+`x in (select private.my_…())` — caller-scoped definer functions with no
+per-row arguments, so each is evaluated once per statement rather than per row.
+That's the set-returning form of Supabase's guidance rather than the inline
+`EXISTS` suggested below, which would have run `event_shares`' own policy per
+share. Verified on the live project by comparing what every user can see before
+and after. The original analysis follows.
 
 ```sql
 create policy events_select on public.events for select to authenticated

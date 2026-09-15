@@ -185,7 +185,8 @@ to become. Individually sensible, collectively a security incident.
     Apple provider in Supabase Auth) + APNs + on-device testing via **Codemagic →
     TestFlight** ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
 17. **App Store prep** — privacy nutrition labels (calendar data is sensitive),
-    screenshots, review. Add **Sentry** (crash reporting) per the proposal.
+    screenshots, review. **Sentry** crash reporting is built and off until a
+    DSN is added to Codemagic ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
 18. **Non-user web participation link** (decision D-14) — lets people join a plan
     without the app; helps the cold-start problem.
 
@@ -215,9 +216,6 @@ to become. Individually sensible, collectively a security incident.
   90-day horizon (0017), and "seen" is tracked on-device.
 - **The invite page has no App Store fallback** — if the app isn't installed the
   button does nothing. Needs a listing to link to.
-- **RLS helper functions answer about anyone** — `are_friends(a, b)` and friends
-  take arbitrary ids and are executable by any authenticated user. Fix needs a
-  careful rewrite of 0002's policies: [`security-review.md`](security-review.md) §4.
 - **Reaching a stranger needs their `username#code`** — by design; the code is
   shown only on their own You tab, and invite links are the other way in.
   Codes are 6 characters of Crockford base32: 1,073,741,824 possible values.
