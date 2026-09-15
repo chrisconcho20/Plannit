@@ -281,6 +281,12 @@ final class AppModel: ObservableObject {
         if let requests = try? await repo.fetchFriendRequests() { friendRequests = requests }
     }
 
+    /// A server-side rate limit (0023) or an auth limit: HTTP 429.
+    static func isRateLimited(_ error: Error) -> Bool {
+        if case SupabaseError.http(429, _) = error { return true }
+        return false
+    }
+
     static func message(for error: Error) -> String {
         guard let e = error as? SupabaseError else {
             return "Couldn't reach Plannit. Check your connection."
@@ -292,6 +298,7 @@ final class AppModel: ObservableObject {
             switch code {
             case 401: return "Your session expired — sign in again."
             case 403: return "You don't have access to that."
+            case 429: return "That's a lot in a short time. Try again in a minute."
             default:  return "Plannit is having trouble (\(code))."
             }
         }
@@ -469,7 +476,9 @@ final class AppModel: ObservableObject {
             guard let token = rows.first?.token else { return nil }
             return Self.inviteURL(token: token)
         } catch {
-            say("Couldn't make an invite link.")
+            say(Self.isRateLimited(error)
+                ? "You've made a lot of invite links. Try again in a little while."
+                : "Couldn't make an invite link.")
             return nil
         }
     }
@@ -504,7 +513,9 @@ final class AppModel: ObservableObject {
                 say("You're now friends.")
             }
         } catch {
-            say("That invite has expired or been used up.")
+            say(Self.isRateLimited(error)
+                ? "Too many invite attempts. Try again in a little while."
+                : "That invite has expired or been used up.")
         }
     }
 
@@ -521,15 +532,29 @@ final class AppModel: ObservableObject {
         return friends + people.filter { seen.insert($0.id).inserted }
     }
 
-    /// Find someone by `username#code`, so you can send them a request.
-    /// Nil when nobody matches — deliberately the same answer as "exists but
-    /// hidden", so the lookup can't be used to fish. Callers parse first, so a
-    /// malformed handle never reaches the server.
-    func findPerson(username: String, code: String) async -> PMember? {
+    enum FriendLookup: Equatable {
+        case found(PMember)
+        /// Nobody matches — deliberately the same answer as "exists but hidden",
+        /// so the lookup can't be used to fish.
+        case notFound
+        /// Too many lookups in a short time (0023).
+        case limited
+        case failed
+    }
+
+    /// Find someone by `username#code`, so you can send them a request. Callers
+    /// parse first, so a malformed handle never reaches the server.
+    func findPerson(username: String, code: String) async -> FriendLookup {
         guard Config.isLiveBackend else {
             return Sample.people.first { $0.name.lowercased() == username.lowercased() }
+                .map(FriendLookup.found) ?? .notFound
         }
-        return try? await SupabaseRepository().findPerson(username: username, code: code)
+        do {
+            let person = try await SupabaseRepository().findPerson(username: username, code: code)
+            return person.map(FriendLookup.found) ?? .notFound
+        } catch {
+            return Self.isRateLimited(error) ? .limited : .failed
+        }
     }
 
     @discardableResult
@@ -545,7 +570,9 @@ final class AppModel: ObservableObject {
             await refreshFriends()
             return true
         } catch {
-            return failed(false, "Couldn't send that request.")
+            return failed(false, Self.isRateLimited(error)
+                ? "You've sent a lot of requests. Try again in a little while."
+                : "Couldn't send that request.")
         }
     }
 

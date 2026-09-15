@@ -57,6 +57,14 @@ Deno.serve(async (req) => {
   if (authzErr) return json({ error: "authz_check_failed", detail: authzErr.message }, 500);
   if (!isMember) return json({ error: "forbidden" }, 403);
 
+  // Frequency cap (0023): each search reads every member's busy time for up to
+  // a year. Counted against the caller, so it runs under their JWT.
+  const { error: limitErr } = await asUser.rpc("consume_rate_limit", { p_action: "find_slots" });
+  if (limitErr) {
+    if (limitErr.code === "rate_limited") return json({ error: "rate_limited" }, 429);
+    return json({ error: "rate_limit_check_failed", detail: limitErr.message }, 500);
+  }
+
   // Service role — read every member's busy blocks in the window.
   const admin = createClient(supabaseUrl, serviceKey);
 

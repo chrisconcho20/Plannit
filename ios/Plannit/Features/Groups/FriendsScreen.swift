@@ -211,14 +211,19 @@ struct AddFriendSheet: View {
         searching = true
         message = nil
         Task {
-            let person = await model.findPerson(username: parsed.username, code: parsed.code)
+            let result = await model.findPerson(username: parsed.username, code: parsed.code)
             searching = false
-            found = person
-            if person == nil {
-                message = "Nobody on Plannit has that username and code."
-            } else if model.friends.contains(where: { $0.id == person?.id }) {
-                found = nil
+            switch result {
+            case .found(let person) where model.friends.contains(where: { $0.id == person.id }):
                 message = "You're already friends."
+            case .found(let person):
+                found = person
+            case .notFound:
+                message = "Nobody on Plannit has that username and code."
+            case .limited:
+                message = "That's a lot of lookups in a short time. Try again in a few minutes."
+            case .failed:
+                message = "Couldn't look that up. Check your connection and try again."
             }
         }
     }

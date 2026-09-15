@@ -89,6 +89,22 @@ final class FriendHandleTests: XCTestCase {
         XCTAssertTrue(body.contains("\"p_code\":\"K7M2QX\""), body)
     }
 
+    func testARateLimitedLookupIsRecognisedAsOne() async {
+        StubTransport.reset()
+        defer { StubTransport.reset() }
+        StubTransport.on("/rpc/find_profile_by_handle", status: 429,
+                         body: #"{"code":"rate_limited","message":"Too many requests. Try again shortly."}"#)
+        let repo = SupabaseRepository(client: StubTransport.client())
+
+        do {
+            _ = try await repo.findPerson(username: "Maya", code: "K7M2QX")
+            XCTFail("a 429 must not read as 'nobody has that handle'")
+        } catch {
+            XCTAssertTrue(AppModel.isRateLimited(error))
+        }
+        XCTAssertFalse(AppModel.isRateLimited(SupabaseError.http(403, "")))
+    }
+
     func testNobodyMatchingIsNotAnError() async throws {
         StubTransport.reset()
         defer { StubTransport.reset() }

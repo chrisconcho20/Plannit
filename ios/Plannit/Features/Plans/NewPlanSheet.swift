@@ -387,6 +387,7 @@ struct NewPlanSheet: View {
             switch code {
             case 401: return "Your session expired — sign in and try again."
             case 403: return "You’re not a member of that group any more."
+            case 429: return "You’ve run a lot of searches in the last hour. Try again in a little while."
             default:  return "The scheduler failed (\(code)). Try again in a moment."
             }
         }

@@ -18,14 +18,19 @@ settings:
     # Empty is fine — you pick the team once in Signing & Capabilities.
     DEVELOPMENT_TEAM: ""
 
-# The one third-party dependency (decision D-16). Only the Realtime product:
-# our REST/auth layer stays hand-rolled. Pinned exactly rather than a range —
-# the SDK needs Xcode 16.4/Swift 6.1 and the CI runner is on exactly 16.4, so a
-# minor bump could break the build without us touching anything.
+# Third-party dependencies, both pinned exactly — a minor bump could break the
+# CI build without us touching anything.
+#   • Supabase: only the Realtime product (decision D-16). The REST/auth layer
+#     stays hand-rolled. Needs Xcode 16.4/Swift 6.1.
+#   • Sentry: crash reporting, as the technical proposal planned. The prebuilt
+#     static `Sentry` product, for the smallest launch-time cost.
 packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     exactVersion: 2.55.1
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    exactVersion: 9.28.0
 
 targets:
   Plannit:
@@ -36,6 +41,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Realtime
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         # Defaults are the ones a FREE Apple ID can actually build (see

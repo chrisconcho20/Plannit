@@ -4,6 +4,11 @@ import SwiftUI
 struct PlannitApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // First, so a crash during launch is reported too.
+        CrashReporting.start()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

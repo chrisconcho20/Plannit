@@ -63,6 +63,11 @@
     <key>SUPABASE_ANON_KEY</key>
     <string></string>
 
+    <!-- Crash reporting. Empty = off. Filled at build time for release builds
+         (codemagic.yaml), never committed. See Services/CrashReporting.swift. -->
+    <key>SENTRY_DSN</key>
+    <string></string>
+
     <!-- Deep link for Sign in with Apple / auth callback -->
     <key>CFBundleURLTypes</key>
     <array>

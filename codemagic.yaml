@@ -14,6 +14,10 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.plannit.app
       xcode: latest
+      # Secure variables SUPABASE_URL, SUPABASE_ANON_KEY and SENTRY_DSN, set in
+      # the Codemagic UI (ios/CODEMAGIC.md). Never in this file.
+      groups:
+        - plannit_release
       vars:
         XCODE_PROJECT: "Plannit.xcodeproj"
         XCODE_SCHEME: "Plannit"
@@ -23,6 +27,18 @@ workflows:
         script: |
           brew install xcodegen
           cd ios && xcodegen generate
+      - name: Inject backend and crash-reporting config (build time only)
+        script: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL / SUPABASE_ANON_KEY missing from the plannit_release group."
+            echo "A TestFlight build without them opens in demo mode."
+            exit 1
+          fi
+          PLIST=ios/Plannit/App/Info.plist
+          plutil -replace SUPABASE_URL -string "$SUPABASE_URL" "$PLIST"
+          plutil -replace SUPABASE_ANON_KEY -string "$SUPABASE_ANON_KEY" "$PLIST"
+          plutil -replace SENTRY_DSN -string "${SENTRY_DSN:-}" "$PLIST"
+          [ -n "$SENTRY_DSN" ] && echo "Crash reporting on." || echo "SENTRY_DSN not set: crash reporting off."
       - name: Apply signing profiles
         script: |
           cd ios
