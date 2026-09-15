@@ -220,6 +220,7 @@ struct YouScreen: View {
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
     @AppStorage(MinimumAttendance.key) private var minimumAttendance = MinimumAttendance.defaultValue
     @State private var showNeverFree = false
+    @State private var showDeleteAccount = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -342,6 +343,13 @@ struct YouScreen: View {
                 }
                 .padding(.horizontal, Space.gutter).padding(.top, 16)
 
+                if model.isLiveBackend {
+                    PlannitButton(title: "Delete account", variant: .ghost, size: .sm, fullWidth: true) {
+                        showDeleteAccount = true
+                    }
+                    .padding(.horizontal, Space.gutter).padding(.top, 4)
+                }
+
                 Text("Plannit \(Bundle.appVersion)")
                     .textStyle(.caption, color: .textFaint)
                     .frame(maxWidth: .infinity)
@@ -354,6 +362,7 @@ struct YouScreen: View {
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .sheet(isPresented: $showCalendars) { CalendarPicker().environmentObject(model) }
         .sheet(isPresented: $showNeverFree) { NeverFreeSheet().environmentObject(model) }
+        .sheet(isPresented: $showDeleteAccount) { DeleteAccountSheet().environmentObject(model) }
         .sheet(isPresented: $showRename) {
             ProfileSheet().environmentObject(model)
         }

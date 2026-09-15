@@ -25,15 +25,26 @@ enum BackgroundRefresh {
         try? BGTaskScheduler.shared.submit(request)
     }
 
-    /// Recompute availability from the device calendar and push it. Deliberately
-    /// the *only* thing that happens here: it's the one piece of state that goes
-    /// stale without us, it needs no UI, and it's a single round trip.
+    /// Two things go stale while the app is shut: your availability, and the
+    /// Plannit calendar on the phone — a plan its owner deleted would otherwise
+    /// stay there until you next opened Plannit.
     static func run() async {
         Log.sync("background refresh fired")
         await MainActor.run { _ = SupabaseClient.shared.restoreSession() }
         await CalendarReader.shared.refreshSources()
         await AvailabilityUploader.upload(reading: CalendarReader.shared.read())
+        await refreshPlannitCalendar()
         schedule()   // one run only ever earns the next
+    }
+
+    /// Re-read the plans and bring the Plannit calendar into line. A failed
+    /// fetch changes nothing: mirroring an empty list would remove every copy.
+    @MainActor
+    static func refreshPlannitCalendar() async {
+        guard SupabaseClient.shared.isSignedIn, let uid = SupabaseClient.shared.userId,
+              let events = try? await SupabaseRepository().fetchEvents(groups: [])
+        else { return }
+        CalendarService().mirror(AppModel.calendarCopies(of: events, for: uid))
     }
 }
 

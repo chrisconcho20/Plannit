@@ -1533,7 +1533,43 @@ final class AppModel: ObservableObject {
     /// no mirror, no complaints.
     func mirrorToDeviceCalendar() {
         guard calendarConnected else { return }
-        calendar.mirror(events)
+        calendar.mirror(Self.calendarCopies(of: events, for: userId))
+    }
+
+    /// What belongs in the Plannit calendar on the phone: your own events, plans
+    /// you said yes to, and events shared with you directly. Not invitations
+    /// you haven't answered or plans you declined — those were being copied too.
+    /// Anything missing from this list is removed from the phone, which is how a
+    /// plan its owner deleted leaves everyone's calendar.
+    static func calendarCopies(of events: [PEvent], for userId: String?) -> [PEvent] {
+        events.filter { $0.isOnCalendar(for: userId) }
+    }
+
+    /// Delete the account and everything tied to it, then sign out. Nil on
+    /// success, or a message to show.
+    ///
+    /// Server side (`delete_my_account`, 0025): profile, friendships,
+    /// memberships, busy times, RSVPs, invites and every event you own go;
+    /// groups with other members pass to the longest-standing one. The photo
+    /// is removed here first, because Storage files can't be deleted by SQL.
+    func deleteAccount() async -> String? {
+        guard Config.isLiveBackend, let uid = userId else { return "There's no account to delete in demo mode." }
+        do {
+            try? await SupabaseClient.shared.deleteObject(bucket: "avatars", path: "\(uid)/avatar.jpg")
+            try await SupabaseClient.shared.rpcVoid("delete_my_account", args: EmptyArgs())
+        } catch {
+            return Self.isRateLimited(error)
+                ? "Too many attempts. Try again in a minute."
+                : "Couldn't delete your account. Check your connection and try again."
+        }
+        // This phone: take Plannit's copies out of the calendar, then forget
+        // every setting the account left behind.
+        if calendarConnected { calendar.mirror([]) }
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("plannit.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        signOut()
+        return nil
     }
 
     /// Upload merged busy intervals (no titles) so group availability can be

@@ -711,6 +711,17 @@ final class SupabaseClient {
 
     // MARK: Storage
 
+    /// Remove one object. Storage files have to go through the Storage API: a
+    /// row deleted with SQL leaves the file behind, orphaned.
+    func deleteObject(bucket: String, path: String) async throws {
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
+        var req = URLRequest(url: baseURL.appendingPathComponent("storage/v1/object/\(bucket)/\(path)"))
+        req.httpMethod = "DELETE"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        try await sendRaw(req)
+    }
+
     /// Upload bytes and return the public URL.
     ///
     /// `upsert` matters here: an avatar lives at a fixed path per user
