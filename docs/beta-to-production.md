@@ -14,10 +14,10 @@ you know. Work top-down: the first section is what actually exposes data.
 | Setting | Beta | Production | Why |
 |---|---|---|---|
 | **Email confirmation** | Off (dashboard → Auth → Sign In / Providers → Email) | **On** | Off, anyone can register any address, including someone else's. No longer blocked on a web page: the app confirms with a 6-digit code. Needs custom SMTP and the code templates first — order in [`backend/auth-setup.md`](backend/auth-setup.md). |
-| **`auto_friend_everyone`** | `true` | **`false`** — `update public.app_config set value = 'false' where key = 'auto_friend_everyone';` | Every new account is instantly friends with every existing one, so a stranger's first screen lists every user's name. Existing friendships survive the flip. _2026-09-14: scripted, pending being run on the live project._ |
-| **Test accounts** | 5 × `@plannit.test`, shared password, in your groups | **Delete them** | They're real, sign-in-able accounts auto-friended to everyone. `delete from auth.users where email like '%@plannit.test';` cascades to profiles, memberships and busy blocks. Checked 2026-09-14: they own no groups or events; deleting removes 24 memberships and their friendships. _Scripted, pending being run._ |
+| **`auto_friend_everyone`** | `true` | **`false`** — `update public.app_config set value = 'false' where key = 'auto_friend_everyone';` | Every new account is instantly friends with every existing one, so a stranger's first screen lists every user's name. Existing friendships survive the flip. ✅ Off since 2026-09-15. |
+| **Test accounts** | 5 × `@plannit.test`, shared password, in your groups | **Delete them** | They're real, sign-in-able accounts auto-friended to everyone. `delete from auth.users where email like '%@plannit.test';` cascades to profiles, memberships and busy blocks. Checked 2026-09-14: they own no groups or events; deleting removes 24 memberships and their friendships. ✅ Deleted 2026-09-15. |
 | **`seed-test-users.sql`** | Run against the live project | **Never run** | ✅ Refuses to run on a project marked `app_config.environment = 'production'` (2026-09-14). |
-| **Live Appetize preview** | Public URL, real project | **Retire, or point at staging** | ✅ Build workflow removed 2026-09-14; `retire-appetize-live.yml` deletes the uploaded app, pending being run. |
+| **Live Appetize preview** | Public URL, real project | **Retire, or point at staging** | ✅ Build workflow removed 2026-09-14; the uploaded app was deleted on 2026-09-15 and its URL returns 404. |
 | **`enable_signup`** | `true` | Consider **off** between cohorts | Closes the door behind a known set of testers without affecting existing accounts. |
 
 ## 2. Security review follow-ups

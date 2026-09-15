@@ -3,7 +3,7 @@
 > **Retired 2026-09-14.** This preview ran the app against the production
 > Supabase project at an unauthenticated URL, which was the top finding of
 > [`../docs/security-review.md`](../docs/security-review.md). The build workflow
-> has been removed and `retire-appetize-live.yml` deletes the uploaded app.
+> has been removed and the uploaded app was deleted on 2026-09-15.
 > Don't recreate it against production; it needs a separate staging project.
 > The rest of this page is kept for that case.
 

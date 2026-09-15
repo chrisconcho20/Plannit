@@ -26,7 +26,7 @@ stop and resume anywhere.
 ## Before you start
 
 - **Seeded accounts (`maya@plannit.test` and friends) no longer exist on the
-  production project** (deleted 2026-09-14). Scripts that sign in as them need a
+  production project** (deleted 2026-09-15). Scripts that sign in as them need a
   staging project seeded with `supabase/seed-test-users.sql`, or a second real
   account of your own in their place.
 

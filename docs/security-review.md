@@ -55,14 +55,11 @@ preview URL. Rotation is the only remedy, and rotation is only complete once the
 seed has been re-run with a new password **and** the live Appetize build has been
 deleted or rebuilt (its old URL keeps working until you do).
 
-**Still yours to do:**
-- Set a private `test_password` and re-run the seed. `plannit123` should be
-  treated as burned.
-- Decide what the live preview is for. It runs against real data with real
-  accounts; treat that URL as a credential, or point the preview at a separate
-  Supabase project.
-- Turn `auto_friend_everyone` off before anyone outside your circle has an
-  account (see 2).
+**Resolved 2026-09-15.** The five seeded accounts are deleted from the live
+project, `auto_friend_everyone` is off, the project is marked
+`app_config.environment = 'production'` so the seed refuses to run there, and
+the live Appetize build is deleted (its URL returns 404) along with the workflow
+that built it. The burned passwords no longer open anything.
 
 ## 2. Anyone who signs up sees every user's name — MEDIUM (by design, for now)
 
