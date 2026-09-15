@@ -35,7 +35,9 @@ supabase/
 │  ├─ 0020_friend_codes_base32.sql        # friend codes use Crockford base32 (1.07B codes)
 │  ├─ 0021_fix_rsvp_cast.sql              # rsvp_to_event() saves (enum cast)
 │  ├─ 0022_rls_rewrite.sql                # set-based RLS; helpers only answer about the caller
-│  └─ 0023_rate_limits.sql                # per-user limits, HTTP 429
+│  ├─ 0023_rate_limits.sql                # per-user limits, HTTP 429
+│  ├─ 0024_consent_and_sharing_rules.sql  # no joining, befriending, adding or sharing without consent
+│  └─ 0025_delete_account_and_event_changes.sql  # delete_my_account(); event edits broadcast
 └─ functions/
    ├─ _shared/
    │  ├─ scheduler.ts               # the wedge — pure, testable slot finder

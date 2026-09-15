@@ -33,6 +33,14 @@ reading back, or every plan would show twice.
    event if it's yours, or **Remove** if you were invited).
    - [ ] It disappears from the simulator's Calendar app too, within a refresh.
 
+5b. **Deleted by its owner, on someone else's phone.** With a second account in
+   the group that said yes to a plan, delete the plan as its owner.
+   - [ ] On the second account's device, the plan leaves Plannit and the phone's
+         Calendar app within a few seconds while Plannit is open (realtime), or
+         on the next launch or background refresh if it's closed.
+   - [ ] An invitation the second account never answered was never in its phone
+         calendar in the first place; declining a plan removes it from there.
+
 6. **Force-quit Plannit and relaunch.**
    - [ ] Console shows another `mirror:` line.
    - [ ] The number **written** is 0 or very low. It should skip events that

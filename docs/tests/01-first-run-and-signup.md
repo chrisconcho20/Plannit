@@ -86,6 +86,16 @@ straight in the app.
           with Apple isn't available in this build. On a build with the
           entitlement, it signs in and uses the name Apple provides.
 
+14. **Delete account** (use a throwaway account). You → **Delete account**.
+    - [ ] The sheet lists what's deleted and names any groups you own: groups
+          with other members "will pass to the member who has been in it
+          longest"; groups with only you "will be deleted".
+    - [ ] **Delete my account** stays disabled until you type `DELETE`.
+    - [ ] After deleting, you're back on the sign-in screen. Signing in with the
+          same email and password fails.
+    - [ ] A second account that was in a group you owned now sees itself as that
+          group's owner; plans you created are gone from its calendar.
+
 ---
 
 ## Verify in the database

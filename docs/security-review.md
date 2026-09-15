@@ -151,6 +151,33 @@ build (including a free personal team on a real phone) it never triggers. It's
 the difference between "the preview can't stay signed in" and "a refresh token
 sits in a plist on a simulator nobody owns", and I took the trade knowingly.
 
+## 8. Consent and sharing rules — HIGH → fixed (0024, 2026-09-15)
+
+A second review attempted each of these against the live project as a signed-in
+user, in a rolled-back transaction, and all succeeded before 0024:
+
+| | Issue | Severity |
+|---|---|---|
+| S1 | Anyone could insert themselves into any group whose id they knew, so removing a member didn't hold. | High |
+| S2 | A group owner could add any user id, then read that person's free/busy through the date finder. | High |
+| S3 | A friendship could be created already accepted, or accepted by the person who sent the request. | High |
+| S4 | An event could be shared onto any user's calendar (and so their phone) or into any group. | Medium |
+| S5 | Anyone with the publishable key could list the avatars bucket, whose object names are user ids. | Medium |
+| S6 | Soft-deleted events stayed readable to everyone they had been shared with. | Low |
+
+0024 limits membership inserts to owners adding themselves or people they're
+connected to; requires friendships to start `pending`, lets only the addressee
+change the status and revokes UPDATE on every other column; limits shares to
+your own groups and connections; replaces the public bucket read with an
+owner-only one; and hides tombstones from everyone but the owner. The same
+rehearsal confirmed each path now fails with 42501, the app's own flows still
+succeed, and what every user can see was otherwise unchanged.
+
+Still open, lower risk: free/busy can be probed through the date finder by a
+group's own members (rate limited to 60 searches an hour), invite links are
+bearer tokens that can be forwarded, sign-up reveals whether an email is
+registered while confirmation is off, and the password minimum is 6.
+
 ## What I checked and found clean
 
 - **No secrets in the repo or its git history** — no JWTs, service-role keys or

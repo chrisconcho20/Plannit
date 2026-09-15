@@ -114,6 +114,12 @@ app shows "Google sign-in didn't go through."
 
 Needs the Apple Developer Program membership.
 
+**Account deletion and Apple tokens.** Apple requires apps that offer Sign in
+with Apple to revoke the user's tokens when they delete their account (Apple's
+`/auth/revoke` endpoint, signed with the Sign in with Apple key). You → Delete
+account (0025) removes the Supabase account but can't revoke yet: that call
+needs the key, so it belongs in a server function added with this step.
+
 1. Certificates, Identifiers & Profiles → the app's **App ID** → enable **Sign in
    with Apple**. Leave server-to-server notification endpoints blank.
 2. `ios/project.yml`: set `CODE_SIGN_ENTITLEMENTS` back to
