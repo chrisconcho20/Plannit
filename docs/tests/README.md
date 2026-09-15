@@ -25,6 +25,11 @@ stop and resume anywhere.
 
 ## Before you start
 
+- **Seeded accounts (`maya@plannit.test` and friends) no longer exist on the
+  production project** (deleted 2026-09-14). Scripts that sign in as them need a
+  staging project seeded with `supabase/seed-test-users.sql`, or a second real
+  account of your own in their place.
+
 - **Migrations must be applied**: `npx supabase db push`. Tests 07 onwards need
   0009, and 11/12 need 0007/0008.
 

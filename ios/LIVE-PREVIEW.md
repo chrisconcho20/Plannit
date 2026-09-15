@@ -1,4 +1,11 @@
-# Live backend preview (test real Supabase data in a browser — no Apple account)
+# Live backend preview — retired
+
+> **Retired 2026-09-14.** This preview ran the app against the production
+> Supabase project at an unauthenticated URL, which was the top finding of
+> [`../docs/security-review.md`](../docs/security-review.md). The build workflow
+> has been removed and `retire-appetize-live.yml` deletes the uploaded app.
+> Don't recreate it against production; it needs a separate staging project.
+> The rest of this page is kept for that case.
 
 This builds a **separate** Appetize preview wired to your real Supabase project.
 You sign in with a test email/password (no Sign in with Apple needed), so it works

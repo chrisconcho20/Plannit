@@ -30,11 +30,10 @@ app locally**. Validate and test entirely through cloud services:
   simulator builds). Two previews, both **stable URLs**:
   - Demo (sample data): `https://appetize.io/app/e2mqoojyf4ig4quzphi4p52dwi` —
     rebuilds automatically on `ios/**` push.
-  - Live (real Supabase, dev email sign-in): **URL deliberately not recorded
-    here.** This repo is public, and that link is a front door to the real
-    project — pair it with any working credential and a stranger is inside the
-    owner's groups. Rebuild with `"$GH" workflow run ios-appetize-live.yml -R
-    chrisconcho20/Plannit` and take the URL from the run summary.
+  - Live (real Supabase): **retired 2026-09-14.** An unauthenticated URL running
+    the app against production was the top security finding. Its workflow is
+    gone; don't bring it back pointed at the production project. A live preview
+    needs a separate staging Supabase project first.
   - After a build, the run **Summary** prints the URL; the workflow also echoes
     `Appetize URL: …` in the log.
 
@@ -48,8 +47,9 @@ push, real Sign in with Apple) still needs the paid program + Codemagic
 
 - `Config.isLiveBackend` is true only when `SUPABASE_URL` + `SUPABASE_ANON_KEY`
   are set in `Info.plist`. **Keep them EMPTY in the repo** (demo default) so the
-  demo preview stays clickable. Live creds are injected **only at build time** by
-  `ios-appetize-live.yml` from GitHub secrets — never commit them.
+  demo preview stays clickable. Live values are injected only at build time
+  (Codemagic for TestFlight, or pasted locally for a device build) — never commit
+  them.
 - Screens read data from `AppModel`, fed by `DataRepository` (`SampleRepository`
   in demo, `SupabaseRepository` in live). Add live features behind this seam and
   keep demo working.
@@ -66,7 +66,7 @@ push, real Sign in with Apple) still needs the paid program + Codemagic
   packages, which keeps CI/Appetize builds simple. Keep it that way unless there's
   a strong reason.
 - After any iOS change: push, confirm **iOS Build is green** via `gh`, then (if
-  relevant) trigger the live Appetize build and hand the user the URL.
+  relevant) point the user at the demo Appetize preview.
 
 ## Where to start
 Open [`docs/ROADMAP.md`](docs/ROADMAP.md) → Phase 1 is the live date-finder

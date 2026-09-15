@@ -1,0 +1,38 @@
+name: Retire live Appetize preview
+
+# The live preview was an unauthenticated URL running the app against the
+# production Supabase project (docs/security-review.md, finding 1). Its build
+# workflow is gone; this deletes the uploaded app so the old URL stops working.
+#
+# Permanent: Appetize can't restore a deleted app. Run it once from the Actions
+# tab or with `gh workflow run retire-appetize-live.yml`, then delete the
+# APPETIZE_LIVE_PUBLIC_KEY repo variable. With the variable gone it does nothing,
+# and this file can be removed.
+on:
+  workflow_dispatch:
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the live Appetize app
+        env:
+          APPETIZE_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+          PUBLIC_KEY: ${{ vars.APPETIZE_LIVE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$PUBLIC_KEY" ]; then
+            echo "APPETIZE_LIVE_PUBLIC_KEY isn't set — nothing to retire."
+            exit 0
+          fi
+          if [ -z "$APPETIZE_TOKEN" ]; then echo "::error::APPETIZE_API_TOKEN not set"; exit 1; fi
+          STATUS=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X DELETE \
+            -H "X-API-KEY: ${APPETIZE_TOKEN}" \
+            "https://api.appetize.io/v1/apps/${PUBLIC_KEY}")
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
+            echo "Deleted the live Appetize app (HTTP $STATUS)."
+          elif [ "$STATUS" = "404" ]; then
+            echo "Already gone (HTTP 404)."
+          else
+            echo "::error::Appetize answered HTTP $STATUS"
+            exit 1
+          fi

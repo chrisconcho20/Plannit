@@ -11,7 +11,7 @@ for the client-facing contract.
 supabase/
 ├─ config.toml                      # local dev + Apple auth config
 ├─ seed.sql                         # local demo data (3 users, 1 group, busy blocks)
-├─ seed-test-users.sql              # HOSTED test data — 5 people in your groups
+├─ seed-test-users.sql              # STAGING test data — 5 people; refuses to run on production
 ├─ migrations/
 │  ├─ 0001_init.sql                 # schema: profiles, groups, events, shares, busy_blocks, proposals…
 │  ├─ 0002_rls.sql                  # SECURITY DEFINER auth helpers + RLS policies

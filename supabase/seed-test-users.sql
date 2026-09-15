@@ -1,7 +1,12 @@
--- seed-test-users.sql — real people to test against, in a HOSTED project.
+-- seed-test-users.sql — real people to test against, in a HOSTED STAGING project.
+--
+-- Not for production. The live project is marked with
+-- `app_config.environment = 'production'` and this script refuses to run there:
+-- five sign-in-able accounts inside real groups were the top finding of
+-- docs/security-review.md, and were deleted on 2026-09-14.
 --
 -- `seed.sql` is for `supabase db reset` (local only). This one is written to be
--- pasted into the Supabase SQL editor of the live project: it is idempotent
+-- pasted into the Supabase SQL editor of a hosted test project: it is idempotent
 -- (safe to run again), it attaches everything to YOUR account, and it re-creates
 -- the busy blocks relative to today so the date-finder always has fresh data.
 --
@@ -46,6 +51,13 @@ declare
   sun          date;   -- the next Sunday
   i            int;
 begin
+  -- Never on production, whatever else is set below.
+  if exists (select 1 from public.app_config
+              where key = 'environment' and value = '"production"'::jsonb) then
+    raise exception
+      'This project is marked production (app_config.environment). Seed a staging project instead.';
+  end if;
+
   -- Refuse to create sign-in-able accounts with a password anyone can read.
   -- 16 characters isn't security theatre here: these accounts sit inside your
   -- real groups, and the app is reachable from a public preview link.
