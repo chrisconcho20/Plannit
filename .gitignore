@@ -2,6 +2,17 @@
 .env
 .env.*
 !.env.example
+# Keys and credentials: APNs and Sign in with Apple keys (AuthKey_*.p8),
+# certificates, and service-account JSON never belong in this public repo.
+*.p8
+*.p12
+*.pem
+*.key
+*.cer
+*.mobileprovision
+*credentials*.json
+*service-account*.json
+GoogleService-Info.plist
 
 # Supabase local
 supabase/.branches
