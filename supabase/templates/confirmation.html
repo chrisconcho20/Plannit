@@ -1,9 +1,77 @@
-<!-- Confirm signup. Source of truth for Authentication → Emails → "Confirm signup"
-     in the Supabase dashboard; subject: "Your Plannit code". The app has no web
-     page for a link to open, so this sends the code only. -->
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 420px; margin: 0 auto; padding: 24px; color: #1f1a17;">
-  <h2 style="margin: 0 0 12px;">Welcome to Plannit</h2>
-  <p style="margin: 0 0 20px;">Enter this code in the app to finish creating your account:</p>
-  <p style="font-size: 32px; font-weight: 700; letter-spacing: 6px; margin: 0 0 20px;">{{ .Token }}</p>
-  <p style="margin: 0; color: #6b625c; font-size: 14px;">If you didn't try to sign up for Plannit, you can ignore this email.</p>
-</div>
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- Confirm signup. Source of truth for Authentication → Emails → "Confirm signup"
+       in the Supabase dashboard; subject: "Your Plannit code". The app has no web
+       page for a link to open, so this sends the code only. Colours and type follow
+       design-system/tokens; layout is table-based and inline-styled for mail clients. -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>Your Plannit code</title>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0; padding:0; background-color:#FFFBF6;">
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#FFFBF6;">Your code is {{ .Token }}. Enter it in the app to finish creating your account.</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFBF6" style="background-color:#FFFBF6;">
+    <tr>
+      <td align="center" style="padding:40px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; font-family:'Figtree',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;">
+
+          <tr>
+            <td align="center" style="padding:0 0 24px; font-size:28px; font-weight:800; letter-spacing:-0.03em; color:#F76941;">Plannit</td>
+          </tr>
+
+          <tr>
+            <td bgcolor="#FFFFFF" style="background-color:#FFFFFF; border:1px solid #EFE9DF; border-radius:18px; padding:36px 28px; box-shadow:0 4px 12px -2px rgba(26,23,20,.10);">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size:28px; line-height:1.2; font-weight:700; letter-spacing:-0.02em; color:#1A1714; padding:0 0 12px;">Welcome to Plannit</td>
+                </tr>
+                <tr>
+                  <td style="font-size:17px; line-height:1.5; color:#5A524A; padding:0 0 28px;">Enter this code in the app to finish creating your account.</td>
+                </tr>
+                <tr>
+                  <td align="center" bgcolor="#FFF3EE" style="background-color:#FFF3EE; border:1px solid #FFE2D7; border-radius:14px; padding:22px 12px;">
+                    <span style="font-size:36px; line-height:1; font-weight:800; letter-spacing:10px; padding-left:10px; color:#1A1714; font-variant-numeric:tabular-nums; font-family:'Figtree',-apple-system,BlinkMacSystemFont,'SF Pro Rounded','Segoe UI',Roboto,sans-serif;">{{ .Token }}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="font-size:13px; line-height:1.5; color:#7A7268; padding:12px 0 0;">The code works for one hour.</td>
+                </tr>
+
+                <tr>
+                  <td style="padding:32px 0 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EFE9DF;">
+                      <tr>
+                        <td style="padding:24px 0 0; font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#9E958A;">What's next</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:10px 0 0; font-size:15px; line-height:1.5; color:#3E3831;">
+                          <span style="display:inline-block; width:8px; height:8px; border-radius:4px; background-color:#14A98F; margin-right:10px; vertical-align:middle;"></span>Connect your calendar. Your friends only see busy blocks, never your event titles.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0 0; font-size:15px; line-height:1.5; color:#3E3831;">
+                          <span style="display:inline-block; width:8px; height:8px; border-radius:4px; background-color:#F76941; margin-right:10px; vertical-align:middle;"></span>Make a group and find a date that works for everyone.
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:24px 12px 0; font-size:13px; line-height:1.5; color:#9E958A;">If you didn't try to sign up for Plannit, you can ignore this email.</td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
