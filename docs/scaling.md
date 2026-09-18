@@ -158,6 +158,39 @@ Set PostgREST's **`db-max-rows`** (Settings → API) to something like 1,000. It
 caps any query — including one a future bug forgets to bound — from returning the
 whole table. Costs nothing, prevents the category.
 
+### 10. Auth email has two hard caps 🟠 — upgrade before a launch spike
+
+_Added 2026-09-18, when custom SMTP went live._ Sign-up confirmation and
+password-reset codes are sent through Resend (`mail.plannittogether.com`), and
+two limits sit in front of every one of them:
+
+| Limit | Where it's set | Current value |
+|---|---|---|
+| Resend plan | Resend dashboard | Free: **100 emails/day**, 3,000/month |
+| Supabase auth email rate | Authentication → Rate Limits | Raised from the 30/hour default on 2026-09-18 |
+
+Each new email account costs one email, and each password reset another.
+Apple and Google sign-in cost none. So the Resend free plan runs out at roughly
+**100 email sign-ups a day** — an ordinary day at 1,000 users, and a single
+hour of an App Store feature or a post that travels.
+
+The failure is quiet: once either cap is hit, codes stop arriving, and a new
+user is left on the code screen with nothing in their inbox. Nothing in the
+app can tell that apart from a slow mail server.
+
+What to do, in order of when it matters:
+
+- **Before public launch:** move to Resend Pro ($20/month, 50,000 emails, no
+  daily cap) and raise the Supabase auth email rate to match. Resend bills
+  overage on paid plans rather than stopping, so the cap becomes a cost.
+- **Keep Apple and Google prominent** on the sign-in screen. Every sign-up that
+  goes through them is one less email.
+- **Watch Resend → Emails** for bounces and complaints. A poor sending
+  reputation gets codes filtered to spam before any quota is reached.
+
+Prices from [resend.com/pricing](https://resend.com/pricing), checked
+2026-09-18.
+
 ---
 
 ## Order of work
@@ -166,6 +199,7 @@ whole table. Costs nothing, prevents the category.
 2. **Before real users:** the RLS rewrite (3) plus the activity time bound (5),
    with `09-sharing.md` and `13-live-updates.md` run afterwards.
 3. **Before push:** `pg_net` cleanup job (8).
+   **Before public launch:** Resend Pro and a matching auth email rate (10).
 4. **When the numbers say so:** diff-based availability upload (4), and the
    realtime connection add-on (7).
 
@@ -186,3 +220,6 @@ Supabase's dashboard covers egress and realtime concurrency directly. The number
 worth a weekly glance is **egress per active user** — it's the one that grows
 with a code change rather than with signups, and it's how a chatty refresh loop
 turns into a bill.
+
+For email, **Resend's daily send count against the plan's cap** (10). On the
+free plan, a day that reaches 80 sends is the signal to upgrade.
