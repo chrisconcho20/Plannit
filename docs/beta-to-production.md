@@ -31,8 +31,8 @@ closing before open sign-up.
 
 ## 3. Client build
 
-- **Entitlements:** device testing uses `Plannit-Personal.entitlements` (empty) because a free Apple ID can't sign Sign in with Apple. **Switch `project.yml` back to `Plannit.entitlements`** for TestFlight or the App Store, or Apple sign-in silently won't work.
-- **Bundle id:** if you changed `com.plannit.app` for personal-team signing, change it back — it's the App Store identity.
+- ✅ **Entitlements** (2026-09-20): `project.yml` builds with `Plannit.entitlements`, which carries Sign in with Apple. `Plannit-Personal.entitlements` (empty) stays for free-Apple-ID device builds only. Add `aps-environment` to the same file when push is wired.
+- **Bundle id** is `com.chrisconcho.plannit` — the App Store identity, since `com.plannit.app` is registered to someone else.
 - **`Info.plist` Supabase keys stay empty in the repo.** Live values are injected at build time. The anon key is publishable, but a committed one flips the demo build to live.
 - **Keychain fallback:** `Keychain.swift` falls back to `UserDefaults` only when the Keychain returns `errSecMissingEntitlement` — unsigned simulator builds. Any signed build never takes that path, so production is unaffected. Don't "simplify" it away without checking that.
 

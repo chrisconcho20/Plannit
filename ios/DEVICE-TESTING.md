@@ -35,18 +35,13 @@ Then, in Xcode, **one** thing — in the **Plannit** target →
 - **Team** → *Add an Account…* → sign in with your Apple ID → pick
   `<Your Name> (Personal Team)`.
 
-The two settings that used to need changing here are now the committed defaults
-in [`project.yml`](project.yml), because regenerating the project reset them
-every time and the resulting build error (*"Personal development teams do not
-support the Sign in with Apple capability"*) doesn't say what to do about it:
-
-- **Bundle id** is `com.chrisconcho.plannit`. Bundle ids are global and
-  `com.plannit.app` belongs to someone else.
-- **Entitlements** are `Plannit-Personal.entitlements`, which is deliberately
-  empty. Sign in with Apple can't be signed by a personal team, and nothing
-  calls it yet — live mode signs in with dev email.
-
-Switch both back when there's a paid membership.
+- **Bundle id** is `com.chrisconcho.plannit` in [`project.yml`](project.yml).
+  Bundle ids are global and `com.plannit.app` belongs to someone else.
+- **Entitlements** are `Plannit.entitlements` since 2026-09-20, because there is
+  now a paid membership. A **free** Apple ID cannot sign Sign in with Apple and
+  fails with *"Personal development teams do not support the Sign in with Apple
+  capability"* — for that case, point `CODE_SIGN_ENTITLEMENTS` at
+  `Plannit-Personal.entitlements`, which is deliberately empty.
 
 **Don't commit your Team ID.** It isn't a credential — you can't sign anything
 with someone else's — but this repo is public and there's no upside to

@@ -12,7 +12,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.plannit.app
+        bundle_identifier: com.chrisconcho.plannit
       xcode: latest
       # Secure variables SUPABASE_URL, SUPABASE_ANON_KEY and SENTRY_DSN, set in
       # the Codemagic UI (ios/CODEMAGIC.md). Never in this file.
@@ -21,7 +21,7 @@ workflows:
       vars:
         XCODE_PROJECT: "Plannit.xcodeproj"
         XCODE_SCHEME: "Plannit"
-        BUNDLE_ID: "com.plannit.app"
+        BUNDLE_ID: "com.chrisconcho.plannit"
     scripts:
       - name: Install XcodeGen and generate the project
         script: |

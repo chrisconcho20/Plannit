@@ -45,19 +45,13 @@ targets:
         product: Sentry
     settings:
       base:
-        # Defaults are the ones a FREE Apple ID can actually build (see
-        # DEVICE-TESTING.md). Regenerating the project used to reset both of
-        # these to values that fail on a personal team, so every device test
-        # started with the same two edits and the same confusing build error.
-        #
-        # `com.plannit.app` is registered to someone else; this id is ours.
-        # Switch the entitlements back to Plannit.entitlements when there's a
-        # paid membership — that one carries Sign in with Apple, which a
-        # personal team cannot sign, and nothing calls it yet (live mode signs
-        # in with email).
+        # `com.plannit.app` is registered to someone else; this id is ours,
+        # and it is the App Store identity. Entitlements carry Sign in with
+        # Apple, so building on a free Apple ID (personal team) fails — swap to
+        # Plannit-Personal.entitlements for that, see DEVICE-TESTING.md.
         PRODUCT_BUNDLE_IDENTIFIER: com.chrisconcho.plannit
         INFOPLIST_FILE: Plannit/App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit-Personal.entitlements
+        CODE_SIGN_ENTITLEMENTS: Plannit/App/Plannit.entitlements
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
