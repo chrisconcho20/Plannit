@@ -331,7 +331,12 @@ final class CalendarService {
             ekEvent.location = event.location
             // One repeating EKEvent, not 400 copies.
             ekEvent.recurrenceRules = Recurrence.ekRule(for: event.recurrence).map { [$0] }
-            ekEvent.notes = "Planned with Plannit"
+            // The mirror rewrites this copy from the server, so an edit made
+            // here is replaced. Say so where the person doing it will read it.
+            ekEvent.notes = """
+                Planned with Plannit.
+                Edit this in the Plannit app — changes made here are replaced.
+                """
             do {
                 try store.save(ekEvent, span: .thisEvent, commit: false)
                 map[event.id] = ekEvent.eventIdentifier

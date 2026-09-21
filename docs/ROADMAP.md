@@ -225,6 +225,12 @@ to become. Individually sensible, collectively a security incident.
   one setting for every group today; a group-level override would let a
   five-a-side need ten while a family dinner needs everyone. Would live on
   `groups` rather than on the phone.
+- **Edits made to a plan in Apple Calendar are discarded.** The Plannit calendar
+  is a one-way mirror, so retitling or moving a plan there is overwritten on the
+  next sync (confirmed on a device 2026-09-21; the event's notes now warn about
+  it). Carrying such an edit back would mean calling `reschedule_event` — and
+  only for the organiser, since nobody else may change a plan. Decide whether
+  the edit should propagate, be refused visibly, or keep being silently undone.
 - **Never-free hours without calendar access.** The rule rides on the
   availability upload, which only runs with calendar read access.
 - Avatar images (initials only today); group avatars; timezone-aware display for

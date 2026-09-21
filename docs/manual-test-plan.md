@@ -173,7 +173,8 @@ These can't be checked on Appetize at all — they're the reason for the Mac.
 | 6d.2 | Lock a plan in, open Apple Calendar | A **Plannit** calendar exists with the event in it |
 | 6d.3 | Back in Plannit, look at the day | The plan appears **once**, not twice (it's in your device calendar now too) |
 | 6d.4 | Add an all-day event in Apple Calendar | It shows in Plannit and does **not** block that day in the date-finder |
-| 6d.5 | Edit an event in Apple Calendar with Plannit open | Plannit re-syncs within a moment |
+| 6d.5 | Edit one of **your own** events in Apple Calendar with Plannit open | Plannit re-syncs within a moment |
+| 6d.5b | Edit a **Plannit plan** from inside Apple Calendar | The edit is replaced within a second — the mirror rewrites the copy from the server. The event's notes say so. Verified 2026-09-21 |
 | 6d.6 | Delete a locked-in plan in Plannit | It disappears from Apple Calendar too |
 | 6d.7 | Settings → Display & Text Size → Larger Text | Every screen scales; nothing clips or overlaps |
 | 6d.8 | Turn on VoiceOver, sweep a screen | **Known gap:** cards read as raw text runs; buttons are labelled |
@@ -218,3 +219,6 @@ and `functions deploy invite`)
 - **No invite links** — reaching someone new needs their exact sign-up email.
 - **No blocking** — removing a friend just deletes the row.
 - **Group colour is device-local** — your teammates see the name-derived one.
+- **Plannit plans can't be edited from Apple Calendar** — the Plannit calendar is
+  a one-way mirror, so edits made there are overwritten on the next sync. Change
+  the plan in Plannit instead. (Removing one is different: that is how you decline.)
