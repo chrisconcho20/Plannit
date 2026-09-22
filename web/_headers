@@ -1,0 +1,3 @@
+# Apple fetches this file and requires application/json, with no extension.
+/.well-known/apple-app-site-association
+  Content-Type: application/json

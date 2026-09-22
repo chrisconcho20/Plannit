@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["JH43PDTH77.com.chrisconcho.plannit"],
+        "components": [
+          { "/": "/invite/*", "comment": "Invite links open the app" }
+        ]
+      }
+    ]
+  }
+}
