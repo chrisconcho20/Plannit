@@ -62,6 +62,12 @@ generate a key with the **App Manager** role. Download the `.p8` and note the
    - `SUPABASE_ANON_KEY` — Supabase dashboard → Settings → API
    - `SENTRY_DSN` — optional; Sentry → your iOS project → Client Keys (DSN).
      Empty leaves crash reporting off.
+   - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — optional, and only
+     for readable crash reports. The build uploads its debug symbols (dSYMs)
+     when all three are set and skips the step when they aren't; without them a
+     crash report is a list of memory addresses rather than function names. The
+     token comes from Sentry → Settings → Auth Tokens and needs the
+     `project:releases` scope.
 
    The build writes them into `Info.plist` for that build only. Without the two
    Supabase values the build stops, because an app without them opens in demo

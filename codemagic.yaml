@@ -52,6 +52,17 @@ workflows:
         script: |
           cd ios
           xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+      # Without debug symbols a crash report is a list of addresses. Skipped
+      # when the Sentry variables are absent, so the build still works for
+      # anyone who hasn't set crash reporting up.
+      - name: Upload debug symbols to Sentry
+        script: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Sentry variables not set: skipping the dSYM upload."
+            exit 0
+          fi
+          curl -sL https://sentry.io/get-cli/ | bash
+          sentry-cli debug-files upload --include-sources ios/build/ios/xcarchive
     artifacts:
       - ios/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
