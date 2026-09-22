@@ -54,8 +54,21 @@ struct RootView: View {
         // Straight back in if the Keychain still has a session.
         .task {
             model.startDemoIdentity()
+            PushService.shared.start()
             guard flow == .restoring else { return }
             flow = await model.restoreSession() ? .app : .welcome
+            if flow == .app { await PushService.shared.syncToken() }
+        }
+        // A tapped notification picks the tab its subject lives on. Landing on
+        // the exact group or plan needs a navigation path this app doesn't have
+        // yet (ROADMAP Phase 4).
+        .onReceive(PushService.shared.$destination.compactMap { $0 }) { destination in
+            switch destination {
+            case .group:   tab = .groups
+            case .event:   tab = .plans
+            case .friends: tab = .you
+            }
+            PushService.shared.clearDestination()
         }
         // Signing out anywhere returns to the front door.
         .onChange(of: model.signedIn) { _, signedIn in

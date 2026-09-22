@@ -317,8 +317,13 @@ final class AppModel: ObservableObject {
 
     /// Sign out: forget the session and drop every trace of the account's data.
     func signOut() {
-        Task { await stopRealtime() }
-        SupabaseClient.shared.signOut()
+        // The token row is deleted while the session can still authorise it,
+        // so the next person on this phone doesn't inherit the notifications.
+        Task {
+            await PushService.shared.forgetDevice()
+            await stopRealtime()
+            SupabaseClient.shared.signOut()
+        }
         signedIn = false
         userId = nil
         userEmail = nil
@@ -1574,6 +1579,17 @@ final class AppModel: ObservableObject {
 
     /// Upload merged busy intervals (no titles) so group availability can be
     /// computed. Shared with the background task — see AvailabilityUploader.
+    /// You → Share availability. Off clears what the server already holds;
+    /// on uploads again immediately, so the switch takes effect while the
+    /// person is still looking at it.
+    func setAvailabilitySharing(_ on: Bool) async {
+        if on {
+            await uploadBusyBlocksIfLive()
+        } else {
+            await AvailabilityUploader.clearUploaded()
+        }
+    }
+
     private func uploadBusyBlocksIfLive() async {
         guard calendarAuthorized else { return }   // write-only has nothing to share
         await AvailabilityUploader.upload(reading: CalendarReader.shared.read())

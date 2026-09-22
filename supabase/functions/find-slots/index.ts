@@ -162,6 +162,7 @@ Deno.serve(async (req) => {
           headers: { "content-type": "application/json", "x-internal-secret": secret },
           body: JSON.stringify({
             userIds: recipients,
+            category: "date_found",
             notification: {
               title: "Plannit found a date",
               body: [

@@ -214,9 +214,10 @@ struct YouScreen: View {
     @State private var showCalendars = false
     @State private var confirmSignOut = false
     @State private var connecting = false
-    @State private var shareAvailability = true
-    @State private var pushDateFound = true
-    @State private var pushInvites = true
+    @AppStorage(AvailabilitySharing.key) private var shareAvailability = true
+    @AppStorage(PushPreference.dateFoundKey) private var pushDateFound = true
+    @AppStorage(PushPreference.invitesKey) private var pushInvites = true
+    @State private var pushDenied = false
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
     @AppStorage(MinimumAttendance.key) private var minimumAttendance = MinimumAttendance.defaultValue
     @State private var showNeverFree = false
@@ -336,6 +337,17 @@ struct YouScreen: View {
                     toggleRow("wand-sparkles", "A date was found", "When Plannit finds a time for a group", $pushDateFound)
                     divider
                     toggleRow("user-plus", "Invites & requests", "Friend requests and shared events", $pushInvites)
+                    if pushDenied {
+                        divider
+                        HStack(spacing: 12) {
+                            PIcon("info", size: 20, color: .textMuted).frame(width: 22)
+                            Text("Notifications are off for Plannit in iOS Settings, so these stay quiet.")
+                                .textStyle(.caption, color: .textMuted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
                 }
 
                 PlannitButton(title: "Sign out", variant: .danger, size: .md, fullWidth: true) {
@@ -372,6 +384,23 @@ struct YouScreen: View {
         } message: {
             Text("You'll need your email and password to get back in.")
         }
+        .task { pushDenied = !(await PushService.shared.isAuthorized) }
+        // Turning a notification on is the moment to ask iOS, if we never have.
+        .onChange(of: pushDateFound) { _, on in Task { await pushChanged(turnedOn: on) } }
+        .onChange(of: pushInvites) { _, on in Task { await pushChanged(turnedOn: on) } }
+        .onChange(of: shareAvailability) { _, on in
+            Task { await model.setAvailabilitySharing(on) }
+        }
+    }
+
+    /// Both notification switches write the same row, so both take the same
+    /// path: ask for permission if this is the first yes, then tell the server.
+    private func pushChanged(turnedOn: Bool) async {
+        if turnedOn, !(await PushService.shared.isAuthorized) {
+            _ = await PushService.shared.requestAuthorization()
+        }
+        pushDenied = !(await PushService.shared.isAuthorized)
+        await PushService.shared.syncToken()
     }
 
     private var divider: some View { Rectangle().fill(Color.hairline).frame(height: 1).padding(.leading, 46) }

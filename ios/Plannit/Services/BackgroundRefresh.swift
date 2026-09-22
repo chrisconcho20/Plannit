@@ -64,6 +64,10 @@ enum AvailabilityUploader {
     static func upload(reading: BusyReading) async {
         guard SupabaseClient.shared.isConfigured, SupabaseClient.shared.isSignedIn,
               SupabaseClient.shared.userId != nil else { return }
+        guard AvailabilitySharing.isOn else {
+            Log.cal("busy: sharing is off, nothing uploaded")
+            return
+        }
 
         let iso = ISO8601DateFormatter()
         let blocks = reading.blocks
@@ -102,6 +106,26 @@ enum AvailabilityUploader {
             // blocks are still there, which is the right way to fail.
             lastUploadFailed = true
             Log.cal("busy: upload failed, keeping the previous blocks")
+        }
+    }
+
+    /// Turning sharing off has to remove what was already uploaded — leaving
+    /// yesterday's blocks behind would keep answering for you. The digest goes
+    /// too, so turning sharing back on uploads afresh rather than deciding
+    /// nothing has changed.
+    @MainActor
+    static func clearUploaded() async {
+        guard SupabaseClient.shared.isConfigured, SupabaseClient.shared.isSignedIn else { return }
+        do {
+            try await SupabaseClient.shared.rpcVoid(
+                "replace_busy_blocks", args: ReplaceBusyBlocksArgs(p_blocks: []))
+            UserDefaults.standard.removeObject(forKey: digestKey)
+            lastUploadedAt = nil
+            lastUploadFailed = false
+            Log.cal("busy: cleared the uploaded blocks")
+        } catch {
+            lastUploadFailed = true
+            Log.cal("busy: couldn't clear the uploaded blocks")
         }
     }
 

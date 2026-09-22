@@ -6,9 +6,10 @@
     <array>
         <string>Default</string>
     </array>
-    <!-- Add when wiring push (see docs/backend/push-notifications.md):
+    <!-- TestFlight and App Store builds talk to APNs production. A build
+         signed with a development profile needs "development" instead; the
+         device_tokens row records which one a token came from. -->
     <key>aps-environment</key>
-    <string>development</string>
-    -->
+    <string>production</string>
 </dict>
 </plist>

@@ -1,7 +1,27 @@
 import SwiftUI
+import UIKit
+
+/// APNs hands the device token to the app delegate and nowhere else, so SwiftUI
+/// needs one. It forwards to PushService and holds no state of its own.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in PushService.shared.didRegister(deviceToken: deviceToken) }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in PushService.shared.didFailToRegister(error) }
+    }
+}
 
 @main
 struct PlannitApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     init() {

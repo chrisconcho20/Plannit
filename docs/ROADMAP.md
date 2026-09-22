@@ -132,7 +132,7 @@ account. See §6 for URLs/creds.
    made on-device before 0017 are uploaded once by the owner.
 
 ### Phase 4 — Notifications
-8. **APNs client** — request permission, register the device token into
+8. ~~**APNs client**~~ ✅ **client built (2026-09-21), waiting on the key.** — request permission, register the device token into
    `device_tokens` on launch, handle taps → deep-link (`proposalId`/`groupId`).
    Server side already exists (`send-push` + triggers). Contract:
    [`backend/push-notifications.md`](backend/push-notifications.md). Requires the

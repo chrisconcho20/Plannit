@@ -16,6 +16,7 @@ enum Log {
     #if DEBUG
     private static let calendar = Logger(subsystem: "com.plannit.app", category: "calendar")
     private static let sync = Logger(subsystem: "com.plannit.app", category: "sync")
+    private static let push = Logger(subsystem: "com.plannit.app", category: "push")
     #endif
 
     /// EventKit: access, reads, and what we wrote back.
@@ -29,6 +30,14 @@ enum Log {
     static func sync(_ message: String) {
         #if DEBUG
         Self.sync.notice("\(message, privacy: .public)")
+        #endif
+    }
+
+    /// APNs: registration, the token row, and taps. States only — never a
+    /// token's value, never a notification's text.
+    static func push(_ message: String) {
+        #if DEBUG
+        Self.push.notice("\(message, privacy: .public)")
         #endif
     }
 }

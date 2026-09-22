@@ -4,16 +4,30 @@
 // directly by clients. Protected by a shared INTERNAL_FUNCTION_SECRET rather
 // than a user JWT, because it can push to any user's devices.
 //
-// Body: { userIds?: string[], deviceTokens?: string[], notification: {...} }
+// Body: { userIds?: string[], deviceTokens?: string[], category?: string,
+//          notification: {...} }
+//
+// `category` names one of the switches in the app's You tab. Devices that
+// turned it off are skipped here, rather than delivering a push the app would
+// have to drop. A category nobody has a switch for reaches every device.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { loadApnsConfig, sendApnsPush, type ApnsNotification } from "../_shared/apns.ts";
 
+type PushCategory = "date_found" | "invites";
+
 interface RequestBody {
   userIds?: string[];
   deviceTokens?: string[];
+  category?: PushCategory | string | null;
   notification: ApnsNotification;
 }
+
+// Which column a category is gated by. Unlisted categories are ungated.
+const CATEGORY_COLUMN: Record<string, string> = {
+  date_found: "notify_date_found",
+  invites: "notify_invites",
+};
 
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -42,10 +56,10 @@ Deno.serve(async (req) => {
   // Resolve device tokens from userIds and/or explicit tokens.
   let tokens: string[] = body.deviceTokens ?? [];
   if (body.userIds?.length) {
-    const { data, error } = await admin
-      .from("device_tokens")
-      .select("token")
-      .in("user_id", body.userIds);
+    let query = admin.from("device_tokens").select("token").in("user_id", body.userIds);
+    const column = body.category ? CATEGORY_COLUMN[body.category] : undefined;
+    if (column) query = query.eq(column, true);
+    const { data, error } = await query;
     if (error) return json({ error: "tokens_lookup_failed", detail: error.message }, 500);
     tokens = tokens.concat((data ?? []).map((r) => r.token as string));
   }

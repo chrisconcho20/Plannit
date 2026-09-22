@@ -187,6 +187,16 @@ struct EventUpdate: Encodable {
 }
 /// Soft delete — the sync contract wants a tombstone, not a vanished row.
 struct EventTombstone: Encodable { let deleted_at: String }
+
+/// One phone's APNs registration. `user_id` is sent explicitly because the
+/// row's RLS check compares it with `auth.uid()`.
+struct DeviceTokenUpsert: Encodable {
+    let user_id: String
+    let token: String
+    let environment: String
+    let notify_date_found: Bool
+    let notify_invites: Bool
+}
 /// A nil hue is omitted from the PATCH, so renaming leaves the colour alone.
 struct GroupRename: Encodable {
     let name: String
@@ -645,6 +655,23 @@ final class SupabaseClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
         req.httpBody = try JSONEncoder().encode(values)
+        _ = try await sendRaw(req)
+    }
+
+    /// Insert, or update the row that collides with `onConflict`. PostgREST
+    /// spells this as an insert with `resolution=merge-duplicates`.
+    func upsert<T: Encodable>(_ table: String, values: T, onConflict: String) async throws {
+        guard let baseURL, let token = await authorized() else { throw SupabaseError.notConfigured }
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("rest/v1/\(table)"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: onConflict)]
+        var req = URLRequest(url: components.url!)
+        req.httpMethod = "POST"
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal,resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        req.httpBody = try JSONEncoder().encode([values])
         _ = try await sendRaw(req)
     }
 
