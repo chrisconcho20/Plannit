@@ -99,7 +99,30 @@ confirmation: [`auth-setup.md`](auth-setup.md).
   This gives you the key file + `APNS_KEY_ID`.
 - `APNS_TEAM_ID` = your Apple Developer Team ID.
 - `APNS_BUNDLE_ID` = the app's bundle id.
-- Use `APNS_ENV=sandbox` for TestFlight/dev builds, `production` for App Store.
+- `APNS_ENV=production` for **TestFlight and App Store** builds — both are
+  signed for distribution and register with APNs production. `sandbox` is for
+  builds run straight from Xcode. The environment a token came from is on its
+  `device_tokens` row.
+
+**Where each value goes.** The APNs values and `INTERNAL_FUNCTION_SECRET` are
+**Edge Function secrets** (dashboard → Edge Functions → Secrets, or
+`supabase secrets set`). The triggers run inside Postgres and cannot read those,
+so `internal_function_secret` and `functions_base_url` go in **Vault** as well
+(§5b) — the same value in both places, or `send-push` answers 403.
+
+**Sending a test push.** With a device registered (You → Notifications turned on,
+a row in `device_tokens`), from the SQL editor:
+
+```sql
+select private.notify_push(
+  array['<your user id>']::uuid[],
+  'Plannit', 'Test push', '{}'::jsonb, 'test', null);
+```
+
+Nothing arriving means one of: the Vault entries are missing (the function
+returns silently), the two secret values differ, `APNS_ENV` doesn't match the
+build (`production` for TestFlight), or the device never registered. The
+`net._http_response` table holds what APNs answered.
 
 ## 7. Smoke test
 
