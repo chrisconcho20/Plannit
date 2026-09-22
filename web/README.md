@@ -14,6 +14,7 @@ Static HTML with one stylesheet. No build step, no framework, no JavaScript.
 | `styles.css` | Design-system colours and type, copied as plain CSS |
 | `.well-known/apple-app-site-association` | Declares that `/invite/*` belongs to the app (Universal Links) |
 | `_headers` | Serves the association file as `application/json`, which Apple requires |
+| `_redirects` | Sends `/invite/<token>` to the invite Edge Function for anyone without the app |
 
 ## Deploying
 
@@ -37,8 +38,12 @@ records already on the sending subdomain.
 
 ## Universal Links
 
-The association file is in place, but links do not open the app until the app
-declares the matching entitlement: `com.apple.developer.associated-domains`
-holding `applinks:plannittogether.com`, in `ios/Plannit/App/Plannit.entitlements`.
-The provisioning profile already carries the capability. Until then, an invite
-link opens this site and the app must be opened by hand.
+Both halves are in place since 2026-09-22: the association file here, and
+`applinks:plannittogether.com` in `ios/Plannit/App/Plannit.entitlements`. The app
+shares invite links as `https://plannittogether.com/invite/<token>`, so iOS opens
+the app directly and `_redirects` serves everyone else the invite page.
+
+iOS fetches the association file **when the app is installed**, so the site has
+to be deployed before the build that carries the entitlement is installed. If a
+link opens Safari instead of the app, reinstall from TestFlight — that is what
+makes iOS look again.

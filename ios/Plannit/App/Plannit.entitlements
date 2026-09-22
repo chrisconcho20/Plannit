@@ -11,5 +11,12 @@
          device_tokens row records which one a token came from. -->
     <key>aps-environment</key>
     <string>production</string>
+    <!-- Invite links (https://plannittogether.com/invite/<token>) open the app
+         instead of Safari. iOS fetches the site's apple-app-site-association
+         file at install time, so the site has to be live for this to bind. -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:plannittogether.com</string>
+    </array>
 </dict>
 </plist>

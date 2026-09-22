@@ -131,12 +131,15 @@ struct RootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        // plannit://invite/<token> — from the web landing page, or a link
-        // someone taps with the app already installed.
+        // Two shapes reach here: the Universal Link a person taps in Messages
+        // (https://plannittogether.com/invite/<token>) and the custom scheme the
+        // web page falls back to (plannit://invite/<token>).
         .onOpenURL { url in
-            guard url.scheme == "plannit", url.host == "invite" else { return }
-            let token = url.pathComponents.last.map { $0.replacingOccurrences(of: "/", with: "") }
-            guard let token, !token.isEmpty else { return }
+            guard let token = Self.inviteToken(in: url) else { return }
+            Task { await model.redeemInvite(token: token) }
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            guard let url = activity.webpageURL, let token = Self.inviteToken(in: url) else { return }
             Task { await model.redeemInvite(token: token) }
         }
         .animation(Motion.base, value: model.toast)
@@ -159,6 +162,20 @@ struct RootView: View {
                 await model.loadData()
                 await model.startRealtime()
             }
+        }
+    }
+
+    /// The token in an invite link, whichever shape it arrived in. Anything
+    /// else — another path on the site, another scheme — is not ours.
+    static func inviteToken(in url: URL) -> String? {
+        let parts = url.pathComponents.filter { $0 != "/" }
+        switch url.scheme {
+        case "plannit" where url.host == "invite":
+            return parts.last.flatMap { $0.isEmpty ? nil : $0 }
+        case "https" where parts.first == "invite":
+            return parts.count > 1 ? parts[1] : nil
+        default:
+            return nil
         }
     }
 

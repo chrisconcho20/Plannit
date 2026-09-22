@@ -217,8 +217,12 @@ reads the flag and drops the "everyone is your friend" line when it's off.
 
 ## Invite links
 
-`GET /functions/v1/invite?t=<token>` is a public HTML landing page (no JWT — see
-`config.toml`). It calls `peek_invite` and deep-links to `plannit://invite/<token>`.
+Shared links read `https://plannittogether.com/invite/<token>`, which the site
+redirects to `GET /functions/v1/invite?t=<token>` — a public HTML landing page
+(no JWT — see `config.toml`) that calls `peek_invite` and deep-links to
+`plannit://invite/<token>`. The link is on the site rather than the functions
+domain so iOS can match it against the app's associated domain and open the app
+directly; the redirect is what serves everyone without the app.
 
 | Function | Who | Returns |
 |---|---|---|

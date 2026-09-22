@@ -184,9 +184,10 @@ and `functions deploy invite`)
 
 | # | Do this | Expect |
 |---|---|---|
-| 6e.1 | Group → Invite with a link → Share | A share sheet with an https link |
+| 6e.1 | Group → Invite with a link → Share | A share sheet with `https://plannittogether.com/invite/<token>` |
 | 6e.2 | Open that link in a browser | A page naming the inviter and group, with an "Open in Plannit" button |
-| 6e.3 | Tap it with the app installed | Plannit opens, "You're in <group>", and you're friends with the inviter |
+| 6e.3 | Tap it in Messages **with the app installed** | Plannit opens directly, no browser — "You're in <group>", and you're friends with the inviter |
+| 6e.3b | Long-press the link in Messages | The menu offers "Open in Plannit" — if it doesn't, the association file isn't binding (see `web/README.md`) |
 | 6e.4 | Tap the same link again | "You're already in <group>" — and no use is burned |
 | 6e.5 | Owner removes the inviter, then someone opens the link | Refused — a removed member's link stops working |
 | 6e.6 | Open `?t=deadbeef` in a browser | "Expired or used up" — never "no such invite" |

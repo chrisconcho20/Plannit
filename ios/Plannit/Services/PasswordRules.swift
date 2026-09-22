@@ -7,8 +7,10 @@ import Foundation
 // wrong while the person is still typing.
 
 enum PasswordRules {
-    /// Supabase Auth's default minimum. Raise it here and in the dashboard together.
-    static let minimumLength = 6
+    /// Must match Authentication → Providers → Email → minimum password length
+    /// in the dashboard; the server is what actually enforces it. Eight rather
+    /// than Supabase's default six, which the security review called out.
+    static let minimumLength = 8
 
     /// The first thing wrong with a new password and its confirmation, or nil.
     static func problem(_ password: String, confirm: String) -> String? {

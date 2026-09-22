@@ -1,0 +1,3 @@
+# Invite links live on the site so iOS can match them against the app's
+# associated domain; the page itself is the invite function's.
+/invite/*  https://jkvrdcallufomeavzvhv.supabase.co/functions/v1/invite?t=:splat  302

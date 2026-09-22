@@ -128,9 +128,11 @@ final class AuthTests: XCTestCase {
 
     func testANewPasswordNeedsLengthAndAMatchingConfirmation() {
         XCTAssertNotNil(PasswordRules.problem("abc", confirm: "abc"), "too short")
-        XCTAssertEqual(PasswordRules.problem("abcdef", confirm: "abcdeg"),
+        XCTAssertNotNil(PasswordRules.problem("abcdefg", confirm: "abcdefg"),
+                        "one short of the minimum")
+        XCTAssertEqual(PasswordRules.problem("abcdefgh", confirm: "abcdefgi"),
                        "The passwords don't match.")
-        XCTAssertNil(PasswordRules.problem("abcdef", confirm: "abcdef"))
+        XCTAssertNil(PasswordRules.problem("abcdefgh", confirm: "abcdefgh"))
     }
 
     func testAMismatchIsOnlyShownOnceTheConfirmationIsTyped() {

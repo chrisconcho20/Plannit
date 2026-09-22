@@ -473,7 +473,7 @@ final class AppModel: ObservableObject {
     /// Returns nil if we couldn't make one.
     func inviteLink(for group: PGroup) async -> URL? {
         guard Config.isLiveBackend else {
-            return URL(string: "https://plannit.app/i/demo")   // nothing real to share in demo
+            return URL(string: "\(Config.siteURL)/invite/demo")   // nothing real to share in demo
         }
         do {
             let rows: [InviteDTO] = try await SupabaseClient.shared.rpc(
@@ -489,12 +489,12 @@ final class AppModel: ObservableObject {
     }
 
     /// The public landing page. An https link so it previews in a message and
-    /// works for someone who hasn't installed the app; that page deep-links
-    /// back into plannit://invite/<token>.
+    /// works for someone who hasn't installed the app. With the app installed
+    /// iOS opens it directly (Universal Links); without it, the site redirects
+    /// to the invite function, whose page deep-links back into
+    /// plannit://invite/<token>.
     static func inviteURL(token: String) -> URL? {
-        URL(string: Config.supabaseURL)?
-            .appendingPathComponent("functions/v1/invite")
-            .appending(queryItems: [URLQueryItem(name: "t", value: token)])
+        URL(string: "\(Config.siteURL)/invite/\(token)")
     }
 
     /// Handle plannit://invite/<token>, however we were opened.

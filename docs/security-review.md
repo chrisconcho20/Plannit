@@ -176,7 +176,8 @@ succeed, and what every user can see was otherwise unchanged.
 Still open, lower risk: free/busy can be probed through the date finder by a
 group's own members (rate limited to 60 searches an hour), invite links are
 bearer tokens that can be forwarded, sign-up reveals whether an email is
-registered while confirmation is off, and the password minimum is 6.
+registered while confirmation is off. The password minimum was 6 and is 8
+since 2026-09-22, in `PasswordRules` and in the dashboard.
 
 ## What I checked and found clean
 

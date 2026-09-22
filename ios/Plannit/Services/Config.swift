@@ -14,6 +14,12 @@ enum Config {
         (Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? "")
             .trimmingCharacters(in: .whitespaces)
     }
+    /// The public site. Invite links are served from here rather than straight
+    /// from the functions domain, so iOS can match them against
+    /// `applinks:plannittogether.com` and open the app instead of Safari.
+    /// `/invite/*` redirects to the invite function (see `web/_redirects`).
+    static let siteURL = "https://plannittogether.com"
+
     static var isLiveBackend: Bool {
         !supabaseURL.isEmpty && !supabaseAnonKey.isEmpty
     }
