@@ -43,11 +43,23 @@ workflows:
         script: |
           cd ios
           xcode-project use-profiles
+      # Build numbers must rise and must never repeat: Apple rejects a repeat
+      # with "an attribute with a value that has already been used", after the
+      # whole build has run. The lookup used to be silenced and fall back to 0,
+      # which numbered every build 1. It now speaks up, and the fallback is a
+      # UTC timestamp — always larger than anything that came before it.
       - name: Set the TestFlight build number
         script: |
           cd ios
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          agvtool new-version -all $((LATEST + 1)) || true
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID") || LATEST=""
+          if [ -n "$LATEST" ] && [ "$LATEST" -gt 0 ] 2>/dev/null; then
+            NEXT=$((LATEST + 1))
+          else
+            NEXT=$(date -u +%Y%m%d%H%M)
+            echo "Couldn't read the latest TestFlight build number; using $NEXT."
+          fi
+          echo "Build number: $NEXT"
+          agvtool new-version -all "$NEXT"
       - name: Build the IPA
         script: |
           cd ios
