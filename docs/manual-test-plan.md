@@ -215,10 +215,20 @@ and `functions deploy invite`)
 
 ## Known gaps (don't file these)
 
-- **No reopening a locked plan** — cancel it and run the finder again.
-- **No invite links** — reaching someone new needs their exact sign-up email.
+_Reviewed 2026-09-21._
+
+- **No reopening a locked plan** — cancel it and run the finder again. Moving one
+  to another day is `reschedule_event` (§6e), which is a different thing.
 - **No blocking** — removing a friend just deletes the row.
-- **Group colour is device-local** — your teammates see the name-derived one.
+- **Invite links can't be listed or revoked in the app**, though the database
+  allows the creator or group owner to delete them.
+- **Plannit plans can't be edited from Apple Calendar** — see 6d.5b.
+- **The activity feed has no pagination**, and "seen" is tracked on the device.
+- **Sign in with Apple and Google** need their providers configured in Supabase
+  before the buttons do anything ([`backend/auth-setup.md`](backend/auth-setup.md) §5–6).
+
+Fixed since this list was first written: invite links exist (§6e), and a group's
+colour is shared with every member rather than being device-local.
 - **Plannit plans can't be edited from Apple Calendar** — the Plannit calendar is
   a one-way mirror, so edits made there are overwritten on the next sync. Change
   the plan in Plannit instead. (Removing one is different: that is how you decline.)

@@ -158,7 +158,11 @@ account. See §6 for URLs/creds.
     list pulls to refresh. Calendar, Groups, Plans, Activity and Friends show
     skeletons on first load. Failed writes report themselves: inline in the
     sheet that made them, or as a toast from the app shell.
-12. **Empty-state copy** — friendly "nothing yet / here's what to do" states.
+12. ~~**Empty-state copy**~~ ✅ **done (confirmed 2026-09-21).** Every list has a
+    "nothing yet, here's the one thing to do next" state in the product voice:
+    calendar day and month, groups, a group's plans, friends, the friend search,
+    people to add, plans, activity, and the date-finder's no-results and
+    couldn't-check cases.
 13. ~~**Wire or hide placeholder buttons**~~ ✅ **done (2026-08-14).** Search
     filters groups by name or member; ⋯ on an event is Edit/Share/Delete; the
     dead Inbox and Settings buttons are gone; Sign out works.
