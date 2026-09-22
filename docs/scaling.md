@@ -191,6 +191,35 @@ What to do, in order of when it matters:
 Prices from [resend.com/pricing](https://resend.com/pricing), checked
 2026-09-18.
 
+### 11. The sign-in screens name the project, not the app 🟢 — a launch-day cost
+
+_Added 2026-09-22._ Signing in with Google shows an iOS prompt reading
+"Plannit wants to use **supabase.co** to sign in", because that is where the
+OAuth page lives. Nothing is wrong, and it costs nothing today, but it reads as
+somebody else's domain at the exact moment a new user decides whether to trust
+the app.
+
+Removing it needs a **Supabase custom domain** (`auth.plannittogether.com`), an
+add-on at **$10/month** that requires a paid plan — so **$35/month** with Pro,
+against $0 now. Free improvements that don't need it: the Google **OAuth
+consent screen** carries the app name, icon, home page and privacy URL, so the
+screen people actually read says Plannit either way.
+
+Apple's sheet is unaffected: native Sign in with Apple never leaves the app.
+
+**Where this lands.** The upgrade is one item in a launch-day bill that also
+includes Resend Pro (10) and, eventually, realtime connections (7):
+
+| At public launch | Monthly |
+|---|---|
+| Supabase Pro | $25 |
+| Supabase custom domain | $10 |
+| Resend Pro | $20 |
+| **Total** | **$55** |
+
+Plus the fixed $99/yr Apple Developer Program. See
+[`cost-analysis.md`](cost-analysis.md), which models the backend at each stage.
+
 ---
 
 ## Order of work
@@ -199,7 +228,8 @@ Prices from [resend.com/pricing](https://resend.com/pricing), checked
 2. **Before real users:** the RLS rewrite (3) plus the activity time bound (5),
    with `09-sharing.md` and `13-live-updates.md` run afterwards.
 3. **Before push:** `pg_net` cleanup job (8).
-   **Before public launch:** Resend Pro and a matching auth email rate (10).
+   **Before public launch:** Resend Pro and a matching auth email rate (10),
+   and the custom domain if the sign-in screens should say Plannit (11).
 4. **When the numbers say so:** diff-based availability upload (4), and the
    realtime connection add-on (7).
 
