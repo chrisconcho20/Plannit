@@ -51,6 +51,16 @@ struct CalendarScreen: View {
         model.events.filter { $0.isOnCalendar(for: model.userId) }
     }
 
+    /// Your own calendar's events, minus the ones Plannit already holds a copy
+    /// of. An event you've shared exists twice — in EventKit, and as the copy
+    /// the group can see — and it is one event, so it gets one row and one dot,
+    /// the Plannit copy's, because that one knows who it's shared with. The day
+    /// list always did this; the dots did not, which is why sharing an event
+    /// left two marks on its day.
+    private var unsharedDeviceEvents: [DeviceEvent] {
+        AppModel.deviceEventsWithoutCopies(model.deviceEvents, copies: calendarEvents)
+    }
+
     /// Events in the shown month, grouped by day — the source of the grid's dots.
     /// Derived from real events, so a day only gets a mark if something is on it.
     private var marks: [Int: [Color]] {
@@ -58,7 +68,7 @@ struct CalendarScreen: View {
         for event in monthOccurrences {
             out[event.day, default: []].append(event.hue.color)
         }
-        for device in model.deviceEvents
+        for device in unsharedDeviceEvents
         where cal.isDate(device.start, equalTo: visibleMonth, toGranularity: .month) {
             out[cal.component(.day, from: device.start), default: []].append(GroupHue.coral.color)
         }
@@ -86,13 +96,7 @@ struct CalendarScreen: View {
     /// dumped every day under whichever day you'd tapped — invisible on an
     /// empty simulator, a wall of text on a real phone.
     private var deviceEvents: [DeviceEvent] {
-        // An event you've shared exists twice — in EventKit, and as the Plannit
-        // copy the group can see. Show the Plannit one: it's the same event, and
-        // it's the one that knows who it's shared with.
-        let sharedExternalIds = Set(calendarEvents.compactMap(\.externalCalId))
-        let all = model.deviceEvents
-            .filter { $0.externalId.map { !sharedExternalIds.contains($0) } ?? true }
-            .sorted { $0.start < $1.start }
+        let all = unsharedDeviceEvents
         if mode != .list, let selectedDate {
             return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
         }
@@ -295,9 +299,15 @@ struct CalendarScreen: View {
         }
     }
 
+    /// The week strip's dots, held to the same rules as the month grid's: what
+    /// is actually on your calendar, each event counted once.
     private func dots(for date: Date) -> [Color] {
-        var out = model.events.filter { $0.isOn(date) }.map(\.hue.color)
-        out += model.deviceEvents.filter { cal.isDate($0.start, inSameDayAs: date) }
+        let day = cal.startOfDay(for: date)
+        let end = cal.date(byAdding: .day, value: 1, to: day) ?? day
+        var out = calendarEvents.flatMap { $0.occurrences(in: day...end) }
+            .filter { $0.isOn(date) }
+            .map(\.hue.color)
+        out += unsharedDeviceEvents.filter { cal.isDate($0.start, inSameDayAs: date) }
             .map { _ in GroupHue.coral.color }
         return out
     }

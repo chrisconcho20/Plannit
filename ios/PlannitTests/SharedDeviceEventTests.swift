@@ -109,3 +109,53 @@ final class SharedDeviceEventTests: XCTestCase {
         XCTAssertFalse(AppModel.differs(jittered, from: d))
     }
 }
+
+// The calendar's dots and its day list disagreed about this rule: the list
+// dropped the phone's copy of a shared event, the dots counted it, so sharing
+// an event left two marks on its day — one in the group's colour, one in the
+// device coral. Reported from a device on 2026-09-23.
+@MainActor
+final class DeviceEventDedupeTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_786_838_400)
+
+    private func device(_ id: String, externalId: String?, at offset: TimeInterval = 0) -> DeviceEvent {
+        DeviceEvent(id: id, externalId: externalId, title: "Dinner",
+                    start: start.addingTimeInterval(offset),
+                    end: start.addingTimeInterval(offset + 3600),
+                    location: nil, isAllDay: false)
+    }
+
+    private func copy(of externalId: String?) -> PEvent {
+        PEvent(id: "row-1", start: start, end: start.addingTimeInterval(3600),
+               title: "Dinner", time: "7:00 PM", source: .device,
+               externalCalId: externalId, ownerId: "me")
+    }
+
+    func testAnEventPlannitAlreadyHoldsIsCountedOnce() {
+        let result = AppModel.deviceEventsWithoutCopies(
+            [device("d1", externalId: "ext-1")], copies: [copy(of: "ext-1")])
+        XCTAssertTrue(result.isEmpty, "the Plannit copy represents it, so the device row is dropped")
+    }
+
+    func testUnsharedEventsSurvive() {
+        let result = AppModel.deviceEventsWithoutCopies(
+            [device("d1", externalId: "ext-1"), device("d2", externalId: "ext-2", at: 7200)],
+            copies: [copy(of: "ext-1")])
+        XCTAssertEqual(result.map(\.id), ["d2"])
+    }
+
+    /// An event with no stable id can't be matched to a copy, and dropping it
+    /// would hide it from the calendar entirely.
+    func testAnEventWithoutAnExternalIdIsKept() {
+        let result = AppModel.deviceEventsWithoutCopies(
+            [device("d1", externalId: nil)], copies: [copy(of: "ext-1")])
+        XCTAssertEqual(result.map(\.id), ["d1"])
+    }
+
+    func testTheResultIsInTimeOrder() {
+        let result = AppModel.deviceEventsWithoutCopies(
+            [device("late", externalId: "b", at: 7200), device("early", externalId: "a")],
+            copies: [])
+        XCTAssertEqual(result.map(\.id), ["early", "late"])
+    }
+}

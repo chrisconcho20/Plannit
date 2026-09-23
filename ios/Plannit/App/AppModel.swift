@@ -937,6 +937,17 @@ final class AppModel: ObservableObject {
         if changed { await refreshEvents() }
     }
 
+    /// The phone's events with the ones Plannit already holds a copy of removed.
+    /// A shared event exists twice — in EventKit, and as the copy the group can
+    /// see — and it is one event, so the calendar shows it once, as the copy
+    /// that knows who it's shared with.
+    static func deviceEventsWithoutCopies(_ device: [DeviceEvent], copies: [PEvent]) -> [DeviceEvent] {
+        let copied = Set(copies.compactMap(\.externalCalId))
+        return device
+            .filter { $0.externalId.map { !copied.contains($0) } ?? true }
+            .sorted { $0.start < $1.start }
+    }
+
     /// Is this instant inside the window we actually read from the device?
     /// Nil when we can't tell.
     private func deviceWindowCovers(_ date: Date) -> Bool? {
