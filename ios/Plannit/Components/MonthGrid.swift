@@ -12,17 +12,31 @@ struct MonthGrid: View {
     private let weekdaySymbols = ["S", "M", "T", "W", "T", "F", "S"]
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
 
-    private var daysInMonth: Int {
-        var c = DateComponents(); c.year = year; c.month = month
-        guard let date = Calendar.current.date(from: c),
-              let range = Calendar.current.range(of: .day, in: .month, for: date) else { return 30 }
-        return range.count
+    /// One square of the grid. The blanks before the 1st are cells too, and they
+    /// carry the same kind of id as the days — two sibling ForEach views in one
+    /// lazy grid share an identity space, so ids 1, 2 and 3 belonged to both the
+    /// blanks and the first days of the month, and SwiftUI dropped the
+    /// collisions. That is why the 1st was missing from every month.
+    struct Cell: Identifiable {
+        let id: Int          // position in the grid, so it is unique either way
+        let day: Int?        // nil for a leading blank
     }
-    private var leadingBlanks: Int {
+
+    /// The month laid out Sunday-first, blanks included. Static and calendar-
+    /// injectable so the offsets can be tested without a view.
+    static func cells(year: Int, month: Int, calendar: Calendar = .current) -> [Cell] {
         var c = DateComponents(); c.year = year; c.month = month; c.day = 1
-        guard let date = Calendar.current.date(from: c) else { return 0 }
-        return Calendar.current.component(.weekday, from: date) - 1  // 1=Sun -> 0 blanks
+        guard let first = calendar.date(from: c),
+              let range = calendar.range(of: .day, in: .month, for: first)
+        else { return [] }
+        let blanks = calendar.component(.weekday, from: first) - 1   // 1=Sun -> 0 blanks
+        let days = range.count
+        return (0..<(blanks + days)).map { index in
+            Cell(id: index, day: index < blanks ? nil : index - blanks + 1)
+        }
     }
+
+    private var cells: [Cell] { Self.cells(year: year, month: month) }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -33,9 +47,12 @@ struct MonthGrid: View {
                 }
             }
             LazyVGrid(columns: columns, spacing: 2) {
-                ForEach(0..<leadingBlanks, id: \.self) { _ in Color.clear.frame(height: 44) }
-                ForEach(1...daysInMonth, id: \.self) { day in
-                    dayCell(day)
+                ForEach(cells) { cell in
+                    if let day = cell.day {
+                        dayCell(day)
+                    } else {
+                        Color.clear.frame(height: 44)
+                    }
                 }
             }
         }
