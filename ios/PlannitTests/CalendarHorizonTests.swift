@@ -137,3 +137,51 @@ final class CalendarHorizonTests: XCTestCase {
             start: day, end: cal.date(byAdding: .day, value: 2, to: day)!))
     }
 }
+
+// Plannit stores an all-day event as midnight to midnight the next day, which
+// is the half-open interval the availability maths needs. EventKit's all-day
+// end is inclusive, so passing that straight through drew the event across two
+// days in the Calendar app — reported from a device on 2026-09-23.
+final class AllDaySpanTests: XCTestCase {
+    private var cal: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return c
+    }
+
+    private func date(_ y: Int, _ m: Int, _ d: Int, _ h: Int = 0) -> Date {
+        cal.date(from: DateComponents(year: y, month: m, day: d, hour: h))!
+    }
+
+    func testAOneDayAllDayEventEndsOnItsOwnDay() {
+        let (start, end) = CalendarService.eventKitSpan(
+            start: date(2026, 10, 12), end: date(2026, 10, 13), isAllDay: true, calendar: cal)
+        XCTAssertEqual(start, date(2026, 10, 12))
+        XCTAssertEqual(end, date(2026, 10, 12), "the end must stay inside the same day")
+        XCTAssertTrue(cal.isDate(start, inSameDayAs: end))
+    }
+
+    func testAMultiDayAllDayEventKeepsItsLastDay() {
+        let (start, end) = CalendarService.eventKitSpan(
+            start: date(2026, 10, 12), end: date(2026, 10, 15), isAllDay: true, calendar: cal)
+        XCTAssertEqual(start, date(2026, 10, 12))
+        XCTAssertEqual(end, date(2026, 10, 14), "three days: the 12th, 13th and 14th")
+    }
+
+    func testATimedEventIsUntouched() {
+        let start = date(2026, 10, 12, 14)
+        let end = date(2026, 10, 12, 16)
+        let (s, e) = CalendarService.eventKitSpan(start: start, end: end, isAllDay: false, calendar: cal)
+        XCTAssertEqual(s, start)
+        XCTAssertEqual(e, end)
+    }
+
+    /// A malformed row — end at or before start — must not produce a backwards
+    /// event, which EventKit rejects outright.
+    func testADegenerateAllDayEventStillLandsOnOneDay() {
+        let (start, end) = CalendarService.eventKitSpan(
+            start: date(2026, 10, 12), end: date(2026, 10, 12), isAllDay: true, calendar: cal)
+        XCTAssertEqual(start, date(2026, 10, 12))
+        XCTAssertEqual(end, date(2026, 10, 12))
+    }
+}

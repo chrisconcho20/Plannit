@@ -306,9 +306,11 @@ final class CalendarService {
         // one-off events where EventKit can hold a single repeating one.
         let wanted = events.filter { $0.source == .plannit && $0.seriesId == nil }
         for event in wanted {
-            let start = event.start
             // Sample rows have no end; an hour is a sane mirror default.
-            let end = event.end ?? start.addingTimeInterval(3600)
+            let (start, end) = Self.eventKitSpan(
+                start: event.start,
+                end: event.end ?? event.start.addingTimeInterval(3600),
+                isAllDay: event.isAllDay)
             let existing = map[event.id].flatMap { store.event(withIdentifier: $0) }
             let ekEvent = existing ?? EKEvent(eventStore: store)
 
@@ -359,6 +361,19 @@ final class CalendarService {
         Log.cal("mirror: \(wanted.count) plannit events, \(written) written")
         Self.mirrorMap = map
         return written
+    }
+
+    /// Plannit stores an all-day event as a half-open interval — midnight to
+    /// midnight the next day — which is what the availability maths needs.
+    /// EventKit's all-day end date is **inclusive**, so handing it that same
+    /// value draws the event across two days in the Calendar app. Pull the end
+    /// back inside the last day; timed events pass through untouched.
+    static func eventKitSpan(start: Date, end: Date, isAllDay: Bool,
+                             calendar: Calendar = .current) -> (Date, Date) {
+        guard isAllDay else { return (start, end) }
+        let first = calendar.startOfDay(for: start)
+        let last = calendar.startOfDay(for: max(end.addingTimeInterval(-1), start))
+        return (first, max(last, first))
     }
 
     private static var mirrorMap: [String: String] {
