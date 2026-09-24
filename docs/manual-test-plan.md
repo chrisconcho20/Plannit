@@ -224,6 +224,12 @@ _Reviewed 2026-09-21._
 - **Invite links can't be listed or revoked in the app**, though the database
   allows the creator or group owner to delete them.
 - **Plannit plans can't be edited from Apple Calendar** — see 6d.5b.
+- **The same event can appear twice from two accounts.** Investigated
+  2026-09-23 after a tester saw duplicated holidays: iCloud and Google each
+  provide a holidays calendar, so the phone genuinely holds both. Not Plannit's
+  doing — the server had no such rows — and not something to fix by matching on
+  title and date, which would eventually merge two real events. You → Calendars
+  turns one off.
 - **The activity feed has no pagination**, and "seen" is tracked on the device.
 - **Sign in with Apple and Google** need their providers configured in Supabase
   before the buttons do anything ([`backend/auth-setup.md`](backend/auth-setup.md) §5–6).
