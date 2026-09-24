@@ -75,41 +75,58 @@ struct CalendarScreen: View {
         return out
     }
 
-    /// What the list under the calendar covers, which is whatever the tab is
-    /// showing: the selected day, else the month or week on screen. Nil in
-    /// List, which runs forward from today instead of being bounded.
-    private var listRange: ClosedRange<Date>? {
-        if mode != .list, let selectedDate {
-            let day = cal.startOfDay(for: selectedDate)
-            return day...(cal.date(byAdding: .day, value: 1, to: day) ?? day)
-        }
+    /// What the list under the calendar covers. The tab decides the span, and
+    /// the span is then clamped to today: the heading says "Upcoming", so a
+    /// month you are looking at starts from now, not from the 1st, and a month
+    /// wholly in the past has nothing upcoming in it at all.
+    enum ListScope: Equatable {
+        case day(Date)                  // a day was tapped
+        case range(ClosedRange<Date>)   // the month or week on screen, from today
+        case empty                      // that span is entirely behind us
+        case unbounded                  // List: forward from today, capped by count
+    }
+
+    static func listScope(mode: Mode, selectedDate: Date?, visibleMonth: Date,
+                          now: Date, calendar: Calendar) -> ListScope {
+        if mode != .list, let selectedDate { return .day(selectedDate) }
+        let today = calendar.startOfDay(for: now)
+        let interval: DateInterval?
         switch mode {
-        case .month:
-            guard let interval = cal.dateInterval(of: .month, for: visibleMonth) else { return nil }
-            return interval.start...interval.end
-        case .week:
-            let anchor = selectedDate ?? visibleMonth
-            guard let interval = cal.dateInterval(of: .weekOfYear, for: anchor) else { return nil }
-            return interval.start...interval.end
-        case .list:
-            return nil
+        case .month: interval = calendar.dateInterval(of: .month, for: visibleMonth)
+        case .week:  interval = calendar.dateInterval(of: .weekOfYear, for: selectedDate ?? visibleMonth)
+        case .list:  return .unbounded
         }
+        guard let interval else { return .unbounded }
+        guard interval.end > today else { return .empty }
+        return .range(max(interval.start, today)...interval.end)
+    }
+
+    private var listScope: ListScope {
+        Self.listScope(mode: mode, selectedDate: selectedDate, visibleMonth: visibleMonth,
+                       now: Date(), calendar: cal)
     }
 
     private var events: [PEvent] {
         // A repeating event should appear on each of its dates in range, not
         // once forever at its original start.
-        if let listRange {
-            let occurrences = calendarEvents.flatMap { $0.occurrences(in: listRange) }
-            guard let selectedDate, mode != .list else {
-                return occurrences.sorted { $0.start < $1.start }
-            }
-            return occurrences.filter { $0.isOn(selectedDate) }.sorted { $0.start < $1.start }
+        switch listScope {
+        case .empty:
+            return []
+        case .day(let date):
+            let day = cal.startOfDay(for: date)
+            let end = cal.date(byAdding: .day, value: 1, to: day) ?? day
+            return calendarEvents.flatMap { $0.occurrences(in: day...end) }
+                .filter { $0.isOn(date) }
+                .sorted { $0.start < $1.start }
+        case .range(let range):
+            return calendarEvents.flatMap { $0.occurrences(in: range) }
+                .sorted { $0.start < $1.start }
+        case .unbounded:
+            let today = cal.startOfDay(for: Date())
+            let horizon = cal.date(byAdding: .month, value: 12, to: today) ?? today
+            return calendarEvents.flatMap { $0.occurrences(in: today...horizon) }
+                .sorted { $0.start < $1.start }
         }
-        let now = cal.startOfDay(for: Date())
-        let horizon = cal.date(byAdding: .month, value: 12, to: now) ?? now
-        return calendarEvents.flatMap { $0.occurrences(in: now...horizon) }
-            .sorted { $0.start < $1.start }
     }
 
     /// Your own calendar's events, scoped exactly like the Plannit ones above:
@@ -118,13 +135,12 @@ struct CalendarScreen: View {
     /// empty simulator, a wall of text on a real phone.
     private var deviceEvents: [DeviceEvent] {
         let all = unsharedDeviceEvents
-        if mode != .list, let selectedDate {
-            return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
+        switch listScope {
+        case .empty:                return []
+        case .day(let date):        return all.filter { cal.isDate($0.start, inSameDayAs: date) }
+        case .range(let range):     return all.filter { range.contains($0.start) }
+        case .unbounded:            return all.filter { $0.start >= cal.startOfDay(for: Date()) }
         }
-        if let listRange {
-            return all.filter { listRange.contains($0.start) }
-        }
-        return all.filter { $0.start >= cal.startOfDay(for: Date()) }
     }
 
     /// A day is one list, in time order. Two stacked sections — Plannit's plans
@@ -202,23 +218,24 @@ struct CalendarScreen: View {
     /// The empty state names the same span as the heading above it: a free day,
     /// a free month, a free week, or a clear run from here.
     private var emptyTitle: String {
-        if mode != .list, selectedDay != nil { return "Nothing on this day" }
-        switch mode {
-        case .month: return "Nothing this month"
-        case .week:  return "Nothing this week"
-        case .list:  return "Nothing coming up"
+        switch listScope {
+        case .day:       return "Nothing on this day"
+        case .empty:     return "Already been and gone"
+        case .unbounded: return "Nothing coming up"
+        case .range:     return mode == .week ? "Nothing left this week" : "Nothing left this month"
         }
     }
 
     private var emptyMessage: String {
-        if mode != .list, selectedDay != nil {
+        switch listScope {
+        case .day:
             return "A free day. Add something, or find a time with a group."
-        }
-        switch mode {
-        case .list:
+        case .empty:
+            return "Everything here is in the past. Look ahead, or add something."
+        case .unbounded:
             return "Your calendar's clear from here. Enjoy it, or fill it."
-        default:
-            return "Nothing on the calendar here. Add something, or find a time with a group."
+        case .range:
+            return "Nothing left on the calendar here. Add something, or find a time with a group."
         }
     }
 
