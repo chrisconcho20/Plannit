@@ -75,18 +75,39 @@ struct CalendarScreen: View {
         return out
     }
 
-    private var events: [PEvent] {
+    /// What the list under the calendar covers, which is whatever the tab is
+    /// showing: the selected day, else the month or week on screen. Nil in
+    /// List, which runs forward from today instead of being bounded.
+    private var listRange: ClosedRange<Date>? {
         if mode != .list, let selectedDate {
             let day = cal.startOfDay(for: selectedDate)
-            let end = cal.date(byAdding: .day, value: 1, to: day) ?? day
-            return calendarEvents.flatMap { $0.occurrences(in: day...end) }
-                .filter { $0.isOn(selectedDate) }
-                .sorted { $0.start < $1.start }
+            return day...(cal.date(byAdding: .day, value: 1, to: day) ?? day)
         }
-        // Upcoming: a repeating event should appear on each of its next dates,
-        // not once forever at its original start.
+        switch mode {
+        case .month:
+            guard let interval = cal.dateInterval(of: .month, for: visibleMonth) else { return nil }
+            return interval.start...interval.end
+        case .week:
+            let anchor = selectedDate ?? visibleMonth
+            guard let interval = cal.dateInterval(of: .weekOfYear, for: anchor) else { return nil }
+            return interval.start...interval.end
+        case .list:
+            return nil
+        }
+    }
+
+    private var events: [PEvent] {
+        // A repeating event should appear on each of its dates in range, not
+        // once forever at its original start.
+        if let listRange {
+            let occurrences = calendarEvents.flatMap { $0.occurrences(in: listRange) }
+            guard let selectedDate, mode != .list else {
+                return occurrences.sorted { $0.start < $1.start }
+            }
+            return occurrences.filter { $0.isOn(selectedDate) }.sorted { $0.start < $1.start }
+        }
         let now = cal.startOfDay(for: Date())
-        let horizon = cal.date(byAdding: .month, value: 3, to: now) ?? now
+        let horizon = cal.date(byAdding: .month, value: 12, to: now) ?? now
         return calendarEvents.flatMap { $0.occurrences(in: now...horizon) }
             .sorted { $0.start < $1.start }
     }
@@ -99,6 +120,9 @@ struct CalendarScreen: View {
         let all = unsharedDeviceEvents
         if mode != .list, let selectedDate {
             return all.filter { cal.isDate($0.start, inSameDayAs: selectedDate) }
+        }
+        if let listRange {
+            return all.filter { listRange.contains($0.start) }
         }
         return all.filter { $0.start >= cal.startOfDay(for: Date()) }
     }
@@ -132,12 +156,19 @@ struct CalendarScreen: View {
         }
     }
 
+    /// How many events List shows. Long enough to be a plan for the next while,
+    /// short enough that the page ends.
+    private static let listLimit = 12
+
     private var rows: [Row] {
-        (events.map(Row.plan) + deviceEvents.map(Row.device))
+        let merged = (events.map(Row.plan) + deviceEvents.map(Row.device))
             .sorted { a, b in
                 if a.isAllDay != b.isAllDay { return a.isAllDay }
                 return a.start < b.start
             }
+        // The cap belongs here, after the two sources are merged: capping each
+        // separately would show twelve of one and twelve of the other.
+        return mode == .list ? Array(merged.prefix(Self.listLimit)) : merged
     }
 
     /// In Month and Week you already know the day you're looking at, so the time
@@ -168,12 +199,42 @@ struct CalendarScreen: View {
         model.ensureDeviceEvents(through: interval.end)
     }
 
+    /// The empty state names the same span as the heading above it: a free day,
+    /// a free month, a free week, or a clear run from here.
+    private var emptyTitle: String {
+        if mode != .list, selectedDay != nil { return "Nothing on this day" }
+        switch mode {
+        case .month: return "Nothing this month"
+        case .week:  return "Nothing this week"
+        case .list:  return "Nothing coming up"
+        }
+    }
+
+    private var emptyMessage: String {
+        if mode != .list, selectedDay != nil {
+            return "A free day. Add something, or find a time with a group."
+        }
+        switch mode {
+        case .list:
+            return "Your calendar's clear from here. Enjoy it, or fill it."
+        default:
+            return "Nothing on the calendar here. Add something, or find a time with a group."
+        }
+    }
+
+    /// The heading has to name what is under it. "Upcoming" over a month you
+    /// have paged back to would be a lie, and over the 3rd when today is the
+    /// 24th it reads as a bug rather than as browsing.
     private var sectionTitle: String {
         if mode != .list, let selectedDate {
             let f = DateFormatter(); f.dateFormat = "EEEE d MMMM"
             return f.string(from: selectedDate)
         }
-        return "Upcoming"
+        switch mode {
+        case .month: return monthTitle
+        case .week:  return weekTitle
+        case .list:  return "Upcoming"
+        }
     }
 
     private var monthTitle: String {
@@ -246,10 +307,7 @@ struct CalendarScreen: View {
                         SkeletonList(count: 3).padding(.horizontal, Space.gutter)
                     } else if events.isEmpty && deviceEvents.isEmpty {
                         EmptyState(icon: "calendar",
-                                   title: mode != .list ? "Nothing on this day" : "Nothing coming up",
-                                   message: mode != .list
-                                            ? "A free day. Add something, or find a time with a group."
-                                            : "Your calendar's clear from here. Enjoy it, or fill it.",
+                                   title: emptyTitle, message: emptyMessage,
                                    actionTitle: "New event") { showNewEvent = true }
                     }
 
