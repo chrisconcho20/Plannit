@@ -57,9 +57,10 @@ final class CalendarListScopeTests: XCTestCase {
         XCTAssertTrue(range.contains(date(2026, 9, 26)))
     }
 
+    /// Paging back a week without tapping a day: the week is anchored on what
+    /// is on screen, and that week is behind us.
     func testAPastWeekHasNothingUpcoming() {
-        XCTAssertEqual(scope(.week, selected: date(2026, 9, 10), month: date(2026, 9, 10),
-                             now: date(2026, 9, 24)), .empty)
+        XCTAssertEqual(scope(.week, month: date(2026, 9, 10), now: date(2026, 9, 24)), .empty)
     }
 
     func testATappedDayIsShownWhicheverDayItIs() {
