@@ -220,7 +220,7 @@ includes Resend Pro (10) and, eventually, realtime connections (7):
 Plus the fixed $99/yr Apple Developer Program. See
 [`cost-analysis.md`](cost-analysis.md), which models the backend at each stage.
 
-### 12. The quiet-plan matcher is cubic in a group's open windows 🟡 — bounded by the purge
+### 12. The quiet-plan matcher 🟢 — **fixed (0029)**
 
 _Added 2026-09-28 with `0027`/`0028`._ `private.match_quiet_plans` finds the
 best overlap by pairing every window start with every window end and counting
@@ -242,10 +242,28 @@ rows that were never deleted**: six people posting twice a week for a year. The
 hourly purge (`0028`) is therefore not housekeeping, it is what keeps `n` in the
 range where the algorithm's shape doesn't matter.
 
-If it ever does matter, in order: bound the search to windows inside the next
-few weeks; replace the cross join with the same sweep line `find-slots` already
-uses, which is `n log n`; and move matching out of the write path so posting a
-window returns immediately.
+**Fixed 2026-09-28 in `0029`**, by the second of the three: the search is now a
+sweep line, the shape `find-slots` already uses. Sort the boundaries once, walk
+them carrying a count of how many windows are open, and the moments worth
+considering are exactly the starts — at each one the overlap runs to the first
+end after it. Sorting is `n log n`, the walk is `n`, and only the eight
+strongest candidates are checked against the participants' own minimum lengths,
+so that part is a constant rather than a second `n`.
+
+| Open windows | Before (n³) | After |
+|---|---|---|
+| 12 | ~1,700 | ~43 |
+| 200 | ~8M | ~1,500 |
+| 600 | ~216M | ~5,500 |
+
+Ends are applied before starts at the same instant, so a window that finishes
+exactly as another begins is not an overlap, and each candidate's covering set
+is confirmed before it is used — the count alone would name an overlap nobody
+shares.
+
+Still worth doing if this ever returns: bound the search to windows inside the
+next few weeks, and move matching out of the write path so posting a window
+returns immediately. The purge (`0028`) remains what keeps `n` small.
 
 ---
 
@@ -257,8 +275,7 @@ window returns immediately.
 3. **Before push:** `pg_net` cleanup job (8).
    **Before public launch:** Resend Pro and a matching auth email rate (10),
    and the custom domain if the sign-in screens should say Plannit (11).
-   **Confirm pg_cron is enabled**, or the quiet-plan purge never runs and the
-   matcher's input grows without limit (12).
+   **Confirm pg_cron is enabled**, or the quiet-plan purge never runs (12).
 4. **When the numbers say so:** diff-based availability upload (4), and the
    realtime connection add-on (7).
 
