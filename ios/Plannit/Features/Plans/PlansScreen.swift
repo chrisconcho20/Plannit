@@ -221,6 +221,7 @@ struct YouScreen: View {
     @AppStorage(SearchWindow.key) private var searchMonths = SearchWindow.defaultMonths
     @AppStorage(MinimumAttendance.key) private var minimumAttendance = MinimumAttendance.defaultValue
     @State private var showNeverFree = false
+    @State private var showQuietRules = false
     @State private var showDeleteAccount = false
 
     var body: some View {
@@ -332,6 +333,49 @@ struct YouScreen: View {
                     toggleRow("eye-off", "Share availability", "Only free/busy — never event details", $shareAvailability)
                 }
 
+                SectionLabel("Quiet plans")
+                settingsCard {
+                    Button { showQuietRules = true } label: {
+                        HStack(spacing: 12) {
+                            PIcon("moon", size: 20, color: .textMuted).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("When a quiet plan counts")
+                                    .textStyle(.headline, color: .textStrong)
+                                Text("How many people it takes, and who you'll be matched with")
+                                    .textStyle(.caption, color: .textMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            PIcon("chevron-right", size: 16, color: .textFaint)
+                        }
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if !model.quietPlans.isEmpty {
+                        divider
+                        // Yours only — the server never returns anyone else's,
+                        // which is the whole point of the feature.
+                        ForEach(model.quietPlans) { plan in
+                            HStack(spacing: 12) {
+                                PIcon("clock", size: 20, color: .textMuted).frame(width: 22)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(plan.title ?? "Open window")
+                                        .textStyle(.headline, color: .textStrong)
+                                    Text(plan.span).textStyle(.caption, color: .textMuted)
+                                }
+                                Spacer()
+                                Button("Cancel") {
+                                    Task { await model.cancelQuietPlan(plan) }
+                                }
+                                .textStyle(.subhead, color: .statusDanger)
+                            }
+                            .padding(.vertical, 12)
+                        }
+                    }
+                }
+
                 SectionLabel("Notifications")
                 settingsCard {
                     toggleRow("wand-sparkles", "A date was found", "When Plannit finds a time for a group", $pushDateFound)
@@ -387,6 +431,7 @@ struct YouScreen: View {
         .navigationDestination(for: YouRoute.self) { _ in FriendsScreen() }
         .sheet(isPresented: $showCalendars) { CalendarPicker().environmentObject(model) }
         .sheet(isPresented: $showNeverFree) { NeverFreeSheet().environmentObject(model) }
+        .sheet(isPresented: $showQuietRules) { QuietPlanRulesSheet().environmentObject(model) }
         .sheet(isPresented: $showDeleteAccount) { DeleteAccountSheet().environmentObject(model) }
         .sheet(isPresented: $showRename) {
             ProfileSheet().environmentObject(model)
@@ -397,7 +442,10 @@ struct YouScreen: View {
         } message: {
             Text("You'll need your email and password to get back in.")
         }
-        .task { pushDenied = !(await PushService.shared.isAuthorized) }
+        .task {
+            pushDenied = !(await PushService.shared.isAuthorized)
+            await model.loadQuietPlans()
+        }
         // Turning a notification on is the moment to ask iOS, if we never have.
         .onChange(of: pushDateFound) { _, on in Task { await pushChanged(turnedOn: on) } }
         .onChange(of: pushInvites) { _, on in Task { await pushChanged(turnedOn: on) } }

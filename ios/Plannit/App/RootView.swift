@@ -13,6 +13,7 @@ struct RootView: View {
     @State private var showCreate = false
     @State private var showNewPlan = false
     @State private var showNewEvent = false
+    @State private var showQuietPlan = false
     @State private var showNewGroup = false
     @State private var toast: String?
 
@@ -89,13 +90,17 @@ struct RootView: View {
                 // Let the sheet finish dismissing before presenting the next one.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     switch choice {
-                    case .findADate: showNewPlan = true
-                    case .addEvent:  showNewEvent = true
-                    case .newGroup:  showNewGroup = true
+                    case .findADate:  showNewPlan = true
+                    case .addEvent:   showNewEvent = true
+                    case .quietPlan:  showQuietPlan = true
+                    case .newGroup:   showNewGroup = true
                     }
                 }
             }
             .environmentObject(model)
+        }
+        .sheet(isPresented: $showQuietPlan) {
+            QuietPlanSheet(group: model.openGroup).environmentObject(model)
         }
         .sheet(isPresented: $showNewPlan) {
             NewPlanSheet(groups: model.groups, preselected: model.openGroup) { name, group in

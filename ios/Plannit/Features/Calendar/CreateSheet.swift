@@ -1,11 +1,11 @@
 import SwiftUI
 
-// CreateSheet — what the ＋ opens. Both routes end in an event on the calendar;
-// the question is only whether Plannit picks the time or you do. When it's
-// opened from inside a group, both routes are scoped to that group.
+// CreateSheet — what the ＋ opens. Every route ends in an event on the calendar;
+// they differ in who picks the time and in who is told you were thinking about
+// it. When it's opened from inside a group, each route is scoped to that group.
 
 struct CreateSheet: View {
-    enum Choice { case findADate, addEvent, newGroup }
+    enum Choice { case findADate, addEvent, quietPlan, newGroup }
 
     var group: PGroup? = nil
     var offerNewGroup = false
@@ -35,6 +35,14 @@ struct CreateSheet: View {
                              : "Pick the date, time and place, and share it with \(group!.name) right away.",
                        choice: .addEvent)
 
+                option(icon: "moon",
+                       hue: .indigo,
+                       title: "Make a quiet plan",
+                       body: group == nil
+                             ? "Say when you're free. Nobody is told — until enough of the group says the same, and then it becomes a plan."
+                             : "Say when you're free\(forWhom). Nobody is told until enough of the group says the same.",
+                       choice: .quietPlan)
+
                 if offerNewGroup {
                     option(icon: "users",
                            hue: .indigo,
@@ -48,7 +56,7 @@ struct CreateSheet: View {
             Spacer(minLength: 0)
         }
         .background(Color.appBg)
-        .presentationDetents([.height(offerNewGroup ? 460 : 360)])
+        .presentationDetents([.height(offerNewGroup ? 580 : 480)])
     }
 
     private func option(icon: String, hue: GroupHue, title: String, body: String,

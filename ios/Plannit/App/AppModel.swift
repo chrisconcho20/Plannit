@@ -1068,6 +1068,109 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: Quiet plans
+
+    /// Every group, for a rule that isn't about one in particular. The server
+    /// keys the default row on this rather than on null, which a primary key
+    /// can't hold.
+    static let everyGroupId = "00000000-0000-0000-0000-000000000000"
+
+    /// Your own open windows, so the You tab can show and cancel them. Never
+    /// anybody else's: RLS only ever returns yours.
+    @Published var quietPlans: [PQuietPlan] = []
+
+    /// Post a window nobody is told about. Returns the matched event when
+    /// posting it completed a plan there and then, so the caller can say what
+    /// happened rather than leaving the person wondering.
+    @discardableResult
+    func createQuietPlan(group: PGroup, start: Date, end: Date,
+                         title: String, minMinutes: Int = 60) async -> Bool {
+        guard Config.isLiveBackend else {
+            say("Quiet plans need the live backend.")
+            return false
+        }
+        let iso = ISO8601DateFormatter()
+        do {
+            let rows: [QuietPlanResultDTO] = try await SupabaseClient.shared.rpc(
+                "create_quiet_plan",
+                args: CreateQuietPlanArgs(
+                    p_group: group.id,
+                    p_start: iso.string(from: start), p_end: iso.string(from: end),
+                    p_title: title.isEmpty ? nil : title, p_min_minutes: minMinutes))
+            await loadQuietPlans()
+            if rows.first?.matched_event_id != nil {
+                await loadData()
+                say("That made a plan — \(group.name) has been told.")
+            } else {
+                say("Noted quietly. Nobody has been told.")
+            }
+            return true
+        } catch {
+            say(Self.isRateLimited(error)
+                ? "That's a lot of quiet plans. Try again in a little while."
+                : "Couldn't save that. Check your connection and try again.")
+            return false
+        }
+    }
+
+    func loadQuietPlans() async {
+        guard Config.isLiveBackend, signedIn else { return }
+        let iso = ISO8601DateFormatter()
+        do {
+            let dtos: [QuietPlanDTO] = try await SupabaseClient.shared.select(
+                "quiet_plans", columns: "*",
+                query: ["status": "eq.open", "order": "window_start.asc"])
+            quietPlans = dtos.compactMap { dto in
+                guard let start = iso.date(from: dto.window_start),
+                      let end = iso.date(from: dto.window_end) else { return nil }
+                return PQuietPlan(id: dto.id, groupId: dto.group_id, title: dto.title,
+                                  start: start, end: end, minMinutes: dto.min_minutes)
+            }
+        } catch {
+            // The You tab simply shows nothing rather than an error: these are
+            // a side note, not the screen's subject.
+            quietPlans = []
+        }
+    }
+
+    func cancelQuietPlan(_ plan: PQuietPlan) async {
+        guard Config.isLiveBackend else { return }
+        do {
+            try await SupabaseClient.shared.rpcVoid(
+                "cancel_quiet_plan", args: CancelQuietPlanArgs(p_id: plan.id))
+            quietPlans.removeAll { $0.id == plan.id }
+        } catch {
+            say("Couldn't cancel that. Try again.")
+        }
+    }
+
+    /// The rule that decides when you can be pulled into a match. Saved per
+    /// group, or under `everyGroupId` as your default.
+    func saveQuietPlanRule(groupId: String = AppModel.everyGroupId,
+                           minPeople: Int, onlyWith: [String]) async -> Bool {
+        guard Config.isLiveBackend, let uid = userId else { return false }
+        do {
+            try await SupabaseClient.shared.upsert(
+                "quiet_plan_rules",
+                values: QuietPlanRuleUpsert(user_id: uid, group_id: groupId,
+                                            min_people: minPeople, only_with: onlyWith),
+                onConflict: "user_id,group_id")
+            return true
+        } catch {
+            say("Couldn't save that setting.")
+            return false
+        }
+    }
+
+    func quietPlanRule(groupId: String = AppModel.everyGroupId) async -> (minPeople: Int, onlyWith: [String]) {
+        guard Config.isLiveBackend else { return (3, []) }
+        let dtos: [QuietPlanRuleDTO]? = try? await SupabaseClient.shared.select(
+            "quiet_plan_rules", columns: "group_id,min_people,only_with",
+            query: ["group_id": "eq.\(groupId)"])
+        guard let rule = dtos?.first else { return (3, []) }
+        return (rule.min_people, rule.only_with)
+    }
+
     /// Create an event on your own calendar. Private unless `shareWith` is set,
     /// which is how an event made from inside a group reaches that group.
     @discardableResult

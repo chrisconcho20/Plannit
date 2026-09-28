@@ -188,6 +188,49 @@ struct EventUpdate: Encodable {
 /// Soft delete — the sync contract wants a tombstone, not a vanished row.
 struct EventTombstone: Encodable { let deleted_at: String }
 
+// MARK: Quiet plans
+
+struct CreateQuietPlanArgs: Encodable {
+    let p_group: String
+    let p_start: String
+    let p_end: String
+    let p_title: String?
+    let p_min_minutes: Int
+}
+
+/// What `create_quiet_plan` answers: the window it stored, and the event it
+/// produced if posting it completed a match there and then.
+struct QuietPlanResultDTO: Decodable {
+    let quiet_plan_id: String
+    let matched_event_id: String?
+}
+
+struct CancelQuietPlanArgs: Encodable { let p_id: String }
+
+struct QuietPlanDTO: Decodable, Identifiable {
+    let id: String
+    let group_id: String
+    let title: String?
+    let window_start: String
+    let window_end: String
+    let min_minutes: Int
+    let status: String
+    let matched_event_id: String?
+}
+
+struct QuietPlanRuleDTO: Decodable {
+    let group_id: String
+    let min_people: Int
+    let only_with: [String]
+}
+
+struct QuietPlanRuleUpsert: Encodable {
+    let user_id: String
+    let group_id: String
+    let min_people: Int
+    let only_with: [String]
+}
+
 /// One phone's APNs registration. `user_id` is sent explicitly because the
 /// row's RLS check compares it with `auth.uid()`.
 struct DeviceTokenUpsert: Encodable {

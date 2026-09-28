@@ -159,6 +159,25 @@ struct PEvent: Identifiable, Hashable {
     }
 }
 
+/// A window you've offered quietly: nobody is told it exists, and it becomes a
+/// real plan only if enough of the group says the same. Only ever your own —
+/// the server never returns anyone else's.
+struct PQuietPlan: Identifiable, Hashable {
+    let id: String
+    let groupId: String
+    let title: String?
+    let start: Date
+    let end: Date
+    let minMinutes: Int
+
+    /// "Sat 3 Oct · 12:00 – 6:00 PM"
+    var span: String {
+        let day = DateFormatter(); day.dateFormat = "EEE d MMM"
+        let time = DateFormatter(); time.dateFormat = "h:mm a"
+        return "\(day.string(from: start)) · \(time.string(from: start)) – \(time.string(from: end))"
+    }
+}
+
 /// One thing that happened, from `my_activity()`. The *wording* deliberately
 /// lives here rather than in SQL — copy changes shouldn't need a migration.
 struct PActivity: Identifiable, Hashable {
