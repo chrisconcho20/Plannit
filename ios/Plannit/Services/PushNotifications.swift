@@ -88,11 +88,27 @@ final class PushService: NSObject, ObservableObject {
     }
 
     var isAuthorized: Bool {
-        get async {
-            let settings = await UNUserNotificationCenter.current().notificationSettings()
-            return settings.authorizationStatus == .authorized
-                || settings.authorizationStatus == .provisional
-        }
+        get async { await status == .authorized || await status == .provisional }
+    }
+
+    /// Has this person been asked yet? iOS shows an app's Notifications screen
+    /// in Settings only once it has, so "never asked" is also "no way to turn
+    /// them on".
+    var status: UNAuthorizationStatus {
+        get async { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
+    }
+
+    /// Ask once, the first time someone is signed in and looking at the app.
+    ///
+    /// The switches under You → Notifications default to on, so somebody who
+    /// never touches them was never asked, never registered, and got no
+    /// notifications — with nothing in iOS Settings to fix it, because iOS
+    /// lists an app there only after it has asked. Found on a device
+    /// 2026-09-27. A prompt nobody ever sees is worse than one that arrives a
+    /// beat early.
+    func requestAuthorizationIfNeverAsked() async {
+        guard await status == .notDetermined else { return }
+        await requestAuthorization()
     }
 
     /// Ask, then register if allowed. Returns what the person chose, so the

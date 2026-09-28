@@ -339,14 +339,27 @@ struct YouScreen: View {
                     toggleRow("user-plus", "Invites & requests", "Friend requests and shared events", $pushInvites)
                     if pushDenied {
                         divider
-                        HStack(spacing: 12) {
-                            PIcon("info", size: 20, color: .textMuted).frame(width: 22)
-                            Text("Notifications are off for Plannit in iOS Settings, so these stay quiet.")
-                                .textStyle(.caption, color: .textMuted)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer()
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                PIcon("info", size: 20, color: .textMuted).frame(width: 22)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Notifications are off for Plannit")
+                                        .textStyle(.headline, color: .textStrong)
+                                    Text("These switches stay quiet until you turn them on in iOS Settings.")
+                                        .textStyle(.caption, color: .textMuted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer()
+                                PIcon("chevron-right", size: 16, color: .textFaint)
+                            }
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 12)
+                        .buttonStyle(.plain)
                     }
                 }
 

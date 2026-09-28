@@ -51,13 +51,20 @@ struct RootView: View {
         // (materials, menus, sheets) flip dark and the result is a dark bar
         // under warm-grey icons. Remove this the day there's a dark ramp.
         .preferredColorScheme(.light)
+        // Reaching the app for the first time is when notifications are worth
+        // asking about: there is a calendar, a name, and something to be told
+        // about. Signing in and finishing onboarding both land here.
+        .onChange(of: flow) { _, phase in
+            guard phase == .app else { return }
+            Task { await readyPushNotifications() }
+        }
         // Straight back in if the Keychain still has a session.
         .task {
             model.startDemoIdentity()
             PushService.shared.start()
             guard flow == .restoring else { return }
             flow = await model.restoreSession() ? .app : .welcome
-            if flow == .app { await PushService.shared.syncToken() }
+            if flow == .app { await readyPushNotifications() }
         }
         // A tapped notification picks the tab its subject lives on. Landing on
         // the exact group or plan needs a navigation path this app doesn't have
@@ -163,6 +170,14 @@ struct RootView: View {
                 await model.startRealtime()
             }
         }
+    }
+
+    /// Ask for notification permission the first time, then make sure this
+    /// device's row is current. Both are no-ops after the first run.
+    private func readyPushNotifications() async {
+        guard model.isLiveBackend else { return }
+        await PushService.shared.requestAuthorizationIfNeverAsked()
+        await PushService.shared.syncToken()
     }
 
     /// The token in an invite link, whichever shape it arrived in. Anything
