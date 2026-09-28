@@ -1171,12 +1171,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Two, matching the server's built-in: two friends free on the same
+    /// afternoon is the ordinary case and the one worth catching.
+    static let defaultQuietPlanMinPeople = 2
+
     func quietPlanRule(groupId: String = AppModel.everyGroupId) async -> (minPeople: Int, onlyWith: [String]) {
-        guard Config.isLiveBackend else { return (3, []) }
+        guard Config.isLiveBackend else { return (Self.defaultQuietPlanMinPeople, []) }
         let dtos: [QuietPlanRuleDTO]? = try? await SupabaseClient.shared.select(
             "quiet_plan_rules", columns: "group_id,min_people,only_with",
             query: ["group_id": "eq.\(groupId)"])
-        guard let rule = dtos?.first else { return (3, []) }
+        guard let rule = dtos?.first else { return (Self.defaultQuietPlanMinPeople, []) }
         return (rule.min_people, rule.only_with)
     }
 

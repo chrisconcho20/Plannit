@@ -23,7 +23,7 @@ that reveals a window to somebody before a plan exists.** Watch for that first.
 
 | # | Do this | Expect |
 |---|---|---|
-| 17.7 | Set both accounts to "it takes 2", then post overlapping windows from each | A plan appears for both, at the overlap — not at either full window |
+| 17.7 | With neither account having touched the settings, post overlapping windows from each | A plan appears for both, at the overlap — two is the default, so this works out of the box |
 | 17.8 | Check the times | The plan covers the shared part only. Two windows of 12–6 and 2–8 make a plan of 2–6 |
 | 17.9 | Both accounts | The invitation behaves like any other: going / not going |
 | 17.10 | You → Quiet plans, both accounts | The matched windows are no longer listed as open |

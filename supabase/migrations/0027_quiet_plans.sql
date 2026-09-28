@@ -82,8 +82,8 @@ create table public.quiet_plan_rules (
   -- The all-zeroes uuid is "every group": a null here would defeat the primary
   -- key, since Postgres treats nulls as distinct.
   group_id   uuid not null default '00000000-0000-0000-0000-000000000000',
-  -- Including you. Two is a plan; the default asks for one more than that.
-  min_people int not null default 3,
+  -- Including you. Two is a plan: 0031 lowered this from three.
+  min_people int not null default 2,
   -- Match me only with these people. Empty means anyone in the group.
   only_with  uuid[] not null default '{}',
   updated_at timestamptz not null default now(),

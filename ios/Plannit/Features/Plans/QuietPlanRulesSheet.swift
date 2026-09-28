@@ -17,7 +17,7 @@ struct QuietPlanRulesSheet: View {
 
     /// Nil is the default that applies to every group.
     @State private var scope: PGroup?
-    @State private var minPeople = 3
+    @State private var minPeople = AppModel.defaultQuietPlanMinPeople
     @State private var onlyWith: Set<String> = []
     @State private var loading = true
     @State private var saving = false
