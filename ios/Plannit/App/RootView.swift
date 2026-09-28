@@ -100,7 +100,8 @@ struct RootView: View {
             .environmentObject(model)
         }
         .sheet(isPresented: $showQuietPlan) {
-            QuietPlanSheet(group: model.openGroup).environmentObject(model)
+            QuietPlanSheet(group: model.openGroup, date: model.selectedDate ?? Date())
+                .environmentObject(model)
         }
         .sheet(isPresented: $showNewPlan) {
             NewPlanSheet(groups: model.groups, preselected: model.openGroup) { name, group in
@@ -111,7 +112,8 @@ struct RootView: View {
             .environmentObject(model)
         }
         .sheet(isPresented: $showNewEvent) {
-            NewEventSheet(date: Date(), group: model.openGroup).environmentObject(model)
+            NewEventSheet(date: model.selectedDate ?? Date(), group: model.openGroup)
+                .environmentObject(model)
         }
         .sheet(isPresented: $showNewGroup) { NewGroupSheet().environmentObject(model) }
         .animation(Motion.base, value: flow)

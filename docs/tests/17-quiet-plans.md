@@ -16,7 +16,8 @@ that reveals a window to somebody before a plan exists.** Watch for that first.
 | 17.3 | As the other account, look everywhere — Plans, the group, Activity, the calendar | **Nothing.** No plan, no dot, no notification |
 | 17.4 | You → Quiet plans | Your own window listed, with Cancel |
 | 17.5 | Cancel it, reload | Gone from the list |
-| 17.6 | Post the same window again, twice in a row | Both saved; posting one twice is not an error |
+| 17.6 | Post a second quiet plan while one is open | The first is gone: one at a time, and the new one replaces it (0030) |
+| 17.6b | The calendar, on a day the window covers | An indigo dot and a "Quiet" card. Tap it → "Take this quiet plan back?" → Remove it, and it goes |
 
 ## Matching
 

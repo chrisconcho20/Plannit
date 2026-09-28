@@ -65,6 +65,9 @@ final class AppModel: ObservableObject {
     /// The group you're currently looking at, so the ＋ can act in its context
     /// instead of guessing from the tab.
     @Published var openGroup: PGroup?
+    /// The day the calendar is showing, so anything opened from the ＋ starts
+    /// there rather than on today. Nil when no day is picked.
+    @Published var selectedDate: Date?
     /// Accepted friends, and requests in both directions.
     @Published var friends: [PMember] = Config.isLiveBackend ? [] : Sample.people
     @Published var friendRequests: [PFriendRequest] = []
@@ -179,6 +182,7 @@ final class AppModel: ObservableObject {
             friends = mates
             friendRequests = requests
             autoFriendEveryone = beta
+            await loadQuietPlans()
             activity = recent
             loadError = nil
             mirrorToDeviceCalendar()   // keep the device copy in step
@@ -1075,8 +1079,9 @@ final class AppModel: ObservableObject {
     /// can't hold.
     static let everyGroupId = "00000000-0000-0000-0000-000000000000"
 
-    /// Your own open windows, so the You tab can show and cancel them. Never
-    /// anybody else's: RLS only ever returns yours.
+    /// Your open window, on the calendar and in the You tab. At most one since
+    /// 0030 — posting a new one replaces it — but held as a list because the
+    /// server is what enforces that, not this.
     @Published var quietPlans: [PQuietPlan] = []
 
     /// Post a window nobody is told about. Returns the matched event when

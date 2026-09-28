@@ -118,7 +118,7 @@ struct QuietPlanSheet: View {
             RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                 .fill(GroupHue.indigo.soft).frame(width: 40, height: 40)
                 .overlay(PIcon("moon", size: 20, color: GroupHue.indigo.color, weight: .semibold))
-            Text("Nobody is told about this. If enough of the group quietly says they're free at the same time, it turns into a plan and everyone hears about it at once.")
+            Text("Nobody is told about this. If enough of the group quietly says they're free at the same time, it turns into a plan and everyone hears about it at once. You have one quiet plan at a time — this replaces it.")
                 .textStyle(.footnote, color: .textBody)
                 .fixedSize(horizontal: false, vertical: true)
         }

@@ -10,6 +10,8 @@ struct CalendarScreen: View {
     @State private var mode: Mode = .month
     @State private var visibleMonth = Date()          // any day inside the shown month
     @State private var selectedDay: Int? = Calendar.current.component(.day, from: Date())
+    /// The quiet window a tap is asking about, if any.
+    @State private var cancelling: PQuietPlan?
     @State private var showNewEvent = false
 
     private let cal = Calendar.current
@@ -31,6 +33,11 @@ struct CalendarScreen: View {
         guard let selectedDay else { return nil }
         return cal.date(from: DateComponents(year: year, month: month, day: selectedDay))
     }
+
+    /// The ＋ lives in the app shell, not here, so the day being looked at has
+    /// to reach it through the model: tapping the 28th and then ＋ should open
+    /// on the 28th, not on today.
+    private func publishSelection() { model.selectedDate = selectedDate }
 
     /// The month on screen, as a range — repeating events are expanded into it.
     private var monthRange: ClosedRange<Date>? {
@@ -71,6 +78,18 @@ struct CalendarScreen: View {
         for device in unsharedDeviceEvents
         where cal.isDate(device.start, equalTo: visibleMonth, toGranularity: .month) {
             out[cal.component(.day, from: device.start), default: []].append(GroupHue.coral.color)
+        }
+        // Your own quiet windows, in the hue the ＋ uses for them. Nobody
+        // else's ever reach the app, so nothing here can leak.
+        for quiet in model.quietPlans {
+            var day = cal.startOfDay(for: quiet.start)
+            while day < quiet.end {
+                if cal.isDate(day, equalTo: visibleMonth, toGranularity: .month) {
+                    out[cal.component(.day, from: day), default: []].append(GroupHue.indigo.color)
+                }
+                guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+                day = next
+            }
         }
         return out
     }
@@ -150,17 +169,22 @@ struct CalendarScreen: View {
     private enum Row: Identifiable {
         case plan(PEvent)
         case device(DeviceEvent)
+        /// A window you offered quietly. Only ever yours, and shown so that a
+        /// thing you posted is a thing you can see and take back.
+        case quiet(PQuietPlan)
 
         var id: String {
             switch self {
             case .plan(let e):   return "p-\(e.id)"
             case .device(let d): return "d-\(d.id)"
+            case .quiet(let q):  return "q-\(q.id)"
             }
         }
         var start: Date {
             switch self {
             case .plan(let e):   return e.start
             case .device(let d): return d.start
+            case .quiet(let q):  return q.start
             }
         }
         /// All-day things lead the day, the way every calendar app shows them.
@@ -168,7 +192,25 @@ struct CalendarScreen: View {
             switch self {
             case .plan(let e):   return e.isAllDay
             case .device(let d): return d.isAllDay
+            case .quiet:         return false
             }
+        }
+    }
+
+    /// Your quiet windows inside whatever the tab is showing. A window can
+    /// straddle days, so it appears on any day it touches.
+    private var quietPlans: [PQuietPlan] {
+        let all = model.quietPlans
+        switch listScope {
+        case .empty:
+            return []
+        case .day(let date):
+            return all.filter { $0.start < cal.startOfDay(for: date).addingTimeInterval(86_400)
+                                && $0.end > cal.startOfDay(for: date) }
+        case .range(let range):
+            return all.filter { $0.start <= range.upperBound && $0.end >= range.lowerBound }
+        case .unbounded:
+            return all.filter { $0.end >= Date() }
         }
     }
 
@@ -177,7 +219,8 @@ struct CalendarScreen: View {
     private static let listLimit = 12
 
     private var rows: [Row] {
-        let merged = (events.map(Row.plan) + deviceEvents.map(Row.device))
+        let merged = (events.map(Row.plan) + deviceEvents.map(Row.device)
+                      + quietPlans.map(Row.quiet))
             .sorted { a, b in
                 if a.isAllDay != b.isAllDay { return a.isAllDay }
                 return a.start < b.start
@@ -315,6 +358,15 @@ struct CalendarScreen: View {
                                               badge: "Private", badgeTone: .neutral)
                                 }
                                 .buttonStyle(CardPressStyle())
+                            case .quiet(let quiet):
+                                Button { cancelling = quiet } label: {
+                                    EventCard(title: quiet.title ?? "Quiet plan",
+                                              time: quiet.span,
+                                              location: model.groups.first { $0.id == quiet.groupId }?.name,
+                                              hue: .indigo, group: nil, people: [],
+                                              icon: "moon", badge: "Quiet", badgeTone: .neutral)
+                                }
+                                .buttonStyle(CardPressStyle())
                             }
                         }
                     }
@@ -339,7 +391,32 @@ struct CalendarScreen: View {
         .navigationDestination(for: DeviceEvent.self) { DeviceEventDetail(event: $0) }
         .onAppear { widenWindowIfNeeded() }
         .task { await model.refreshCalendar() }
-        .onChange(of: visibleMonth) { _, _ in widenWindowIfNeeded() }
+        .onChange(of: visibleMonth) { _, _ in
+            widenWindowIfNeeded()
+            publishSelection()
+        }
+        .onChange(of: selectedDay) { _, _ in publishSelection() }
+        // Tapping your own quiet window offers the only thing you can do with
+        // one: take it back. Nobody was told it existed, so nobody is told it
+        // is gone.
+        .confirmationDialog("Take this quiet plan back?",
+                            isPresented: Binding(get: { cancelling != nil },
+                                                 set: { if !$0 { cancelling = nil } }),
+                            titleVisibility: .visible) {
+            Button("Remove it", role: .destructive) {
+                if let plan = cancelling {
+                    Task { await model.cancelQuietPlan(plan) }
+                }
+                cancelling = nil
+            }
+            Button("Keep it", role: .cancel) { cancelling = nil }
+        } message: {
+            Text(cancelling.map { "\($0.span). Nobody has been told about it." } ?? "")
+        }
+        .onAppear { publishSelection() }
+        // Leaving the calendar drops the selection: opening the ＋ from Groups
+        // or Plans should mean today, not whichever day was last tapped here.
+        .onDisappear { model.selectedDate = nil }
         .sheet(isPresented: $showNewEvent) {
             NewEventSheet(date: selectedDate ?? Date()).environmentObject(model)
         }
@@ -384,6 +461,9 @@ struct CalendarScreen: View {
             .map(\.hue.color)
         out += unsharedDeviceEvents.filter { cal.isDate($0.start, inSameDayAs: date) }
             .map { _ in GroupHue.coral.color }
+        out += model.quietPlans
+            .filter { $0.start < cal.startOfDay(for: date).addingTimeInterval(86_400) && $0.end > cal.startOfDay(for: date) }
+            .map { _ in GroupHue.indigo.color }
         return out
     }
 
