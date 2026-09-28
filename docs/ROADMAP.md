@@ -225,6 +225,12 @@ to become. Individually sensible, collectively a security incident.
   Codes are 6 characters of Crockford base32: 1,073,741,824 possible values.
 
 ## 4. Small backlog
+- **Connecting a Google Calendar.** Scoped 2026-09-27 in
+  [`google-calendar-plan.md`](google-calendar-plan.md). A Google account added
+  to iOS already reaches Plannit through EventKit, so the first move is to say
+  so in onboarding rather than to build anything; a direct in-app integration is
+  8–12 sessions plus Google's sensitive-scope review, and a server-side sync is
+  refused because it would break D-17.
 - **Per-group minimum turnout.** "Plans need at least" (You → Date finder) is
   one setting for every group today; a group-level override would let a
   five-a-side need ten while a family dinner needs everyone. Would live on
