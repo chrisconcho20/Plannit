@@ -88,7 +88,10 @@ final class PushService: NSObject, ObservableObject {
     }
 
     var isAuthorized: Bool {
-        get async { await status == .authorized || await status == .provisional }
+        get async {
+            let current = await status
+            return current == .authorized || current == .provisional
+        }
     }
 
     /// Has this person been asked yet? iOS shows an app's Notifications screen
