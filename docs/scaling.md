@@ -220,6 +220,33 @@ includes Resend Pro (10) and, eventually, realtime connections (7):
 Plus the fixed $99/yr Apple Developer Program. See
 [`cost-analysis.md`](cost-analysis.md), which models the backend at each stage.
 
+### 12. The quiet-plan matcher is cubic in a group's open windows 🟡 — bounded by the purge
+
+_Added 2026-09-28 with `0027`/`0028`._ `private.match_quiet_plans` finds the
+best overlap by pairing every window start with every window end and counting
+the windows that cover each pair: with `n` open windows in a group, about **n³**
+comparisons. It also runs **inside** `create_quiet_plan`, so the person who
+tapped the button waits for it, and it writes, so two people posting at once
+contend.
+
+| Open windows in one group | Comparisons |
+|---|---|
+| 12 (six people, two each) | ~1,700 |
+| 50 | ~125,000 |
+| 200 | ~8M |
+| 600 | ~216M |
+
+Live windows are self-limiting — people post for the next week or two — so the
+realistic number is a dozen. **What could take it to 600 is not usage, it's
+rows that were never deleted**: six people posting twice a week for a year. The
+hourly purge (`0028`) is therefore not housekeeping, it is what keeps `n` in the
+range where the algorithm's shape doesn't matter.
+
+If it ever does matter, in order: bound the search to windows inside the next
+few weeks; replace the cross join with the same sweep line `find-slots` already
+uses, which is `n log n`; and move matching out of the write path so posting a
+window returns immediately.
+
 ---
 
 ## Order of work
@@ -230,6 +257,8 @@ Plus the fixed $99/yr Apple Developer Program. See
 3. **Before push:** `pg_net` cleanup job (8).
    **Before public launch:** Resend Pro and a matching auth email rate (10),
    and the custom domain if the sign-in screens should say Plannit (11).
+   **Confirm pg_cron is enabled**, or the quiet-plan purge never runs and the
+   matcher's input grows without limit (12).
 4. **When the numbers say so:** diff-based availability upload (4), and the
    realtime connection add-on (7).
 
