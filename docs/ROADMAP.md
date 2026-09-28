@@ -196,6 +196,20 @@ to become. Individually sensible, collectively a security incident.
 
 ---
 
+### Phase 7 — Quiet plans (2026-09-28)
+19. **Quiet plans** — a window nobody is told about (`0027`), deleted once it
+    passes (`0028`). Posted to one group; the server intersects the group's open
+    windows and, when an overlap satisfies every participant's own rules, makes
+    an ordinary event everyone RSVPs to. RLS returns only your own rows and the
+    matcher is SECURITY DEFINER, so an unmatched window is visible to nobody.
+    Rules are per person with a per-group override: how many people it takes,
+    and who you're willing to be matched with. Test pass:
+    [`tests/17-quiet-plans.md`](tests/17-quiet-plans.md).
+    _Still to do:_ the matcher has no automated tests, which it deserves more
+    than anything else in the schema; nothing tells you a window expired
+    unmatched; and a group that never gets posted to relies on the hourly
+    pg_cron sweep for its deletes.
+
 ## 3. Known issues / tech debt
 
 - **Security review (2026-08-15):** [`security-review.md`](security-review.md).

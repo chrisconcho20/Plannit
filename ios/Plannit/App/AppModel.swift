@@ -1120,9 +1120,13 @@ final class AppModel: ObservableObject {
             let dtos: [QuietPlanDTO] = try await SupabaseClient.shared.select(
                 "quiet_plans", columns: "*",
                 query: ["status": "eq.open", "order": "window_start.asc"])
+            // A window whose end has passed is deleted server-side, hourly and
+            // whenever its group is matched. Between those moments it is spent,
+            // so it isn't listed either.
+            let now = Date()
             quietPlans = dtos.compactMap { dto in
                 guard let start = iso.date(from: dto.window_start),
-                      let end = iso.date(from: dto.window_end) else { return nil }
+                      let end = iso.date(from: dto.window_end), end > now else { return nil }
                 return PQuietPlan(id: dto.id, groupId: dto.group_id, title: dto.title,
                                   start: start, end: end, minMinutes: dto.min_minutes)
             }
