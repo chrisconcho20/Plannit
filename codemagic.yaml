@@ -73,7 +73,14 @@ workflows:
             echo "Sentry variables not set: skipping the dSYM upload."
             exit 0
           fi
-          curl -sL https://sentry.io/get-cli/ | bash
+          if ! command -v sentry-cli >/dev/null 2>&1; then
+            # The installer's default location is not always on PATH here.
+            export INSTALL_DIR="$HOME/.local/bin"
+            mkdir -p "$INSTALL_DIR"
+            curl -sL https://sentry.io/get-cli/ | bash
+            export PATH="$INSTALL_DIR:$PATH"
+          fi
+          # The archive holds the dSYMs; build-ipa writes it beside the .ipa.
           sentry-cli debug-files upload --include-sources ios/build/ios/xcarchive
     artifacts:
       - ios/build/ios/ipa/*.ipa
