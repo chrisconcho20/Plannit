@@ -188,8 +188,8 @@ to become. Individually sensible, collectively a security incident.
     Apple provider in Supabase Auth) + APNs + on-device testing via **Codemagic →
     TestFlight** ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
 17. **App Store prep** — privacy nutrition labels (calendar data is sensitive),
-    screenshots, review. **Sentry** crash reporting is built and off until a
-    DSN is added to Codemagic ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
+    screenshots, review. ✅ **Sentry** crash reporting is live since 2026-09-30,
+    debug symbols included ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
 18. **Non-user web participation link** (decision D-14) — lets people join a plan
     without the app; helps the cold-start problem.
 

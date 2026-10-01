@@ -45,7 +45,7 @@ closing before open sign-up.
 - ✅ **Account deletion** (0025, 2026-09-15): You → Delete account. Groups with other members pass to the longest-standing member. **When Sign in with Apple goes live, also revoke the user's Apple tokens on deletion** — Apple requires it for apps offering Sign in with Apple, and it needs the Apple Developer key ([`backend/auth-setup.md`](backend/auth-setup.md) §6).
 - **Invite links can't be listed or revoked in the app**, though RLS already allows the creator or group owner to delete them.
 - **Privacy nutrition labels.** Calendar data is sensitive and this app reads it. Be precise: event details never leave the device (decision D-17); only opaque busy ranges are uploaded.
-- **Crash reporting** — built (Sentry 9.28.0, `Services/CrashReporting.swift`), off until a DSN exists. To turn on: create a Sentry project (iOS), add `SENTRY_DSN` to Codemagic's `plannit_release` group ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)). Privacy label: declare **Crash Data**, not linked to the user, not used for tracking — screenshots, view hierarchy, network breadcrumbs and PII are all disabled.
+- ✅ **Crash reporting** (live 2026-09-30): Sentry 9.28.0, `Services/CrashReporting.swift`, with the DSN injected at build time and debug symbols uploaded by the build, so reports carry function names rather than addresses. DEBUG builds never report. Privacy label: declare **Crash Data**, not linked to the user, not used for tracking — screenshots, view hierarchy, network breadcrumbs and PII are all disabled, and that stays true only while those options stay off.
 
 ## 5. Known behaviours to re-check with real users
 
