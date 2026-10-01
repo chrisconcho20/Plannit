@@ -164,4 +164,12 @@ final class AuthTests: XCTestCase {
         XCTAssertEqual(AppModel.signUpMessage(status: 429, body: ""),
                        "Too many sign-ups from here. Wait a minute and try again.")
     }
+
+    /// A pull-to-refresh SwiftUI cancels must not read as "couldn't reach Plannit".
+    func testCancelledLoadIsNotAFailure() {
+        XCTAssertTrue(AppModel.isCancellation(CancellationError()))
+        XCTAssertTrue(AppModel.isCancellation(URLError(.cancelled)))
+        XCTAssertFalse(AppModel.isCancellation(URLError(.notConnectedToInternet)))
+        XCTAssertFalse(AppModel.isCancellation(SupabaseError.http(500, "")))
+    }
 }

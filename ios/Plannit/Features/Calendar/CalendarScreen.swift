@@ -383,7 +383,7 @@ struct CalendarScreen: View {
                     Color.clear.frame(height: 120)
                 }
             }
-            .refreshable { await model.loadData() }
+            .refreshable { await model.refresh() }
         }
         .background(Color.appBg)
         .navigationBarHidden(true)

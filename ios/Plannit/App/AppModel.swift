@@ -189,10 +189,23 @@ final class AppModel: ObservableObject {
             await realtime.sync(groupIds: g.map(\.id))
             await uploadDeviceHues()
             Log.sync("loaded: \(g.count) groups, \(e.count) events, \(mates.count) friends")
+        } catch where Self.isCancellation(error) {
+            // A refresh SwiftUI abandoned, not a failed one: the data on screen is still good.
+            Log.sync("load cancelled")
         } catch {
             loadError = Self.message(for: error)
             Log.sync("load failed: \(Self.message(for: error))")
         }
+    }
+
+    /// A pull-to-refresh runs in a task SwiftUI owns and may cancel mid-flight.
+    /// Running the load in its own task lets it finish either way.
+    func refresh() async {
+        await Task { await loadData() }.value
+    }
+
+    static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled
     }
 
     // MARK: Partial refreshes
