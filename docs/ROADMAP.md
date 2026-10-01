@@ -132,18 +132,17 @@ account. See §6 for URLs/creds.
    made on-device before 0017 are uploaded once by the owner.
 
 ### Phase 4 — Notifications
-8. ~~**APNs client**~~ ✅ **client built (2026-09-21), waiting on the key.** — request permission, register the device token into
-   `device_tokens` on launch, handle taps → deep-link (`proposalId`/`groupId`).
-   Server side already exists (`send-push` + triggers). Contract:
-   [`backend/push-notifications.md`](backend/push-notifications.md). Requires the
-   Apple Developer account + APNs key.
-   **Wire up the You tab's placeholder toggles in the same change.** "A date was
-   found", "Invites & requests" and "Share availability" (`YouScreen`,
-   `Features/Plans/PlansScreen.swift`) are `@State` bools that nothing reads and
-   that reset on every reload. The two notification toggles need persisting and
-   to gate which pushes a device receives; "Share availability" needs to stop
-   `AvailabilityUploader` (and clear the uploaded blocks) when off. Until then
-   they look like settings and control nothing.
+8. ~~**APNs client**~~ ✅ **delivering, verified on a device 2026-09-30.** The app
+   asks for permission the first time it reaches the signed-in shell, registers
+   its token into `device_tokens`, and a tap picks the tab its subject lives on.
+   The APNs key, the Edge Function secrets and the two Vault entries are all set.
+   Contract: [`backend/push-notifications.md`](backend/push-notifications.md).
+   **The three You-tab toggles are wired.** The two notification switches persist
+   per device and gate delivery server-side through `device_tokens.notify_*`
+   (0026) — a muted category is never sent rather than sent and dropped; "Share
+   availability" clears the uploaded busy blocks and stops further uploads.
+   _Still to do:_ a tap lands on the right tab, not the exact group or plan,
+   which needs a navigation path the app doesn't have.
 
 ### Phase 5 — Robustness & finalization
 9. ~~**Session persistence**~~ ✅ **done (2026-08-14).** Keychain-backed session
@@ -205,6 +204,9 @@ to become. Individually sensible, collectively a security incident.
     Rules are per person with a per-group override: how many people it takes,
     and who you're willing to be matched with. Test pass:
     [`tests/17-quiet-plans.md`](tests/17-quiet-plans.md).
+    Verified on a device 2026-09-30, with migrations through 0031 applied: a
+    window is invisible until it matches, and a match becomes an ordinary
+    invitation. A match takes two people, and each person holds one open window.
     _Still to do:_ the matcher has no automated tests, which it deserves more
     than anything else in the schema; nothing tells you a window expired
     unmatched; and a group that never gets posted to relies on the hourly
