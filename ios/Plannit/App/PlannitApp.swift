@@ -42,6 +42,7 @@ struct PlannitApp: App {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { BackgroundRefresh.schedule() }
+            CrashReporting.note(phase == .active ? .active : .background)
         }
     }
 }

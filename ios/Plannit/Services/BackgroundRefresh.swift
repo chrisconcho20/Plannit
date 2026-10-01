@@ -34,6 +34,7 @@ enum BackgroundRefresh {
     /// termination the next launch reports as a crash.
     static func run() async {
         Log.sync("background refresh fired")
+        CrashReporting.note(.backgroundRefresh)
         schedule()   // ask for the next one first: a cancelled run still earns it
         await MainActor.run { _ = SupabaseClient.shared.restoreSession() }
         guard !Task.isCancelled else { return Log.sync("background refresh cancelled early") }

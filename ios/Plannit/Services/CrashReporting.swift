@@ -58,4 +58,21 @@ enum CrashReporting {
             }
         }
     }
+
+    /// What the app was doing, as a tag on whatever is reported next.
+    ///
+    /// A watchdog termination is inferred after the fact — the app vanished —
+    /// so the report carries only what was already stored. Without this, the
+    /// most useful fact about a kill (was it the background refresh?) is
+    /// exactly the one missing. States only: never a title, a name or an id.
+    enum Phase: String {
+        case active, background, backgroundRefresh = "background-refresh"
+    }
+
+    static func note(_ phase: Phase) {
+        guard isEnabled else { return }
+        SentrySDK.configureScope { scope in
+            scope.setTag(value: phase.rawValue, key: "app_phase")
+        }
+    }
 }
