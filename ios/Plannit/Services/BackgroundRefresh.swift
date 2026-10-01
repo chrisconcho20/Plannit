@@ -28,13 +28,23 @@ enum BackgroundRefresh {
     /// Two things go stale while the app is shut: your availability, and the
     /// Plannit calendar on the phone — a plan its owner deleted would otherwise
     /// stay there until you next opened Plannit.
+    /// Cancellation is checked between steps. iOS gives a background refresh a
+    /// short budget and little memory; when it wants the task back, stopping
+    /// where we are is a cleanly skipped refresh, while carrying on is a
+    /// termination the next launch reports as a crash.
     static func run() async {
         Log.sync("background refresh fired")
+        schedule()   // ask for the next one first: a cancelled run still earns it
         await MainActor.run { _ = SupabaseClient.shared.restoreSession() }
+        guard !Task.isCancelled else { return Log.sync("background refresh cancelled early") }
+
         await CalendarReader.shared.refreshSources()
+        guard !Task.isCancelled else { return Log.sync("background refresh cancelled after sources") }
+
         await AvailabilityUploader.upload(reading: CalendarReader.shared.read())
+        guard !Task.isCancelled else { return Log.sync("background refresh cancelled after upload") }
+
         await refreshPlannitCalendar()
-        schedule()   // one run only ever earns the next
     }
 
     /// Re-read the plans and bring the Plannit calendar into line. A failed

@@ -130,18 +130,22 @@ final class CalendarService {
         let now = Date()
         let start = cal.date(byAdding: .day, value: -daysBack, to: now) ?? now
         let end = cal.date(byAdding: .day, value: daysAhead, to: now) ?? now
-        let sorted = matching(from: start, to: end, includingPlannit: false)
-            .sorted { $0.startDate < $1.startDate }
-        let capped = limit.map { Array(sorted.prefix($0)) } ?? sorted
-        return capped.map {
-            DeviceEvent(id: Self.occurrenceId(for: $0),
-                        externalId: $0.calendarItemExternalIdentifier,
-                        title: $0.title ?? "Event",
-                        start: $0.startDate,
-                        end: $0.endDate,
-                        location: $0.location,
-                        isAllDay: $0.isAllDay)
+        // Mapped slice by slice for the same reason the availability sweep is:
+        // a DeviceEvent is a handful of strings, an EKEvent is far more.
+        var mapped: [DeviceEvent] = []
+        forEachSlice(from: start, to: end, includingPlannit: false) { events in
+            for event in events {
+                mapped.append(DeviceEvent(id: Self.occurrenceId(for: event),
+                                          externalId: event.calendarItemExternalIdentifier,
+                                          title: event.title ?? "Event",
+                                          start: event.startDate,
+                                          end: event.endDate,
+                                          location: event.location,
+                                          isAllDay: event.isAllDay))
+            }
         }
+        let sorted = mapped.sorted { $0.start < $1.start }
+        return limit.map { Array(sorted.prefix($0)) } ?? sorted
     }
 
     /// EventKit reuses one `eventIdentifier` across every occurrence of a
@@ -179,17 +183,25 @@ final class CalendarService {
     /// another full pass over the calendar, so it rides along with the first.
     func read(until horizon: Date = Availability.horizon()) -> BusyReading {
         let now = Date()
-        let all = matching(from: now, to: horizon)
-        let busy = all.filter { Self.isBusy($0) }
+        // Slice by slice: only the intervals survive each pass, and a
+        // BusyInterval is two dates where an EKEvent is an object graph.
+        var intervals: [BusyInterval] = []
+        var seen = 0
+        var busyCount = 0
+        forEachSlice(from: now, to: horizon) { events in
+            seen += events.count
+            for event in events where Self.isBusy(event) {
+                busyCount += 1
+                intervals.append(BusyInterval(start: event.startDate, end: event.endDate))
+            }
+        }
         // Hours you're never free count as busy too — merged here, so the
         // server only ever sees ranges, never the rule behind them.
         let rule = NeverFreeHours.current.blocks(from: now, to: horizon)
-        let merged = Availability.prepare(
-            busy.map { BusyInterval(start: $0.startDate, end: $0.endDate) } + rule,
-            from: now, to: horizon)
+        let merged = Availability.prepare(intervals + rule, from: now, to: horizon)
         let days = Calendar.current.dateComponents([.day], from: now, to: horizon).day ?? 0
-        Log.cal("busy: \(busy.count) of \(all.count) events in \(days)d → \(merged.count) merged blocks")
-        return BusyReading(blocks: merged, eventCount: all.count)
+        Log.cal("busy: \(busyCount) of \(seen) events in \(days)d → \(merged.count) merged blocks")
+        return BusyReading(blocks: merged, eventCount: seen)
     }
 
     /// Does this event make you unavailable?
@@ -233,6 +245,33 @@ final class CalendarService {
         // event is already a "24 hour" span — compare the last *inclusive* day.
         let lastMoment = end.addingTimeInterval(-1)
         return !cal.isDate(start, inSameDayAs: max(lastMoment, start))
+    }
+
+    /// Walk a window in slices, handing each slice's events to `body` and
+    /// letting them go before the next.
+    ///
+    /// A year of a full calendar is tens of thousands of `EKEvent`s, each
+    /// carrying its calendar, its attendees and its recurrence. Fetching all of
+    /// them at once is the peak this app has — and the availability sweep runs
+    /// inside a background refresh, where the memory allowance is far smaller
+    /// than in the foreground and overrunning it is a kill, not a slowdown.
+    /// Slicing bounds the peak to a couple of months' worth; the autorelease
+    /// pool is what actually returns the memory, since EventKit's objects are
+    /// Objective-C and would otherwise sit in the outer pool until the whole
+    /// sweep finished.
+    private func forEachSlice(from: Date, to: Date, includingPlannit: Bool = true,
+                              days: Int = 60, body: ([EKEvent]) -> Void) {
+        guard canRead, to > from else { return }
+        let cal = Calendar.current
+        var sliceStart = from
+        while sliceStart < to {
+            let sliceEnd = min(cal.date(byAdding: .day, value: days, to: sliceStart) ?? to, to)
+            autoreleasepool {
+                body(matching(from: sliceStart, to: sliceEnd, includingPlannit: includingPlannit))
+            }
+            guard sliceEnd > sliceStart else { break }
+            sliceStart = sliceEnd
+        }
     }
 
     /// EventKit refuses predicates longer than four years; ours are far shorter.
