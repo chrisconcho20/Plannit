@@ -30,6 +30,8 @@ struct DeviceEvent: Identifiable, Hashable, Sendable {
     let end: Date
     let location: String?
     let isAllDay: Bool
+
+    func isOn(_ date: Date) -> Bool { DaySpan.covers(date, start: start, end: end) }
 }
 
 final class CalendarService {

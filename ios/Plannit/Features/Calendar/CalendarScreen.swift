@@ -72,12 +72,20 @@ struct CalendarScreen: View {
     /// Derived from real events, so a day only gets a mark if something is on it.
     private var marks: [Int: [Color]] {
         var out: [Int: [Color]] = [:]
-        for event in monthOccurrences {
-            out[event.day, default: []].append(event.hue.color)
+        func mark(start: Date, end: Date?, _ color: Color) {
+            for day in DaySpan.days(start: start, end: end)
+            where cal.isDate(day, equalTo: visibleMonth, toGranularity: .month) {
+                out[cal.component(.day, from: day), default: []].append(color)
+            }
         }
-        for device in unsharedDeviceEvents
-        where cal.isDate(device.start, equalTo: visibleMonth, toGranularity: .month) {
-            out[cal.component(.day, from: device.start), default: []].append(GroupHue.coral.color)
+        for event in monthOccurrences {
+            mark(start: event.start, end: event.end, event.hue.color)
+        }
+        if let monthRange {
+            for device in unsharedDeviceEvents
+            where DaySpan.overlaps(monthRange, start: device.start, end: device.end) {
+                mark(start: device.start, end: device.end, GroupHue.coral.color)
+            }
         }
         // Your own quiet windows, in the hue the ＋ uses for them. Nobody
         // else's ever reach the app, so nothing here can leak.
@@ -156,9 +164,9 @@ struct CalendarScreen: View {
         let all = unsharedDeviceEvents
         switch listScope {
         case .empty:                return []
-        case .day(let date):        return all.filter { cal.isDate($0.start, inSameDayAs: date) }
-        case .range(let range):     return all.filter { range.contains($0.start) }
-        case .unbounded:            return all.filter { $0.start >= cal.startOfDay(for: Date()) }
+        case .day(let date):        return all.filter { $0.isOn(date) }
+        case .range(let range):     return all.filter { DaySpan.overlaps(range, start: $0.start, end: $0.end) }
+        case .unbounded:            return all.filter { $0.end > cal.startOfDay(for: Date()) }
         }
     }
 
@@ -459,7 +467,7 @@ struct CalendarScreen: View {
         var out = calendarEvents.flatMap { $0.occurrences(in: day...end) }
             .filter { $0.isOn(date) }
             .map(\.hue.color)
-        out += unsharedDeviceEvents.filter { cal.isDate($0.start, inSameDayAs: date) }
+        out += unsharedDeviceEvents.filter { $0.isOn(date) }
             .map { _ in GroupHue.coral.color }
         out += model.quietPlans
             .filter { $0.start < cal.startOfDay(for: date).addingTimeInterval(86_400) && $0.end > cal.startOfDay(for: date) }

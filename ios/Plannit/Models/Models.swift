@@ -5,6 +5,44 @@ import SwiftUI
 
 enum EventSource: String, Codable { case plannit, device }
 
+/// Which days something with a start and an end is on. An event belongs to
+/// every day it touches, not only the day it starts — a trip from Friday
+/// evening to Sunday is on Saturday too.
+///
+/// The end is exclusive: finishing at midnight doesn't reach into the next
+/// day, so an all-day event (midnight to midnight) is one day, not two.
+enum DaySpan {
+    static func lastDay(start: Date, end: Date?, calendar: Calendar = .current) -> Date {
+        calendar.startOfDay(for: max((end ?? start).addingTimeInterval(-1), start))
+    }
+
+    static func covers(_ date: Date, start: Date, end: Date?, calendar: Calendar = .current) -> Bool {
+        let day = calendar.startOfDay(for: date)
+        return calendar.startOfDay(for: start) <= day
+            && day <= lastDay(start: start, end: end, calendar: calendar)
+    }
+
+    /// Does it overlap `range` at all? Starting before the range is fine as
+    /// long as it's still going when the range begins.
+    static func overlaps(_ range: ClosedRange<Date>, start: Date, end: Date?) -> Bool {
+        start <= range.upperBound && (start >= range.lowerBound || (end ?? start) > range.lowerBound)
+    }
+
+    /// The days it's on, as start-of-day dates. Capped at a year so a bad end
+    /// date can't produce an unbounded walk.
+    static func days(start: Date, end: Date?, calendar: Calendar = .current) -> [Date] {
+        let last = lastDay(start: start, end: end, calendar: calendar)
+        var out: [Date] = []
+        var day = calendar.startOfDay(for: start)
+        while day <= last, out.count < 366 {
+            out.append(day)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return out
+    }
+}
+
 /// Someone you can put in a group. Carries the profile id, not just a name, so
 /// members can actually be added and removed.
 struct PMember: Identifiable, Hashable {
@@ -129,7 +167,7 @@ struct PEvent: Identifiable, Hashable {
     }
 
     var day: Int { Calendar.current.component(.day, from: start) }
-    func isOn(_ date: Date) -> Bool { Calendar.current.isDate(start, inSameDayAs: date) }
+    func isOn(_ date: Date) -> Bool { DaySpan.covers(date, start: start, end: end) }
 
     /// The row this represents — itself, or the series an occurrence came from.
     var rowId: String { seriesId ?? id }
@@ -138,10 +176,14 @@ struct PEvent: Identifiable, Hashable {
     /// A non-repeating event is just itself, so callers don't branch.
     func occurrences(in range: ClosedRange<Date>) -> [PEvent] {
         guard recurrence != .never else {
-            return range.contains(start) ? [self] : []
+            return DaySpan.overlaps(range, start: start, end: end) ? [self] : []
         }
         let length = end.map { $0.timeIntervalSince(start) } ?? 3600
-        return Recurrence.occurrences(start: start, rule: recurrence, in: range, limit: 120)
+        // Looking back by one event's length catches an occurrence that began
+        // before the range and is still running inside it.
+        let widened = range.lowerBound.addingTimeInterval(-max(length, 0))...range.upperBound
+        return Recurrence.occurrences(start: start, rule: recurrence, in: widened, limit: 120)
+            .filter { DaySpan.overlaps(range, start: $0, end: $0.addingTimeInterval(length)) }
             .map { occurrenceStart in
                 var copy = self
                 copy = PEvent(
