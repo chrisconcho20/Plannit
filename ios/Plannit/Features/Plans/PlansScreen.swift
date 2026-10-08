@@ -223,6 +223,7 @@ struct YouScreen: View {
     @State private var showNeverFree = false
     @State private var showQuietRules = false
     @State private var showDeleteAccount = false
+    @State private var copiedHandle = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -237,9 +238,10 @@ struct YouScreen: View {
                     Avatar(name: model.displayName, size: 60,
                            hue: model.avatarHue, imageURL: model.avatarURL)
                     VStack(alignment: .leading, spacing: 3) {
-                        handle
-                        Text(model.userEmail ?? (model.isLiveBackend ? "Signed in" : "Demo mode"))
-                            .textStyle(.footnote, color: .textMuted)
+                        copyableHandle
+                        Text(copiedHandle ? "Copied — send it to a friend to add you"
+                             : model.userEmail ?? (model.isLiveBackend ? "Signed in" : "Demo mode"))
+                            .textStyle(.footnote, color: copiedHandle ? .textStrong : .textMuted)
                     }
                     Spacer()
                     PlannitButton(title: "Edit", variant: .secondary, size: .sm) { showRename = true }
@@ -569,6 +571,36 @@ struct YouScreen: View {
         return off == 0
             ? "All of them count towards when you're busy"
             : "\(off) switched off"
+    }
+
+    /// Tapping your name offers to copy `username#code`, the exact text a
+    /// friend pastes into Add friend. Without a code there's nothing to share.
+    @ViewBuilder private var copyableHandle: some View {
+        if let code = model.friendCode {
+            Menu {
+                Button {
+                    UIPasteboard.general.string = FriendHandle.format(username: model.displayName, code: code)
+                    showCopied()
+                } label: {
+                    Label("Copy \(FriendHandle.format(username: model.displayName, code: code))",
+                          systemImage: "doc.on.doc")
+                }
+            } label: {
+                handle
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Copies your username and friend code")
+        } else {
+            handle
+        }
+    }
+
+    private func showCopied() {
+        withAnimation(Motion.base) { copiedHandle = true }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            withAnimation(Motion.base) { copiedHandle = false }
+        }
     }
 
     /// Your username, and — only here — the code that makes it findable. The
