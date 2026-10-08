@@ -265,6 +265,13 @@ struct LiveSignInView: View {
                 go(to: .forgot)
             }
         }
+
+        // Shown in both modes: Apple and Google sign-in create an account too.
+        Text(LocalizedStringKey("By continuing, you agree to the [Terms](\(Config.siteURL)/terms.html) and [Privacy Policy](\(Config.siteURL)/privacy.html)."))
+            .textStyle(.caption, color: .textFaint)
+            .tint(.actionPrimary)
+            .multilineTextAlignment(.center)
+            .padding(.top, 4)
     }
 
     private var mismatch: Bool { PasswordRules.showMismatch(password, confirm: confirm) }
