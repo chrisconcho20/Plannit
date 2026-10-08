@@ -11,6 +11,7 @@ Static HTML with one stylesheet. No build step, no framework, no JavaScript.
 | `index.html` | What Plannit is, and the fallback for an invite link opened without the app |
 | `privacy.html` | Privacy policy — required for App Store review, and linked from the listing |
 | `support.html` | Support URL — also required by App Store Connect |
+| `terms.html` | Terms of Service, including the minimum terms Apple requires of a custom licence agreement |
 | `styles.css` | Design-system colours and type, copied as plain CSS |
 | `.well-known/apple-app-site-association` | Declares that `/invite/*` belongs to the app (Universal Links) |
 | `_headers` | Serves the association file as `application/json`, which Apple requires |
