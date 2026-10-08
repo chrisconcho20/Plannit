@@ -191,6 +191,15 @@ to become. Individually sensible, collectively a security incident.
     [`app-store-privacy.md`](app-store-privacy.md)),
     screenshots, review. ✅ **Sentry** crash reporting is live since 2026-09-30,
     debug symbols included ([`../ios/CODEMAGIC.md`](../ios/CODEMAGIC.md)).
+    ✅ **Terms of Service** published as `web/terms.html` (2026-10-08) and
+    agreed to on the sign-in screen. _Still to do, before the first
+    subscription ([`monetization-plan.md`](monetization-plan.md)):_
+    - Set the terms URL (`https://plannittogether.com/terms.html`) as the
+      custom licence agreement in App Store Connect (App Information →
+      License Agreement). Apps with auto-renewing subscriptions must link
+      their terms from the listing, and from the purchase screen as well.
+    - Link the Terms and the Privacy Policy from the You tab, so they can be
+      reached after sign-in, not only from the sign-in screen.
 18. **Non-user web participation link** (decision D-14) — lets people join a plan
     without the app; helps the cold-start problem.
 
