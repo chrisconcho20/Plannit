@@ -20,9 +20,10 @@
     <p class="lede">Last updated 1 October 2026.</p>
 
     <p class="note"><strong>The short version.</strong> The details of the events
-      in your phone's calendar are never uploaded. To find a time your group is
-      free, Plannit sends up the start and end of the periods you're busy — no
-      titles, no locations, no guests. Plannit runs no analytics, shows no ads,
+      in your phone's calendar are not uploaded unless you choose to share a
+      specific event with a group. To find a time your group is free, Plannit
+      sends up the start and end of the periods you're busy — no titles, no
+      locations, no guests. Plannit runs no analytics, shows no ads,
       and sells nothing to anyone.</p>
 
     <h2>What is stored</h2>
@@ -56,8 +57,16 @@
       <tr>
         <td><strong>Busy periods</strong> — a start time and an end time, with
           nothing attached</td>
-        <td>How the date finder knows when your group is free. This is the only
-          thing derived from your phone's own calendar.</td>
+        <td>How the date finder knows when your group is free. Unless you share
+          an event, this is the only thing derived from your phone's own
+          calendar.</td>
+      </tr>
+      <tr>
+        <td>An event from your phone's calendar that you choose to share — its
+          title, time, and location if it has one</td>
+        <td>So the group you shared it with can see it. Plannit keeps the copy in
+          step with your phone: a change to the event updates it, and deleting
+          the event removes it.</td>
       </tr>
       <tr>
         <td>A notification token for your phone, if you allow notifications</td>
@@ -71,12 +80,16 @@
       </tr>
     </table>
 
-    <h2>What is never stored</h2>
+    <h2>What stays on your phone</h2>
     <p>The titles, notes, locations, guests and attachments of the events in
       your phone's calendar. Plannit reads them on your device to work out when
       you're busy, and that reading stays on the device. This is a deliberate
       design decision, not a setting, and it is enforced by what the app is
       capable of sending.</p>
+    <p>The one exception is an event you share yourself, by choosing
+      <strong>Share with a group</strong> on it. Only that event is uploaded, and
+      only its title, time and location; its notes, guests and attachments stay
+      on your phone.</p>
     <p>Plannit also does not collect your location, contacts, photos (other than
       a profile photo you choose), advertising identifiers, or any usage
       analytics.</p>

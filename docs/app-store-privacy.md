@@ -51,7 +51,9 @@ Only a profile photo, only if one is chosen, stored in the `avatars` bucket
 **Collected · Linked to the user · App Functionality**
 
 Events created **in Plannit**: title, time, location when given, and who they
-are shared with. Also the optional one-line description on a quiet plan.
+are shared with. Also the optional one-line description on a quiet plan, and
+any phone calendar event the person shares with a group (title, time,
+location; `AppModel.shareDeviceEvent`).
 
 This is the line to read carefully: it covers what people type into Plannit,
 **not** what is in their phone's calendar. See "What not to declare".
@@ -103,7 +105,12 @@ This is decision D-17, it is enforced by what the app is capable of sending,
 and the permission prompt promises it in as many words: *"Event details stay on
 your device — only free/busy is shared."*
 
-Under Apple's definition that data is not collected, so it is not declared.
+The single exception is an event the person shares on purpose with **Share
+with a group**: that one event's title, time and location are uploaded and kept
+in step with the phone (`AppModel.reconcileSharedDeviceEvents`). It is declared
+above under Other User Content, and the privacy policy states it.
+
+Under Apple's definition the rest is not collected, so it is not declared.
 
 **Also absent, so nothing to answer for:** location, contacts, health, financial
 information, browsing or search history, purchases, advertising identifiers,
