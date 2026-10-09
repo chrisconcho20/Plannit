@@ -265,6 +265,45 @@ Still worth doing if this ever returns: bound the search to windows inside the
 next few weeks, and move matching out of the write path so posting a window
 returns immediately. The purge (`0028`) remains what keeps `n` small.
 
+### 13. Abuse becomes a bill after an upgrade 🟠 — do these with each upgrade
+
+_Added 2026-10-09._ On today's free plans, an attacker can cause an outage but
+not a charge, because every free tier stops at its limit. A paid plan keeps
+running past the limit and bills for it. The same flood that once returned errors
+then shows up on an invoice. Each upgrade therefore needs a matching safeguard.
+
+What is exposed today:
+
+- **The public website costs nothing to attack.** `plannittogether.com` is
+  static files on Cloudflare Pages. Static requests are free and unlimited on
+  every Cloudflare plan, and the site has no Pages Functions. `_redirects` only
+  forwards; it runs no code on Cloudflare.
+- **The `invite` Edge Function is public by design.** It runs with
+  `verify_jwt = false`, and its URL appears in `web/_redirects`, so it can be
+  called directly without going through Cloudflare. Each request is one
+  invocation. A malformed token is answered without a database call, but it
+  still counts.
+- **Email sign-up sends a code through Resend** for every attempt (10), so
+  scripted sign-ups use the email quota.
+- `send-push` is not exposed: it rejects any call without
+  `INTERNAL_FUNCTION_SECRET`.
+
+| Upgrade | What changes | Required with it |
+|---|---|---|
+| **Supabase Pro** | Edge Function invocations, egress and realtime run past the included quota | Keep the **Spend Cap on** (the default). It blocks over-quota usage instead of billing it. If it is ever turned off, set billing alerts first and add a rate limit to `invite`. The Spend Cap doesn't cover provisioned add-ons such as compute size or the custom domain (11), which bill whatever happens. |
+| **Resend Pro** | Emails past 50,000 a month are billed rather than refused | **CAPTCHA on email sign-up and password reset:** Cloudflare Turnstile, which is free and supported natively by Supabase Auth (Authentication → Attack Protection). Keep the Supabase auth email rate (Authentication → Rate Limits) at a ceiling sized to real traffic, not unlimited. |
+| **Cloudflare Workers Paid**, or adding Pages Functions | Function requests are billed per million past the included amount | Add a Cloudflare rate-limiting rule on the function's routes, and a billing notification in the Cloudflare dashboard. |
+| **Any paid plan** | — | A billing or usage alert on that service, set at about 2× the expected monthly cost, so abuse is noticed in days rather than at the end of the billing cycle. |
+
+Turnstile is worth adding **before public launch even on the free plan**. Without
+it, scripted sign-ups can use the 100-a-day Resend allowance and stop real users
+receiving codes. It's the only item here that matters before any upgrade.
+
+Sources, checked 2026-10-09:
+[Cloudflare Pages Functions pricing](https://developers.cloudflare.com/pages/functions/pricing/),
+[Supabase Spend Cap](https://supabase.com/docs/guides/platform/spend-cap),
+[Supabase Billing FAQ](https://supabase.com/docs/guides/platform/billing-faq).
+
 ---
 
 ## Order of work
@@ -275,6 +314,8 @@ returns immediately. The purge (`0028`) remains what keeps `n` small.
 3. **Before push:** `pg_net` cleanup job (8).
    **Before public launch:** Resend Pro and a matching auth email rate (10),
    and the custom domain if the sign-in screens should say Plannit (11).
+   Turnstile on email sign-up, and the safeguard that goes with each paid
+   upgrade (13).
    **Confirm pg_cron is enabled**, or the quiet-plan purge never runs (12).
 4. **When the numbers say so:** diff-based availability upload (4), and the
    realtime connection add-on (7).
